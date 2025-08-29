@@ -1,0 +1,23 @@
+{
+  "name": "KiloShare",
+  "description": "Application de partage d'espace bagages",
+  "default_branch": "development",
+  "git": {
+    "auto_commit": true,
+    "commit_prefix": "[Claude] ",
+    "branch_prefix": "claude/",
+    "always_create_branch": true
+  },
+  "structure": {
+    "mobile_app": "./mobile",
+    "backend_api": "./backend",
+    "database": "./database"
+  },
+  "languages": ["dart", "php", "sql"],
+  "frameworks": ["flutter", "slim-php"],
+  "context_files": [
+    "README.md",
+    ".env.example",
+    "database/schema.sql"
+  ]
+}
