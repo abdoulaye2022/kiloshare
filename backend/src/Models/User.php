@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace KiloShare\Modules\Auth\Models;
+namespace KiloShare\Models;
 
 use PDO;
 use PDOException;
@@ -229,5 +229,17 @@ class User
         } catch (PDOException $e) {
             throw new \RuntimeException('Failed to check phone existence: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Normalize user data for API responses
+     */
+    public static function normalizeForApi(array $user): array
+    {
+        if (isset($user['is_verified'])) {
+            $user['is_verified'] = (bool)$user['is_verified'];
+        }
+        
+        return $user;
     }
 }

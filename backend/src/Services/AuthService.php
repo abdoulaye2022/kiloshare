@@ -2,22 +2,26 @@
 
 declare(strict_types=1);
 
-namespace KiloShare\Modules\Auth\Services;
+namespace KiloShare\Services;
 
-use KiloShare\Modules\Auth\Models\User;
-use KiloShare\Modules\Auth\Services\JWTService;
+use KiloShare\Models\User;
+use KiloShare\Models\EmailVerification;
+use KiloShare\Services\JWTService;
+use KiloShare\Services\MailSender;
 use Ramsey\Uuid\Uuid;
 use PDO;
 
 class AuthService
 {
     private User $userModel;
+    private EmailVerification $emailVerificationModel;
     private JWTService $jwtService;
     private PDO $db;
 
     public function __construct(User $userModel, JWTService $jwtService, PDO $db)
     {
         $this->userModel = $userModel;
+        $this->emailVerificationModel = new EmailVerification($db);
         $this->jwtService = $jwtService;
         $this->db = $db;
     }
@@ -60,6 +64,9 @@ class AuthService
             $this->generateVerificationCode($user['id'], 'phone_verification');
         }
 
+        // Send email verification
+        $this->sendEmailVerification($user);
+
         // Generate tokens
         $accessToken = $this->jwtService->generateAccessToken($user);
         $refreshToken = $this->jwtService->generateRefreshToken($user);
@@ -69,6 +76,9 @@ class AuthService
 
         // Remove sensitive data
         unset($user['password_hash']);
+        
+        // Normalize user data for API
+        $user = \KiloShare\Models\User::normalizeForApi($user);
 
         return [
             'user' => $user,
@@ -113,6 +123,9 @@ class AuthService
 
         // Remove sensitive data
         unset($user['password_hash']);
+        
+        // Normalize user data for API
+        $user = \KiloShare\Models\User::normalizeForApi($user);
 
         return [
             'user' => $user,
@@ -147,6 +160,9 @@ class AuthService
 
             // Remove sensitive data
             unset($user['password_hash']);
+            
+            // Normalize user data for API
+            $user = \KiloShare\Models\User::normalizeForApi($user);
 
             return [
                 'user' => $user,
@@ -208,8 +224,8 @@ class AuthService
             }
 
             // Validate password
-            if (strlen($newPassword) < 8) {
-                throw new \RuntimeException('Password must be at least 8 characters', 400);
+            if (strlen($newPassword) < 6) {
+                throw new \RuntimeException('Password must be at least 6 characters', 400);
             }
 
             // Hash new password
@@ -247,8 +263,8 @@ class AuthService
             throw new \RuntimeException('Valid email is required', 400);
         }
 
-        if (empty($data['password']) || strlen($data['password']) < 8) {
-            throw new \RuntimeException('Password must be at least 8 characters', 400);
+        if (empty($data['password']) || strlen($data['password']) < 6) {
+            throw new \RuntimeException('Password must be at least 6 characters', 400);
         }
 
         if (!empty($data['phone'])) {
@@ -371,5 +387,75 @@ class AuthService
         $sql = "INSERT INTO login_attempts (email, ip_address, user_agent, success) VALUES (?, ?, ?, ?)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$email, $ipAddress, $userAgent, $success ? 1 : 0]);
+    }
+
+    private function sendEmailVerification(array $user): void
+    {
+        try {
+            // Generate unique verification token
+            $token = bin2hex(random_bytes(32));
+            
+            // Store verification token in database
+            $this->emailVerificationModel->create($user['id'], $token);
+            
+            // Send email with verification link
+            $firstName = $user['first_name'] ?? 'Utilisateur';
+            MailSender::sendEmailVerification($user['email'], $firstName, $token);
+            
+        } catch (\Exception $e) {
+            // Log error but don't fail registration
+            error_log('Failed to send email verification: ' . $e->getMessage());
+        }
+    }
+
+    public function verifyEmail(string $token): bool
+    {
+        try {
+            // Find verification record
+            $verification = $this->emailVerificationModel->findByToken($token);
+            
+            if (!$verification) {
+                throw new \RuntimeException('Invalid or expired verification token', 400);
+            }
+            
+            // Mark token as used
+            $this->emailVerificationModel->markAsUsed($token);
+            
+            // Update user as verified
+            $success = $this->userModel->verifyEmail($verification['user_id']);
+            
+            if ($success) {
+                // Clean up used tokens for this user
+                $this->emailVerificationModel->deleteByUserId($verification['user_id']);
+            }
+            
+            return $success;
+            
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
+    public function resendEmailVerification(string $email): bool
+    {
+        try {
+            $user = $this->userModel->findByEmail($email);
+            
+            if (!$user) {
+                throw new \RuntimeException('User not found', 404);
+            }
+            
+            if ($user['is_verified']) {
+                throw new \RuntimeException('Email already verified', 400);
+            }
+            
+            // Send new verification email
+            $this->sendEmailVerification($user);
+            
+            return true;
+            
+        } catch (\Exception $e) {
+            throw $e;
+        }
     }
 }

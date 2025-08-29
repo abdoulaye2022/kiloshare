@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace KiloShare\Modules\Auth\Controllers;
+namespace KiloShare\Controllers;
 
-use KiloShare\Modules\Auth\Services\AuthService;
+use KiloShare\Services\AuthService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Respect\Validation\Validator as v;
@@ -23,6 +23,14 @@ class AuthController
     {
         try {
             $data = $request->getParsedBody() ?? [];
+            
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+                error_log('Raw body: ' . $rawBody);
+                error_log('Decoded data: ' . json_encode($data));
+            }
             
             // Validate input
             $this->validateRegistrationInput($data);
@@ -69,7 +77,13 @@ class AuthController
     public function login(Request $request, Response $response): Response
     {
         try {
-            $data = $request->getParsedBody();
+            $data = $request->getParsedBody() ?? [];
+            
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
             
             // Validate input
             if (empty($data['email']) || empty($data['password'])) {
@@ -115,7 +129,7 @@ class AuthController
         }
     }
 
-    public function refreshToken(Request $request, Response $response): Response
+    public function refresh(Request $request, Response $response): Response
     {
         try {
             $data = $request->getParsedBody();
@@ -261,8 +275,8 @@ class AuthController
                 throw new \RuntimeException('Token and new password are required', 400);
             }
             
-            if (strlen($data['password']) < 8) {
-                throw new \RuntimeException('Password must be at least 8 characters', 400);
+            if (strlen($data['password']) < 6) {
+                throw new \RuntimeException('Password must be at least 6 characters', 400);
             }
             
             // Reset password
@@ -345,6 +359,9 @@ class AuthController
         try {
             $user = $request->getAttribute('user');
             
+            // Normalize user data for API
+            $user = \KiloShare\Models\User::normalizeForApi($user);
+            
             $response->getBody()->write(json_encode([
                 'success' => true,
                 'data' => ['user' => $user]
@@ -367,14 +384,80 @@ class AuthController
         }
     }
 
+    public function updateProfile(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody();
+            
+            // TODO: Implement profile update logic
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Profile update not implemented yet'
+            ]));
+            
+            return $response
+                ->withStatus(501)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Profile update failed',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function changePassword(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody();
+            
+            // TODO: Implement change password logic
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Change password not implemented yet'
+            ]));
+            
+            return $response
+                ->withStatus(501)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Change password failed',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
     private function validateRegistrationInput(array $data): void
     {
+        // Debug: Log received data
+        error_log('=== Registration Debug ===');
+        error_log('Received data: ' . json_encode($data));
+        error_log('Email value: ' . ($data['email'] ?? 'NULL'));
+        error_log('Email empty check: ' . (empty($data['email']) ? 'TRUE' : 'FALSE'));
+        error_log('Email filter_var result: ' . (filter_var($data['email'] ?? '', FILTER_VALIDATE_EMAIL) ? 'VALID' : 'INVALID'));
+        error_log('==========================');
+        
         if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             throw new \RuntimeException('Valid email is required', 400);
         }
 
-        if (empty($data['password']) || strlen($data['password']) < 8) {
-            throw new \RuntimeException('Password must be at least 8 characters', 400);
+        if (empty($data['password']) || strlen($data['password']) < 6) {
+            throw new \RuntimeException('Password must be at least 6 characters', 400);
         }
 
         if (!empty($data['first_name']) && (strlen($data['first_name']) < 1 || strlen($data['first_name']) > 100)) {
@@ -412,5 +495,119 @@ class AuthController
         }
 
         return 500; // Internal Server Error
+    }
+
+    public function verifyEmail(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody() ?? [];
+            
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['token'])) {
+                throw new \RuntimeException('Verification token is required', 400);
+            }
+            
+            // Verify email
+            $success = $this->authService->verifyEmail($data['token']);
+            
+            if (!$success) {
+                throw new \RuntimeException('Email verification failed', 500);
+            }
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Email verified successfully'
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'EMAIL_VERIFICATION_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Email verification failed',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function resendEmailVerification(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody() ?? [];
+            
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+                throw new \RuntimeException('Valid email is required', 400);
+            }
+            
+            // Resend verification email
+            $success = $this->authService->resendEmailVerification($data['email']);
+            
+            if (!$success) {
+                throw new \RuntimeException('Failed to resend verification email', 500);
+            }
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Verification email sent successfully'
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'EMAIL_RESEND_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Failed to resend verification email',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
     }
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace KiloShare\Modules\Auth\Services;
+namespace KiloShare\Services;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;

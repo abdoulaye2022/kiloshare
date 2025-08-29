@@ -6,6 +6,8 @@ use DI\ContainerBuilder;
 use Slim\Factory\AppFactory;
 use Slim\Factory\ServerRequestCreatorFactory;
 use Slim\ResponseEmitter;
+use KiloShare\Config\Database;
+use KiloShare\Config\Config;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -18,48 +20,65 @@ $containerBuilder = new ContainerBuilder();
 
 // Add container definitions
 $containerBuilder->addDefinitions([
-    'settings' => require __DIR__ . '/../config/settings.php',
+    'settings' => [
+        'displayErrorDetails' => Config::get('app.debug', false),
+        'logError' => true,
+        'logErrorDetails' => Config::get('app.debug', false),
+        'jwt' => [
+            'secret' => Config::get('jwt.secret'),
+            'algorithm' => Config::get('jwt.algorithm'),
+            'access_expires_in' => Config::get('jwt.access_expires_in'),
+            'refresh_expires_in' => Config::get('jwt.refresh_expires_in')
+        ]
+    ],
     
     // Database PDO
     PDO::class => function () {
-        $config = require __DIR__ . '/../config/database.php';
-        $dsn = sprintf(
-            '%s:host=%s;dbname=%s;charset=%s',
-            $config['driver'],
-            $config['host'],
-            $config['database'],
-            $config['charset']
-        );
-        
-        return new PDO($dsn, $config['username'], $config['password'], $config['options']);
+        return Database::getConnection();
     },
     
-    // Auth Module Dependencies
-    \KiloShare\Modules\Auth\Services\JWTService::class => function ($container) {
-        return new \KiloShare\Modules\Auth\Services\JWTService($container->get('settings'));
+    // Services
+    \KiloShare\Services\JWTService::class => function ($container) {
+        return new \KiloShare\Services\JWTService($container->get('settings'));
     },
     
-    \KiloShare\Modules\Auth\Models\User::class => function ($container) {
-        return new \KiloShare\Modules\Auth\Models\User($container->get(PDO::class));
+    // Models
+    \KiloShare\Models\User::class => function ($container) {
+        return new \KiloShare\Models\User($container->get(PDO::class));
     },
     
-    \KiloShare\Modules\Auth\Services\AuthService::class => function ($container) {
-        return new \KiloShare\Modules\Auth\Services\AuthService(
-            $container->get(\KiloShare\Modules\Auth\Models\User::class),
-            $container->get(\KiloShare\Modules\Auth\Services\JWTService::class),
+    // Services with dependencies
+    \KiloShare\Services\AuthService::class => function ($container) {
+        return new \KiloShare\Services\AuthService(
+            $container->get(\KiloShare\Models\User::class),
+            $container->get(\KiloShare\Services\JWTService::class),
             $container->get(PDO::class)
         );
     },
     
-    \KiloShare\Modules\Auth\Controllers\AuthController::class => function ($container) {
-        return new \KiloShare\Modules\Auth\Controllers\AuthController(
-            $container->get(\KiloShare\Modules\Auth\Services\AuthService::class)
+    // Controllers
+    \KiloShare\Controllers\AuthController::class => function ($container) {
+        return new \KiloShare\Controllers\AuthController(
+            $container->get(\KiloShare\Services\AuthService::class)
         );
     },
     
-    \KiloShare\Modules\Auth\Middleware\AuthMiddleware::class => function ($container) {
-        return new \KiloShare\Modules\Auth\Middleware\AuthMiddleware(
-            $container->get(\KiloShare\Modules\Auth\Services\JWTService::class)
+    // Middleware
+    \KiloShare\Middleware\AuthMiddleware::class => function ($container) {
+        return new \KiloShare\Middleware\AuthMiddleware(
+            $container->get(\KiloShare\Services\JWTService::class)
+        );
+    },
+    
+    \KiloShare\Middleware\OptionalAuthMiddleware::class => function ($container) {
+        return new \KiloShare\Middleware\OptionalAuthMiddleware(
+            $container->get(\KiloShare\Services\JWTService::class)
+        );
+    },
+    
+    \KiloShare\Middleware\AdminAuthMiddleware::class => function ($container) {
+        return new \KiloShare\Middleware\AdminAuthMiddleware(
+            $container->get(\KiloShare\Services\JWTService::class)
         );
     }
 ]);
@@ -72,18 +91,19 @@ $app = AppFactory::create();
 
 // Add error middleware
 $errorMiddleware = $app->addErrorMiddleware(
-    $container->get('settings')['displayErrorDetails'],
-    $container->get('settings')['logError'],
-    $container->get('settings')['logErrorDetails']
+    Config::get('app.debug', false),
+    true,
+    Config::get('app.debug', false)
 );
 
 // Add CORS middleware
-$app->add(function ($request, $handler) {
+$app->add(function ($request, $handler) use ($container) {
     $response = $handler->handle($request);
     return $response
-        ->withHeader('Access-Control-Allow-Origin', '*')
-        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        ->withHeader('Access-Control-Allow-Origin', Config::get('cors.allow_origins', '*'))
+        ->withHeader('Access-Control-Allow-Headers', Config::get('cors.allow_headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization'))
+        ->withHeader('Access-Control-Allow-Methods', Config::get('cors.allow_methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS'))
+        ->withHeader('Access-Control-Allow-Credentials', Config::get('cors.allow_credentials', true) ? 'true' : 'false');
 });
 
 // Handle preflight OPTIONS requests
@@ -92,20 +112,8 @@ $app->options('/{routes:.+}', function ($request, $response) {
 });
 
 // Register routes
-require __DIR__ . '/../src/Routes/api.php';
-require __DIR__ . '/../src/modules/auth/routes.php';
-
-// Health check endpoint
-$app->get('/health', function ($request, $response) {
-    $payload = [
-        'status' => 'OK',
-        'timestamp' => date('c'),
-        'service' => 'KiloShare API'
-    ];
-    
-    $response->getBody()->write(json_encode($payload));
-    return $response->withHeader('Content-Type', 'application/json');
-});
+$routes = require __DIR__ . '/../src/Config/routes.php';
+$routes($app);
 
 // Create server request
 $serverRequestCreator = ServerRequestCreatorFactory::create();

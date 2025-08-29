@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace KiloShare\Modules\Auth\Middleware;
+namespace KiloShare\Middleware;
 
-use KiloShare\Modules\Auth\Services\JWTService;
+use KiloShare\Services\JWTService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
@@ -42,6 +42,9 @@ class AuthMiddleware
                 return $this->unauthorizedResponse('Invalid token payload');
             }
 
+            // Normalize user data for API
+            $user = \KiloShare\Models\User::normalizeForApi($user);
+            
             // Add user data to request attributes
             $request = $request->withAttribute('user', $user);
             $request = $request->withAttribute('token', $token);
@@ -89,6 +92,9 @@ class OptionalAuthMiddleware
                 $user = $this->jwtService->getUserFromToken($token);
                 
                 if ($user) {
+                    // Normalize user data for API
+                    $user = \KiloShare\Models\User::normalizeForApi($user);
+                    
                     $request = $request->withAttribute('user', $user);
                     $request = $request->withAttribute('token', $token);
                 }
@@ -134,6 +140,9 @@ class AdminAuthMiddleware
             // Check if user is admin (you might have a role field in your user table)
             // For now, we'll assume all verified users can access admin routes
             // You should implement proper role-based access control
+            // Normalize user data for API
+            $user = \KiloShare\Models\User::normalizeForApi($user);
+            
             if (!$user['is_verified']) {
                 return $this->forbiddenResponse('Admin access required');
             }
