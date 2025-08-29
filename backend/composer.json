@@ -21,7 +21,8 @@
     },
     "autoload": {
         "psr-4": {
-            "KiloShare\\": "src/"
+            "KiloShare\\": "src/",
+            "KiloShare\\Modules\\": "src/modules/"
         }
     },
     "autoload-dev": {

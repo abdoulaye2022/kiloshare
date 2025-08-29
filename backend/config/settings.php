@@ -13,7 +13,8 @@ return [
     ],
     'jwt' => [
         'secret' => $_ENV['JWT_SECRET'] ?? 'your_secret_key',
-        'expires_in' => (int)($_ENV['JWT_EXPIRES_IN'] ?? 86400),
+        'access_expires_in' => (int)($_ENV['JWT_ACCESS_EXPIRES_IN'] ?? 3600),
+        'refresh_expires_in' => (int)($_ENV['JWT_REFRESH_EXPIRES_IN'] ?? 604800),
         'algorithm' => 'HS256'
     ],
     'upload' => [

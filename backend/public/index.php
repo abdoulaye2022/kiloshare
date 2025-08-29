@@ -32,6 +32,35 @@ $containerBuilder->addDefinitions([
         );
         
         return new PDO($dsn, $config['username'], $config['password'], $config['options']);
+    },
+    
+    // Auth Module Dependencies
+    \KiloShare\Modules\Auth\Services\JWTService::class => function ($container) {
+        return new \KiloShare\Modules\Auth\Services\JWTService($container->get('settings'));
+    },
+    
+    \KiloShare\Modules\Auth\Models\User::class => function ($container) {
+        return new \KiloShare\Modules\Auth\Models\User($container->get(PDO::class));
+    },
+    
+    \KiloShare\Modules\Auth\Services\AuthService::class => function ($container) {
+        return new \KiloShare\Modules\Auth\Services\AuthService(
+            $container->get(\KiloShare\Modules\Auth\Models\User::class),
+            $container->get(\KiloShare\Modules\Auth\Services\JWTService::class),
+            $container->get(PDO::class)
+        );
+    },
+    
+    \KiloShare\Modules\Auth\Controllers\AuthController::class => function ($container) {
+        return new \KiloShare\Modules\Auth\Controllers\AuthController(
+            $container->get(\KiloShare\Modules\Auth\Services\AuthService::class)
+        );
+    },
+    
+    \KiloShare\Modules\Auth\Middleware\AuthMiddleware::class => function ($container) {
+        return new \KiloShare\Modules\Auth\Middleware\AuthMiddleware(
+            $container->get(\KiloShare\Modules\Auth\Services\JWTService::class)
+        );
     }
 ]);
 
@@ -64,6 +93,7 @@ $app->options('/{routes:.+}', function ($request, $response) {
 
 // Register routes
 require __DIR__ . '/../src/Routes/api.php';
+require __DIR__ . '/../src/modules/auth/routes.php';
 
 // Health check endpoint
 $app->get('/health', function ($request, $response) {
