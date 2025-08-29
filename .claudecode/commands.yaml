@@ -1,200 +1,51 @@
-# Configuration Claude Code Simple
-project: KiloShare
-description: Application de partage d'espace bagages
-
-# Commandes de base
-commands:
-  # === SETUP ===
-  setup:
-    description: "Installation complète du projet"
-    run: |
-      echo "🚀 Setup KiloShare..."
-      # Backend
-      cd backend
-      composer install
-      cp .env.example .env
-      echo "✅ Backend installé"
-      # Mobile
-      cd ../mobile
-      flutter pub get
-      echo "✅ Flutter installé"
-      # Database
-      cd ..
-      mysql -u root -p < database/schema.sql
-      echo "✅ Base de données créée"
-
-  # === DÉVELOPPEMENT ===
-  dev:
-    description: "Lancer le développement"
-    run: |
-      echo "🔧 Démarrage des serveurs..."
-      # Backend PHP
-      cd backend
-      php -S localhost:8000 -t public &
-      echo "✅ API disponible sur http://localhost:8000"
-      # Flutter
-      cd ../mobile
-      flutter run
-
-  dev-api:
-    description: "Lancer seulement l'API"
-    run: |
-      cd backend
-      php -S localhost:8000 -t public
-
-  dev-mobile:
-    description: "Lancer seulement Flutter"
-    run: |
-      cd mobile
-      flutter run
-
-  # === TESTS ===
-  test:
-    description: "Lancer tous les tests"
-    run: |
-      echo "🧪 Tests en cours..."
-      cd backend && ./vendor/bin/phpunit
-      cd ../mobile && flutter test
-
-  test-api:
-    description: "Tester l'API"
-    run: |
-      cd backend
-      ./vendor/bin/phpunit
-
-  test-mobile:
-    description: "Tester Flutter"
-    run: |
-      cd mobile
-      flutter test
-
-  # === BUILD ===
-  build-android:
-    description: "Build APK Android"
-    run: |
-      cd mobile
-      flutter build apk --release
-      echo "📱 APK disponible dans mobile/build/app/outputs/flutter-apk/"
-
-  build-ios:
-    description: "Build iOS"
-    run: |
-      cd mobile
-      flutter build ios --release
-      echo "📱 Build iOS terminé"
-
-  # === BASE DE DONNÉES ===
-  db-create:
-    description: "Créer la base de données"
-    run: |
-      mysql -u root -p < database/schema.sql
-      echo "✅ Base de données créée"
-
-  db-seed:
-    description: "Ajouter des données de test"
-    run: |
-      mysql -u root -p kiloshare < database/seed.sql
-      echo "✅ Données de test ajoutées"
-
-  db-reset:
-    description: "Réinitialiser la base de données"
-    run: |
-      mysql -u root -p -e "DROP DATABASE IF EXISTS kiloshare; CREATE DATABASE kiloshare;"
-      mysql -u root -p kiloshare < database/schema.sql
-      mysql -u root -p kiloshare < database/seed.sql
-      echo "✅ Base de données réinitialisée"
-
-  # === NETTOYAGE ===
-  clean:
-    description: "Nettoyer les fichiers temporaires"
-    run: |
-      rm -rf backend/vendor
-      rm -rf mobile/build
-      rm -rf mobile/.dart_tool
-      echo "🧹 Nettoyage terminé"
-
-  # === GÉNÉRATION DE CODE ===
-  new-screen:
-    description: "Créer un nouveau screen Flutter"
-    args:
-      - name
-    run: |
-      cat > mobile/lib/screens/${name}_screen.dart << 'EOF'
-      import 'package:flutter/material.dart';
-      
-      class ${name^}Screen extends StatefulWidget {
-        const ${name^}Screen({Key? key}) : super(key: key);
-        
-        @override
-        State<${name^}Screen> createState() => _${name^}ScreenState();
-      }
-      
-      class _${name^}ScreenState extends State<${name^}Screen> {
-        @override
-        Widget build(BuildContext context) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text('${name^}'),
-            ),
-            body: Center(
-              child: Text('${name^} Screen'),
-            ),
-          );
-        }
-      }
-      EOF
-      echo "✅ Screen ${name} créé"
-
-  new-controller:
-    description: "Créer un nouveau controller PHP"
-    args:
-      - name
-    run: |
-      cat > backend/src/Controllers/${name^}Controller.php << 'EOF'
-      <?php
-      namespace App\Controllers;
-      
-      use Psr\Http\Message\ResponseInterface as Response;
-      use Psr\Http\Message\ServerRequestInterface as Request;
-      
-      class ${name^}Controller {
-          
-          public function index(Request $request, Response $response) {
-              $data = ['message' => '${name} endpoint'];
-              $response->getBody()->write(json_encode($data));
-              return $response->withHeader('Content-Type', 'application/json');
-          }
-          
-          public function show(Request $request, Response $response, $args) {
-              $id = $args['id'];
-              $data = ['id' => $id, 'name' => '${name}'];
-              $response->getBody()->write(json_encode($data));
-              return $response->withHeader('Content-Type', 'application/json');
-          }
-          
-          public function store(Request $request, Response $response) {
-              $body = $request->getParsedBody();
-              // Process data
-              $response->getBody()->write(json_encode(['success' => true]));
-              return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
-          }
-      }
-      EOF
-      echo "✅ Controller ${name} créé"
-
-  # === UTILITAIRES ===
-  format:
-    description: "Formater le code"
-    run: |
-      cd mobile
-      dart format lib/
-      cd ../backend
-      ./vendor/bin/php-cs-fixer fix src/
-      echo "✨ Code formaté"
-
-  analyze:
-    description: "Analyser le code"
-    run: |
-      cd mobile
-      flutter analyze
-      echo "✅ Analyse terminée"
+{
+  "commands": {
+    "init": {
+      "description": "Initialiser le projet KiloShare",
+      "steps": [
+        "git checkout -b claude/init-$(date +%Y%m%d-%H%M%S)",
+        "echo 'Initialisation du projet KiloShare'",
+        "mkdir -p mobile/lib backend/src database",
+        "git add .",
+        "git commit -m '[Claude] Initial project setup'"
+      ]
+    },
+    "new-feature": {
+      "description": "Créer une nouvelle branche pour une feature",
+      "args": ["feature_name"],
+      "steps": [
+        "git checkout development",
+        "git pull origin development",
+        "git checkout -b claude/${feature_name}-$(date +%Y%m%d)",
+        "echo 'Nouvelle feature: ${feature_name}'"
+      ]
+    },
+    "save-work": {
+      "description": "Sauvegarder le travail en cours",
+      "steps": [
+        "git add .",
+        "git commit -m '[Claude] Work in progress - $(date +%Y-%m-%d %H:%M)'",
+        "git push origin HEAD"
+      ]
+    },
+    "create-flutter-app": {
+      "description": "Créer l'application Flutter",
+      "steps": [
+        "git checkout -b claude/flutter-setup-$(date +%Y%m%d)",
+        "cd mobile && flutter create . --org com.kiloshare --project-name kiloshare",
+        "git add .",
+        "git commit -m '[Claude] Flutter app initialized'"
+      ]
+    },
+    "create-backend": {
+      "description": "Créer le backend PHP",
+      "steps": [
+        "git checkout -b claude/backend-setup-$(date +%Y%m%d)",
+        "cd backend && composer init --name=kiloshare/api --type=project",
+        "composer require slim/slim:^4.0 slim/psr7 vlucas/phpdotenv",
+        "git add .",
+        "git commit -m '[Claude] Backend Slim PHP initialized'"
+      ]
+    }
+  }
+}

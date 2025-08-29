@@ -1,46 +1,155 @@
-# Kilo-Share 🚀
+# KiloShare - Application de partage d'espace bagages
 
-**Kilo-Share** est une plateforme innovante qui permet aux voyageurs de rentabiliser l'espace disponible dans leurs bagages en transportant des colis pour d'autres utilisateurs. Que vous soyez un voyageur cherchant à gagner un peu d'argent ou un expéditeur à la recherche d'une solution de livraison économique, Kilo-Share est fait pour vous !
+KiloShare est une application mobile permettant aux voyageurs de partager leur espace bagages avec d'autres personnes qui souhaitent envoyer des objets.
 
----
+## Architecture du projet
 
-## 📌 Fonctionnalités
+```
+kiloshare-project/
+├── mobile/                    # Application Flutter (iOS + Android)
+│   ├── lib/
+│   │   ├── config/           # Configuration et thèmes
+│   │   ├── models/           # Modèles de données
+│   │   ├── screens/          # Écrans de l'application
+│   │   ├── services/         # Services API et logique métier
+│   │   ├── widgets/          # Composants UI réutilisables
+│   │   ├── providers/        # Gestion d'état (Riverpod)
+│   │   ├── repositories/     # Couche d'accès aux données
+│   │   └── utils/            # Utilitaires et helpers
+│   ├── assets/               # Ressources (images, icônes, etc.)
+│   └── pubspec.yaml
+│
+├── backend/                   # API REST en Slim PHP 4
+│   ├── public/
+│   │   └── index.php         # Point d'entrée API
+│   ├── src/
+│   │   ├── Controllers/      # Contrôleurs API
+│   │   ├── Models/           # Modèles de données
+│   │   ├── Middleware/       # Middleware (auth, CORS, etc.)
+│   │   ├── Services/         # Services métier
+│   │   └── Routes/           # Définition des routes
+│   ├── config/
+│   │   ├── database.php      # Configuration BDD
+│   │   └── settings.php      # Configuration générale
+│   ├── uploads/              # Dossier FTP pour les fichiers
+│   │   ├── avatars/
+│   │   ├── luggage/
+│   │   ├── documents/
+│   │   └── temp/
+│   ├── .env                  # Variables d'environnement
+│   └── composer.json
+│
+└── database/
+    └── schema.sql            # Structure complète de la BDD
+```
 
-- **Partage d'espace de bagage** : Les voyageurs peuvent proposer l'espace disponible dans leurs bagages pour transporter des colis.
-- **Livraison économique** : Les expéditeurs bénéficient d'un service de livraison rapide et à moindre coût.
-- **Sécurité et confiance** : Profils vérifiés, conseils de sécurité et système de notation pour des échanges en toute confiance.
-- **Simplicité d'utilisation** : Une interface intuitive pour publier des annonces, rechercher des voyageurs et organiser des échanges.
+## Configuration technique
 
----
+### Base de données
+- **Nom**: `kiloshare`
+- **Utilisateur**: `root`
+- **Mot de passe**: (vide)
+- **Type**: MySQL avec charset utf8mb4
 
-## 🚀 Objectif
+### Backend (Slim PHP 4)
+- Framework: Slim 4 avec PHP-DI
+- Authentification: JWT avec Firebase PHP-JWT
+- Upload: FTP local avec sécurisation
+- CORS: Configuré pour le développement
 
-L'objectif de Kilo-Share est de créer une communauté solidaire où les voyageurs et les expéditeurs peuvent collaborer pour optimiser les ressources et réduire les coûts de livraison. Nous croyons en une économie collaborative et durable, où chacun peut partager et bénéficier des ressources disponibles.
+### Mobile (Flutter)
+- Version Flutter: >=3.10.0
+- Dart SDK: >=3.0.0
+- Gestion d'état: Riverpod
+- Navigation: GoRouter
+- UI: Material Design 3
 
----
+## Installation
 
-## 🛠 Technologies Utilisées
+### 1. Backend
 
-- **Frontend** : React, Ant Design
-- **Backend** : PHP
-- **Base de données** : MongoDB
-- **Authentification** : JWT (JSON Web Tokens)
-- **Internationalisation** : `next-intl`
-- **Déploiement** : Vercel
+```bash
+cd backend
+composer install
+php -S localhost:8080 -t public
+```
 
----
+### 2. Base de données
 
-## 🚀 Comment Commencer
+```bash
+mysql -u root < ../database/schema.sql
+```
 
-### Prérequis
+### 3. Mobile
 
-- Node.js (v14 ou supérieur)
-- npm ou yarn
-- MongoDB (local ou cloud)
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
 
-### Installation
+## Modules de l'application
 
-1. Clonez le dépôt :
-   ```bash
-   git clone https://github.com/abdoulaye2022/kilo-share.git
-   cd kilo-share
+1. **Authentification** - Inscription, connexion, profil utilisateur
+2. **Voyages** - Création et gestion des trajets
+3. **Espaces bagages** - Demandes d'envoi d'objets
+4. **Réservations** - Mise en relation voyageurs/expéditeurs
+5. **Paiements** - Gestion des transactions
+6. **Messages** - Chat entre utilisateurs
+7. **Évaluations** - Système de notation
+8. **Notifications** - Alertes et rappels
+9. **Recherche** - Moteur de recherche avancé
+10. **Administration** - Panel admin
+
+## API Endpoints
+
+### Authentification
+- `POST /api/v1/auth/register` - Inscription
+- `POST /api/v1/auth/login` - Connexion
+- `POST /api/v1/auth/refresh` - Actualiser token
+
+### Voyages
+- `GET /api/v1/journeys` - Liste des voyages
+- `POST /api/v1/journeys` - Créer un voyage
+- `GET /api/v1/journeys/{id}` - Détails voyage
+
+### Espaces bagages
+- `GET /api/v1/spaces` - Liste des demandes
+- `POST /api/v1/spaces` - Créer une demande
+- `GET /api/v1/spaces/{id}` - Détails demande
+
+Et bien d'autres...
+
+## Fonctionnalités principales
+
+- **Inscription/Connexion** avec vérification d'identité
+- **Création de voyages** avec détails du trajet
+- **Demandes d'envoi** avec photos et descriptions
+- **Système de matching** automatique
+- **Chat intégré** pour la communication
+- **Paiements sécurisés** avec commission
+- **Géolocalisation** pour pickup/delivery
+- **Notifications push**
+- **Système d'évaluations**
+- **Panel d'administration**
+
+## Sécurité
+
+- Authentification JWT
+- Validation des données côté serveur
+- Upload sécurisé avec restriction des types de fichiers
+- Chiffrement des mots de passe
+- Protection CORS
+- Validation des permissions
+
+## Développement
+
+Le projet est configuré pour le développement local avec:
+- Hot reload pour Flutter
+- Serveur PHP intégré
+- Base de données MySQL locale
+- Variables d'environnement pour la configuration
+
+## Licence
+
+Propriétaire - KiloShare

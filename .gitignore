@@ -3,3 +3,24 @@
 
 # Local Configuration
 /api/v1/.env
+
+# Claude Code
+.claude_session/
+.claude_cache/
+*.claude.tmp
+
+# Backend
+backend/vendor/
+backend/.env
+
+# Mobile
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins*
+
+# Database
+*.sql.backup
+
+# OS
+.DS_Store
+Thumbs.db
