@@ -88,6 +88,26 @@ class Config
             'logging' => [
                 'level' => $_ENV['LOG_LEVEL'] ?? 'info',
                 'path' => $_ENV['LOG_PATH'] ?? '/var/log/kiloshare.log'
+            ],
+            
+            'social' => [
+                'google' => [
+                    'client_id' => $_ENV['GOOGLE_CLIENT_ID'] ?? '',
+                    'client_secret' => $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
+                    'redirect_uri' => $_ENV['GOOGLE_REDIRECT_URI'] ?? '',
+                ],
+                'facebook' => [
+                    'app_id' => $_ENV['FACEBOOK_APP_ID'] ?? '',
+                    'app_secret' => $_ENV['FACEBOOK_APP_SECRET'] ?? '',
+                    'redirect_uri' => $_ENV['FACEBOOK_REDIRECT_URI'] ?? '',
+                ],
+                'apple' => [
+                    'client_id' => $_ENV['APPLE_CLIENT_ID'] ?? '',
+                    'team_id' => $_ENV['APPLE_TEAM_ID'] ?? '',
+                    'key_id' => $_ENV['APPLE_KEY_ID'] ?? '',
+                    'private_key_path' => $_ENV['APPLE_PRIVATE_KEY_PATH'] ?? '',
+                    'redirect_uri' => $_ENV['APPLE_REDIRECT_URI'] ?? '',
+                ],
             ]
         ];
     }

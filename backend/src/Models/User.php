@@ -20,17 +20,24 @@ class User
     public function create(array $userData): ?array
     {
         try {
-            $sql = "INSERT INTO users (uuid, email, phone, password_hash, first_name, last_name) 
-                    VALUES (:uuid, :email, :phone, :password_hash, :first_name, :last_name)";
+            $sql = "INSERT INTO users (uuid, email, phone, password_hash, first_name, last_name, 
+                                     social_provider, social_id, profile_picture, is_verified, email_verified_at) 
+                    VALUES (:uuid, :email, :phone, :password_hash, :first_name, :last_name,
+                            :social_provider, :social_id, :profile_picture, :is_verified, :email_verified_at)";
             
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 ':uuid' => $userData['uuid'],
                 ':email' => $userData['email'],
                 ':phone' => $userData['phone'] ?? null,
-                ':password_hash' => $userData['password_hash'],
+                ':password_hash' => $userData['password_hash'] ?? null,
                 ':first_name' => $userData['first_name'] ?? null,
-                ':last_name' => $userData['last_name'] ?? null
+                ':last_name' => $userData['last_name'] ?? null,
+                ':social_provider' => $userData['social_provider'] ?? null,
+                ':social_id' => $userData['social_id'] ?? null,
+                ':profile_picture' => $userData['profile_picture'] ?? null,
+                ':is_verified' => $userData['is_verified'] ?? 0,
+                ':email_verified_at' => $userData['email_verified_at'] ?? null
             ]);
 
             $userId = $this->db->lastInsertId();
@@ -45,7 +52,7 @@ class User
         try {
             $sql = "SELECT id, uuid, email, phone, first_name, last_name, is_verified, 
                            email_verified_at, phone_verified_at, profile_picture, status, 
-                           last_login_at, created_at, updated_at 
+                           last_login_at, social_provider, social_id, created_at, updated_at 
                     FROM users WHERE id = :id AND status != 'deleted'";
             
             $stmt = $this->db->prepare($sql);
@@ -63,7 +70,7 @@ class User
         try {
             $sql = "SELECT id, uuid, email, phone, password_hash, first_name, last_name, 
                            is_verified, email_verified_at, phone_verified_at, profile_picture, 
-                           status, last_login_at, created_at, updated_at 
+                           status, last_login_at, social_provider, social_id, created_at, updated_at 
                     FROM users WHERE email = :email AND status != 'deleted'";
             
             $stmt = $this->db->prepare($sql);
@@ -229,6 +236,14 @@ class User
         } catch (PDOException $e) {
             throw new \RuntimeException('Failed to check phone existence: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Get database connection
+     */
+    public function getDb(): PDO
+    {
+        return $this->db;
     }
 
     /**

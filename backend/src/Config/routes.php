@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 use KiloShare\Controllers\AuthController;
+use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Middleware\AuthMiddleware;
 use KiloShare\Middleware\OptionalAuthMiddleware;
 use KiloShare\Middleware\AdminAuthMiddleware;
@@ -47,6 +48,18 @@ return function (App $app) {
                 ->add(AuthMiddleware::class);
             $authGroup->post('/change-password', [AuthController::class, 'changePassword'])
                 ->add(AuthMiddleware::class);
+                
+            // Social Authentication Routes
+            $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
+            $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
+            $authGroup->post('/facebook', [SocialAuthController::class, 'facebookAuth']);
+            $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
+            
+            // Protected social routes
+            $authGroup->post('/social/link', [SocialAuthController::class, 'linkSocialAccount'])
+                ->add(AuthMiddleware::class);
+            $authGroup->delete('/social/unlink/{provider}', [SocialAuthController::class, 'unlinkSocialAccount'])
+                ->add(AuthMiddleware::class);
         });
 
         // V1 API routes (for backward compatibility)
@@ -72,6 +85,18 @@ return function (App $app) {
                 $authGroup->post('/verify-phone', [AuthController::class, 'verifyPhone'])
                     ->add(AuthMiddleware::class);
                 $authGroup->post('/change-password', [AuthController::class, 'changePassword'])
+                    ->add(AuthMiddleware::class);
+                    
+                // Social Authentication Routes
+                $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
+                $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
+                $authGroup->post('/facebook', [SocialAuthController::class, 'facebookAuth']);
+                $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
+                
+                // Protected social routes
+                $authGroup->post('/social/link', [SocialAuthController::class, 'linkSocialAccount'])
+                    ->add(AuthMiddleware::class);
+                $authGroup->delete('/social/unlink/{provider}', [SocialAuthController::class, 'unlinkSocialAccount'])
                     ->add(AuthMiddleware::class);
             });
         });

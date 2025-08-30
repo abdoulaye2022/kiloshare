@@ -56,10 +56,24 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    \KiloShare\Services\SocialAuthService::class => function ($container) {
+        return new \KiloShare\Services\SocialAuthService(
+            $container->get(\KiloShare\Models\User::class),
+            $container->get(\KiloShare\Services\JWTService::class),
+            Config::get('social') // Configuration sociale depuis Config.php
+        );
+    },
+    
     // Controllers
     \KiloShare\Controllers\AuthController::class => function ($container) {
         return new \KiloShare\Controllers\AuthController(
             $container->get(\KiloShare\Services\AuthService::class)
+        );
+    },
+    
+    \KiloShare\Controllers\SocialAuthController::class => function ($container) {
+        return new \KiloShare\Controllers\SocialAuthController(
+            $container->get(\KiloShare\Services\SocialAuthService::class)
         );
     },
     
