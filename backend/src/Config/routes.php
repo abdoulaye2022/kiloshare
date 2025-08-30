@@ -52,8 +52,8 @@ return function (App $app) {
             // Social Authentication Routes
             $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
             $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
-            $authGroup->post('/facebook', [SocialAuthController::class, 'facebookAuth']);
             $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
+            $authGroup->post('/firebase', [SocialAuthController::class, 'firebaseAuth']);
             
             // Protected social routes
             $authGroup->post('/social/link', [SocialAuthController::class, 'linkSocialAccount'])
@@ -90,8 +90,8 @@ return function (App $app) {
                 // Social Authentication Routes
                 $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
                 $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
-                $authGroup->post('/facebook', [SocialAuthController::class, 'facebookAuth']);
                 $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
+                $authGroup->post('/firebase', [SocialAuthController::class, 'firebaseAuth']);
                 
                 // Protected social routes
                 $authGroup->post('/social/link', [SocialAuthController::class, 'linkSocialAccount'])

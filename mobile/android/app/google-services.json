@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "325498754106",
+    "project_id": "kiloshare-app",
+    "storage_bucket": "kiloshare-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325498754106:android:app",
+        "android_client_info": {
+          "package_name": "com.kiloshare.kiloshare"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummy_API_Key_For_Development"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

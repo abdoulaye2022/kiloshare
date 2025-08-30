@@ -78,11 +78,12 @@ class SocialAuthController
         }
     }
 
+
     /**
-     * Authenticate with Facebook
-     * POST /api/v1/auth/facebook
+     * Authenticate with Firebase (Google, Apple, etc.)
+     * POST /api/v1/auth/firebase
      */
-    public function facebookAuth(Request $request, Response $response): Response
+    public function firebaseAuth(Request $request, Response $response): Response
     {
         try {
             $data = $request->getParsedBody() ?? [];
@@ -93,15 +94,45 @@ class SocialAuthController
                 $data = json_decode($rawBody, true) ?? [];
             }
 
-            if (empty($data['access_token'])) {
-                throw new \RuntimeException('Facebook access token is required', 400);
+            if (empty($data['firebase_token'])) {
+                throw new \RuntimeException('Firebase token is required', 400);
             }
 
-            $result = $this->socialAuthService->authenticateWithFacebook($data['access_token']);
+            // For now, simulate Firebase token verification
+            // In production, use Firebase Admin SDK to verify the token
+            $firebaseToken = $data['firebase_token'];
+            
+            // Mock user data from Firebase token
+            $mockUser = [
+                'id' => 'firebase_user_123',
+                'email' => 'user@example.com',
+                'first_name' => 'Firebase',
+                'last_name' => 'User',
+                'profile_picture' => null,
+                'verified_email' => true
+            ];
+
+            // Simplified Firebase auth - just return mock success for now
+            $result = [
+                'user' => [
+                    'id' => 'firebase_123',
+                    'email' => 'firebase.user@example.com',
+                    'first_name' => 'Firebase',
+                    'last_name' => 'User',
+                    'is_verified' => true
+                ],
+                'tokens' => [
+                    'access_token' => 'mock_access_token_firebase',
+                    'refresh_token' => 'mock_refresh_token_firebase',
+                    'token_type' => 'bearer',
+                    'expires_in' => 3600
+                ],
+                'is_new_user' => false
+            ];
 
             $response->getBody()->write(json_encode([
                 'success' => true,
-                'message' => $result['is_new_user'] ? 'Account created with Facebook' : 'Logged in with Facebook',
+                'message' => $result['is_new_user'] ? 'Account created with Firebase' : 'Logged in with Firebase',
                 'data' => [
                     'user' => $result['user'],
                     'tokens' => $result['tokens'],
@@ -119,7 +150,7 @@ class SocialAuthController
             $response->getBody()->write(json_encode([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'error_code' => 'FACEBOOK_AUTH_FAILED'
+                'error_code' => 'FIREBASE_AUTH_FAILED'
             ]));
 
             return $response
@@ -129,7 +160,7 @@ class SocialAuthController
         } catch (\Exception $e) {
             $response->getBody()->write(json_encode([
                 'success' => false,
-                'message' => 'Facebook authentication failed',
+                'message' => 'Firebase authentication failed',
                 'error_code' => 'INTERNAL_ERROR'
             ]));
 
@@ -212,12 +243,6 @@ class SocialAuthController
                 'enabled' => !empty($_ENV['GOOGLE_CLIENT_ID']),
                 'icon' => 'google',
                 'color' => '#4285f4'
-            ],
-            'facebook' => [
-                'name' => 'Facebook',
-                'enabled' => !empty($_ENV['FACEBOOK_APP_ID']),
-                'icon' => 'facebook',
-                'color' => '#1877f2'
             ],
             'apple' => [
                 'name' => 'Apple',

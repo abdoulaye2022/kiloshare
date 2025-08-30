@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:go_router/go_router.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import 'config/app_config.dart';
 import 'config/theme.dart';
 import 'config/router.dart';
-import 'services/storage_service.dart';
-import 'utils/constants.dart';
+import 'modules/auth/blocs/bloc.dart';
+import 'modules/auth/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Hive
-  await Hive.initFlutter();
-  await StorageService.init();
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -24,19 +18,26 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  runApp(
-    const ProviderScope(
-      child: KiloShareApp(),
-    ),
-  );
+  runApp(const KiloShareApp());
 }
 
-class KiloShareApp extends ConsumerWidget {
+class KiloShareApp extends StatelessWidget {
   const KiloShareApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>(
+          create: (context) => AuthBloc(authService: AuthService()),
+        ),
+      ],
+      child: _buildApp(context),
+    );
+  }
+
+  Widget _buildApp(BuildContext context) {
+    final router = createRouter();
     
     return ScreenUtilInit(
       designSize: const Size(375, 812),

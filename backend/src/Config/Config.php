@@ -96,11 +96,6 @@ class Config
                     'client_secret' => $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
                     'redirect_uri' => $_ENV['GOOGLE_REDIRECT_URI'] ?? '',
                 ],
-                'facebook' => [
-                    'app_id' => $_ENV['FACEBOOK_APP_ID'] ?? '',
-                    'app_secret' => $_ENV['FACEBOOK_APP_SECRET'] ?? '',
-                    'redirect_uri' => $_ENV['FACEBOOK_REDIRECT_URI'] ?? '',
-                ],
                 'apple' => [
                     'client_id' => $_ENV['APPLE_CLIENT_ID'] ?? '',
                     'team_id' => $_ENV['APPLE_TEAM_ID'] ?? '',

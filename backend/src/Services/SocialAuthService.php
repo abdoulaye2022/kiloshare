@@ -38,20 +38,6 @@ class SocialAuthService
         return $this->handleSocialUser($googleUser, 'google');
     }
 
-    /**
-     * Authenticate with Facebook
-     */
-    public function authenticateWithFacebook(string $accessToken): array
-    {
-        // Get user info from Facebook
-        $facebookUser = $this->getFacebookUserInfo($accessToken);
-        
-        if (!$facebookUser) {
-            throw new \RuntimeException('Failed to get user info from Facebook', 400);
-        }
-
-        return $this->handleSocialUser($facebookUser, 'facebook');
-    }
 
     /**
      * Authenticate with Apple
@@ -71,7 +57,7 @@ class SocialAuthService
     /**
      * Handle social user authentication
      */
-    private function handleSocialUser(array $socialUser, string $provider): array
+    public function handleSocialUser(array $socialUser, string $provider): array
     {
         $email = $socialUser['email'] ?? null;
         
@@ -143,35 +129,6 @@ class SocialAuthService
         ];
     }
 
-    /**
-     * Get user info from Facebook
-     */
-    private function getFacebookUserInfo(string $accessToken): ?array
-    {
-        $fields = 'id,email,first_name,last_name,picture.type(large)';
-        $url = "https://graph.facebook.com/v18.0/me?fields={$fields}&access_token={$accessToken}";
-        
-        $response = $this->makeHttpRequest($url);
-        
-        if (!$response) {
-            return null;
-        }
-
-        $data = json_decode($response, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return null;
-        }
-
-        return [
-            'id' => $data['id'] ?? null,
-            'email' => $data['email'] ?? null,
-            'first_name' => $data['first_name'] ?? '',
-            'last_name' => $data['last_name'] ?? '',
-            'profile_picture' => $data['picture']['data']['url'] ?? null,
-            'verified_email' => true // Facebook emails are always verified
-        ];
-    }
 
     /**
      * Verify Apple ID token
