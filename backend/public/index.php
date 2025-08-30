@@ -37,6 +37,14 @@ $containerBuilder->addDefinitions([
         return Database::getConnection();
     },
     
+    // Logger
+    Psr\Log\LoggerInterface::class => function () {
+        $logger = new \Monolog\Logger('kiloshare');
+        $handler = new \Monolog\Handler\StreamHandler('php://stderr', \Monolog\Level::Debug);
+        $logger->pushHandler($handler);
+        return $logger;
+    },
+    
     // Services
     \KiloShare\Services\JWTService::class => function ($container) {
         return new \KiloShare\Services\JWTService(Config::get());
@@ -110,6 +118,25 @@ $containerBuilder->addDefinitions([
             $container->get(\KiloShare\Services\JWTService::class),
             $container->get(\KiloShare\Services\PhoneVerificationService::class),
             $container->get(\KiloShare\Services\TwilioSmsService::class)
+        );
+    },
+    
+    // Profile services
+    \App\Services\FtpUploadService::class => function ($container) {
+        return new \App\Services\FtpUploadService();
+    },
+    
+    \App\Modules\Profile\Services\ProfileService::class => function ($container) {
+        return new \App\Modules\Profile\Services\ProfileService(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \App\Modules\Profile\Controllers\ProfileController::class => function ($container) {
+        return new \App\Modules\Profile\Controllers\ProfileController(
+            $container->get(\App\Modules\Profile\Services\ProfileService::class),
+            $container->get(\App\Services\FtpUploadService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
         );
     },
     

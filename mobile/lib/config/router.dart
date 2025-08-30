@@ -7,6 +7,13 @@ import '../modules/auth/screens/forgot_password_screen.dart';
 import '../modules/auth/screens/email_verification_screen.dart';
 import '../modules/auth/screens/phone_auth_screen.dart';
 import '../modules/auth/screens/reset_password_screen.dart';
+import '../modules/home/screens/home_screen.dart';
+import '../modules/profile/screens/user_settings_screen.dart';
+import '../modules/profile/screens/change_password_screen.dart';
+import '../modules/profile/screens/notification_settings_screen.dart';
+import '../modules/profile/screens/privacy_settings_screen.dart';
+import '../modules/profile/screens/delete_account_screen.dart';
+import '../modules/profile/screens/linked_accounts_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -48,16 +55,43 @@ GoRouter createRouter() {
         },
       ),
       
-      // Placeholder for home until implemented
+      // Main App
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (context, state) => Scaffold(
-          appBar: AppBar(title: const Text('Home')),
-          body: const Center(
-            child: Text('Home Screen - Coming Soon'),
-          ),
-        ),
+        builder: (context, state) => const HomeScreen(),
+      ),
+      
+      // Profile routes
+      GoRoute(
+        path: '/profile/settings',
+        name: 'profile-settings',
+        builder: (context, state) => const UserSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/change-password',
+        name: 'change-password',
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: '/profile/notifications',
+        name: 'notification-settings',
+        builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/privacy',
+        name: 'privacy-settings',
+        builder: (context, state) => const PrivacySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/linked-accounts',
+        name: 'linked-accounts',
+        builder: (context, state) => const LinkedAccountsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/delete-account',
+        name: 'delete-account',
+        builder: (context, state) => const DeleteAccountScreen(),
       ),
     ],
     

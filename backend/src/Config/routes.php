@@ -8,6 +8,7 @@ use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\PhoneAuthController;
 use KiloShare\Controllers\TestController;
+use App\Modules\Profile\Controllers\ProfileController;
 use KiloShare\Middleware\AuthMiddleware;
 use KiloShare\Middleware\OptionalAuthMiddleware;
 use KiloShare\Middleware\AdminAuthMiddleware;
@@ -380,6 +381,37 @@ return function (App $app) {
                 $authGroup->post('/social/link', [SocialAuthController::class, 'linkSocialAccount'])
                     ->add(AuthMiddleware::class);
                 $authGroup->delete('/social/unlink/{provider}', [SocialAuthController::class, 'unlinkSocialAccount'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Profile routes
+            $v1Group->group('/profile', function (RouteCollectorProxy $profileGroup) {
+                // Profile management
+                $profileGroup->get('', [ProfileController::class, 'getProfile'])
+                    ->add(AuthMiddleware::class);
+                $profileGroup->post('', [ProfileController::class, 'createProfile'])
+                    ->add(AuthMiddleware::class);
+                $profileGroup->put('', [ProfileController::class, 'updateProfile'])
+                    ->add(AuthMiddleware::class);
+                
+                // Avatar upload
+                $profileGroup->post('/avatar', [ProfileController::class, 'uploadAvatar'])
+                    ->add(AuthMiddleware::class);
+                
+                // Document verification
+                $profileGroup->post('/documents', [ProfileController::class, 'uploadDocument'])
+                    ->add(AuthMiddleware::class);
+                $profileGroup->get('/documents', [ProfileController::class, 'getUserDocuments'])
+                    ->add(AuthMiddleware::class);
+                $profileGroup->delete('/documents/{documentId}', [ProfileController::class, 'deleteDocument'])
+                    ->add(AuthMiddleware::class);
+                
+                // Trust badges
+                $profileGroup->get('/badges', [ProfileController::class, 'getUserBadges'])
+                    ->add(AuthMiddleware::class);
+                
+                // Verification status
+                $profileGroup->get('/verification-status', [ProfileController::class, 'getVerificationStatus'])
                     ->add(AuthMiddleware::class);
             });
             

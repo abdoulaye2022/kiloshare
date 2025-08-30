@@ -484,4 +484,119 @@ class AuthService
             throw $e;
         }
     }
+
+    public function changePassword(int $userId, string $currentPassword, string $newPassword): bool
+    {
+        try {
+            // Fetch user
+            $user = $this->userModel->findById($userId);
+            
+            if (!$user) {
+                throw new \RuntimeException('User not found', 404);
+            }
+            
+            // Verify current password
+            if (!password_verify($currentPassword, $user['password'])) {
+                throw new \RuntimeException('Current password is incorrect', 401);
+            }
+            
+            // Hash new password
+            $hashedNewPassword = password_hash($newPassword, PASSWORD_ARGON2ID);
+            
+            // Update password in database
+            $stmt = $this->db->prepare('UPDATE users SET password = :password, updated_at = CURRENT_TIMESTAMP WHERE id = :id');
+            
+            $success = $stmt->execute([
+                'password' => $hashedNewPassword,
+                'id' => $userId
+            ]);
+            
+            if (!$success) {
+                throw new \RuntimeException('Failed to update password', 500);
+            }
+            
+            // Log the password change
+            error_log("Password changed for user ID: {$userId}");
+            
+            return true;
+            
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
+    public function deleteAccount(int $userId, string $password): bool
+    {
+        try {
+            // Fetch user
+            $user = $this->userModel->findById($userId);
+            
+            if (!$user) {
+                throw new \RuntimeException('User not found', 404);
+            }
+            
+            // Verify password
+            if (!password_verify($password, $user['password'])) {
+                throw new \RuntimeException('Password is incorrect', 401);
+            }
+            
+            // Check for pending reservations (this would be implemented based on your business logic)
+            // TODO: Add check for active reservations/bookings
+            
+            // Start transaction
+            $this->db->beginTransaction();
+            
+            try {
+                // Delete related data first (maintain referential integrity)
+                
+                // Delete user profile and related data
+                $stmt = $this->db->prepare('DELETE FROM user_profiles WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Delete verification documents
+                $stmt = $this->db->prepare('DELETE FROM verification_documents WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Delete trust badges
+                $stmt = $this->db->prepare('DELETE FROM trust_badges WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Delete verification logs
+                $stmt = $this->db->prepare('DELETE FROM verification_logs WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Delete email verifications
+                $stmt = $this->db->prepare('DELETE FROM email_verification WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Delete password reset tokens
+                $stmt = $this->db->prepare('DELETE FROM password_resets WHERE user_id = (SELECT id FROM users WHERE id = :user_id)');
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Finally, delete the user
+                $stmt = $this->db->prepare('DELETE FROM users WHERE id = :id');
+                $success = $stmt->execute(['id' => $userId]);
+                
+                if (!$success) {
+                    throw new \RuntimeException('Failed to delete user account', 500);
+                }
+                
+                // Commit transaction
+                $this->db->commit();
+                
+                // Log the account deletion
+                error_log("Account deleted for user ID: {$userId}, Email: {$user['email']}");
+                
+                return true;
+                
+            } catch (\Exception $e) {
+                // Rollback transaction on error
+                $this->db->rollBack();
+                throw $e;
+            }
+            
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
 }

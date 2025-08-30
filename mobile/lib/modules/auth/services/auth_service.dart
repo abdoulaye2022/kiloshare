@@ -452,6 +452,67 @@ class AuthService {
     return await getAccessToken();
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final token = await getValidAccessToken();
+    if (token == null) throw AuthException('Not authenticated');
+
+    try {
+      final response = await _dio.put(
+        '/auth/change-password',
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      
+      final apiResponse = ApiResponse.fromJson(response.data, (json) => json);
+
+      if (!apiResponse.success) {
+        throw AuthException(apiResponse.message);
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    } catch (e) {
+      throw AuthException('Password change failed: $e');
+    }
+  }
+
+  Future<void> deleteAccount({
+    required String password,
+    required String confirmation,
+  }) async {
+    final token = await getValidAccessToken();
+    if (token == null) throw AuthException('Not authenticated');
+
+    try {
+      final response = await _dio.delete(
+        '/auth/account',
+        data: {
+          'password': password,
+          'confirmation': confirmation,
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      
+      final apiResponse = ApiResponse.fromJson(response.data, (json) => json);
+
+      if (!apiResponse.success) {
+        throw AuthException(apiResponse.message);
+      }
+
+      // Clear all local data after successful deletion
+      await clearTokens();
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    } catch (e) {
+      throw AuthException('Account deletion failed: $e');
+    }
+  }
+
   AuthException _handleDioException(DioException e) {
     if (e.response != null && e.response!.data != null) {
       final data = e.response!.data;

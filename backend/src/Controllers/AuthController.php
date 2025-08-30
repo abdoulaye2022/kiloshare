@@ -448,22 +448,127 @@ class AuthController
     {
         try {
             $user = $request->getAttribute('user');
-            $data = $request->getParsedBody();
+            $data = $request->getParsedBody() ?? [];
             
-            // TODO: Implement change password logic
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            // Validate input
+            if (empty($data['currentPassword'])) {
+                throw new \RuntimeException('Current password is required', 400);
+            }
+            
+            if (empty($data['newPassword'])) {
+                throw new \RuntimeException('New password is required', 400);
+            }
+            
+            if (strlen($data['newPassword']) < 6) {
+                throw new \RuntimeException('New password must be at least 6 characters', 400);
+            }
+            
+            // Change password
+            $success = $this->authService->changePassword(
+                $user['id'],
+                $data['currentPassword'],
+                $data['newPassword']
+            );
+            
+            if (!$success) {
+                throw new \RuntimeException('Failed to change password', 500);
+            }
+            
             $response->getBody()->write(json_encode([
                 'success' => true,
-                'message' => 'Change password not implemented yet'
+                'message' => 'Password changed successfully'
             ]));
             
             return $response
-                ->withStatus(501)
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'PASSWORD_CHANGE_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
                 ->withHeader('Content-Type', 'application/json');
                 
         } catch (\Exception $e) {
             $response->getBody()->write(json_encode([
                 'success' => false,
                 'message' => 'Change password failed',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function deleteAccount(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            // Debug: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            // Validate input
+            if (empty($data['password'])) {
+                throw new \RuntimeException('Password is required for account deletion', 400);
+            }
+            
+            if (empty($data['confirmation']) || $data['confirmation'] !== 'SUPPRIMER MON COMPTE') {
+                throw new \RuntimeException('Account deletion confirmation is required', 400);
+            }
+            
+            // Delete account
+            $success = $this->authService->deleteAccount($user['id'], $data['password']);
+            
+            if (!$success) {
+                throw new \RuntimeException('Failed to delete account', 500);
+            }
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Account deleted successfully'
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'ACCOUNT_DELETION_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Account deletion failed',
                 'error_code' => 'INTERNAL_ERROR'
             ]));
             
