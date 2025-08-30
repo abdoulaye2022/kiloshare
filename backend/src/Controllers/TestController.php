@@ -153,6 +153,74 @@ class TestController
     }
 
     /**
+     * Test password reset email
+     * POST /api/v1/test/email/reset-password
+     */
+    public function testPasswordResetEmail(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody() ?? [];
+            
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['email'])) {
+                throw new \RuntimeException('Email is required', 400);
+            }
+
+            $testUser = [
+                'id' => 999,
+                'email' => $data['email'],
+                'first_name' => $data['first_name'] ?? 'Test',
+                'last_name' => $data['last_name'] ?? 'User',
+                'uuid' => 'test-uuid-' . time()
+            ];
+
+            $testToken = 'test-reset-token-' . time();
+            $result = $this->emailService->sendPasswordResetEmail($testUser, $testToken);
+
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => $result ? 'Password reset email sent successfully' : 'Failed to send password reset email (check API key configuration)',
+                'data' => [
+                    'email_sent' => $result,
+                    'recipient' => $testUser['email'],
+                    'test_mode' => true,
+                    'reset_token' => $testToken
+                ]
+            ]));
+
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+
+        } catch (\RuntimeException $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'TEST_EMAIL_FAILED'
+            ]));
+
+            return $response
+                ->withStatus(400)
+                ->withHeader('Content-Type', 'application/json');
+
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Failed to send test email',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    /**
      * Get email configuration status
      * GET /api/v1/test/email/config
      */

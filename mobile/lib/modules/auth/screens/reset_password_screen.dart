@@ -7,21 +7,30 @@ import '../blocs/bloc.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String? token;
+  
+  const ResetPasswordScreen({
+    super.key,
+    this.token,
+  });
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  bool _emailSent = false;
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _resetCompleted = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -29,22 +38,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Redirect if no token
+    if (widget.token == null || widget.token!.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.go('/login');
+      });
+      return const SizedBox.shrink();
+    }
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthPasswordResetSent) {
+        if (state is AuthPasswordResetSuccess) {
           setState(() {
-            _emailSent = true;
+            _resetCompleted = true;
           });
         } else if (state is AuthError) {
-          // Show error message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
               backgroundColor: theme.colorScheme.error,
             ),
           );
-          // Clear error after showing
-          context.read<AuthBloc>().add(AuthErrorCleared());
         }
       },
       child: Scaffold(
@@ -64,12 +78,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     children: [
                       SizedBox(height: 40.h),
                       
-                      if (!_emailSent) ...[
-                        // Page de saisie email
-                        _buildForgotPasswordForm(theme),
+                      if (!_resetCompleted) ...[
+                        // Page de réinitialisation
+                        _buildResetPasswordForm(theme),
                       ] else ...[
                         // Page de confirmation
-                        _buildConfirmationView(theme),
+                        _buildSuccessView(theme),
                       ],
                     ],
                   ),
@@ -95,7 +109,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               borderRadius: BorderRadius.circular(12.r),
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.shadow.withOpacity(0.1),
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -115,7 +129,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildForgotPasswordForm(ThemeData theme) {
+  Widget _buildResetPasswordForm(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -125,11 +139,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           width: 120.w,
           margin: EdgeInsets.only(bottom: 32.h),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
-            Icons.lock_reset_outlined,
+            Icons.lock_person_outlined,
             size: 60.sp,
             color: theme.colorScheme.primary,
           ),
@@ -137,7 +151,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         
         // Header
         Text(
-          'Mot de passe oublié ?',
+          'Nouveau mot de passe',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: theme.colorScheme.onSurface,
@@ -149,7 +163,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         SizedBox(height: 12.h),
         
         Text(
-          'Ne vous inquiétez pas, nous allons vous envoyer un lien de réinitialisation sur votre adresse email.',
+          'Choisissez un nouveau mot de passe sécurisé pour votre compte.',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             height: 1.4,
@@ -166,17 +180,58 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AuthTextField(
-                controller: _emailController,
-                label: 'Adresse email',
-                hint: 'Entrez votre adresse email',
-                keyboardType: TextInputType.emailAddress,
-                prefixIcon: Icons.email_outlined,
+                controller: _passwordController,
+                label: 'Nouveau mot de passe',
+                hint: 'Entrez votre nouveau mot de passe',
+                obscureText: _obscurePassword,
+                prefixIcon: Icons.lock_outline,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'L\'email est requis';
+                    return 'Le mot de passe est requis';
                   }
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                    return 'Veuillez entrer un email valide';
+                  if (value.length < 6) {
+                    return 'Le mot de passe doit contenir au moins 6 caractères';
+                  }
+                  return null;
+                },
+              ),
+              
+              SizedBox(height: 16.h),
+              
+              AuthTextField(
+                controller: _confirmPasswordController,
+                label: 'Confirmer le mot de passe',
+                hint: 'Confirmez votre nouveau mot de passe',
+                obscureText: _obscureConfirmPassword,
+                prefixIcon: Icons.lock_outline,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'La confirmation est requise';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'Les mots de passe ne correspondent pas';
                   }
                   return null;
                 },
@@ -184,14 +239,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               
               SizedBox(height: 32.h),
               
-              // Send button
+              // Reset button
               BlocBuilder<AuthBloc, AuthState>(
                 builder: (context, state) {
                   final isLoading = state is AuthLoading;
                   return AuthButton(
-                    text: 'Envoyer le lien',
-                    onPressed: isLoading ? null : _handleSendResetLink,
+                    text: 'Réinitialiser le mot de passe',
+                    onPressed: isLoading ? null : _handleResetPassword,
                     isLoading: isLoading,
+                    icon: Icons.security,
                   );
                 },
               ),
@@ -230,7 +286,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildConfirmationView(ThemeData theme) {
+  Widget _buildSuccessView(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -244,7 +300,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            Icons.mark_email_read_outlined,
+            Icons.check_circle_outline,
             size: 60.sp,
             color: theme.colorScheme.tertiary,
           ),
@@ -252,7 +308,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         
         // Success message
         Text(
-          'Email envoyé !',
+          'Mot de passe réinitialisé !',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: theme.colorScheme.onSurface,
@@ -263,120 +319,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         
         SizedBox(height: 12.h),
         
-        RichText(
+        Text(
+          'Votre mot de passe a été mis à jour avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
           textAlign: TextAlign.center,
-          text: TextSpan(
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
-            children: [
-              const TextSpan(
-                text: 'Nous avons envoyé un lien de réinitialisation à\n',
-              ),
-              TextSpan(
-                text: _emailController.text,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
         ),
         
-        SizedBox(height: 32.h),
+        SizedBox(height: 40.h),
         
-        // Instructions
-        Container(
-          padding: EdgeInsets.all(16.w),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16.r),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: theme.colorScheme.onSurfaceVariant,
-                size: 24.sp,
-              ),
-              SizedBox(height: 12.h),
-              Text(
-                'Vérifiez votre boîte de réception (et vos spams) puis cliquez sur le lien pour réinitialiser votre mot de passe.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        
-        SizedBox(height: 32.h),
-        
-        // Actions
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            OutlinedButton(
-              onPressed: () {
-                setState(() {
-                  _emailSent = false;
-                });
-              },
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16.h),
-                side: BorderSide(color: theme.colorScheme.primary),
-              ),
-              child: Text(
-                'Renvoyer l\'email',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            
-            SizedBox(height: 16.h),
-            
-            TextButton(
-              onPressed: () => context.go('/login'),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16.h),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.arrow_back,
-                    size: 16.sp,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                  SizedBox(width: 8.w),
-                  Text(
-                    'Retour à la connexion',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        // Login button
+        AuthButton(
+          text: 'Se connecter',
+          onPressed: () => context.go('/login'),
+          icon: Icons.login,
         ),
       ],
     );
   }
 
-  Future<void> _handleSendResetLink() async {
+  Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
     context.read<AuthBloc>().add(
-      AuthForgotPasswordRequested(
-        email: _emailController.text.trim(),
+      AuthPasswordResetRequested(
+        token: widget.token!,
+        newPassword: _passwordController.text,
       ),
     );
   }

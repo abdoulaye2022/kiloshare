@@ -64,6 +64,13 @@ class AuthPasswordResetSent extends AuthState {
   List<Object?> get props => [email];
 }
 
+class AuthPasswordResetSuccess extends AuthState {
+  const AuthPasswordResetSuccess();
+
+  @override
+  List<Object?> get props => [];
+}
+
 class AuthSocialLoginInProgress extends AuthState {
   final String provider; // 'google', 'apple'
 

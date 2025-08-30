@@ -194,24 +194,44 @@ class AuthService
 
     public function forgotPassword(string $email): bool
     {
-        $user = $this->userModel->findByEmail(strtolower(trim($email)));
-        
-        if (!$user) {
-            // Don't reveal if email exists or not
+        try {
+            error_log("ForgotPassword: Starting process for email {$email}");
+            
+            $user = $this->userModel->findByEmail(strtolower(trim($email)));
+            
+            if (!$user) {
+                error_log("ForgotPassword: User not found for email {$email}");
+                // Don't reveal if email exists or not
+                return true;
+            }
+
+            error_log("ForgotPassword: User found, generating reset token");
+            
+            // Generate password reset token
+            $token = $this->jwtService->generatePasswordResetToken($email);
+            
+            error_log("ForgotPassword: Token generated, storing in database");
+            
+            // Store password reset token
+            $this->storePasswordResetToken($email, $token);
+
+            error_log("ForgotPassword: Token stored, sending email");
+
+            // Send password reset email
+            $emailSent = $this->emailService->sendPasswordResetEmail($user, $token);
+            
+            if (!$emailSent) {
+                error_log("Failed to send password reset email to {$email}");
+                // Still return true to not reveal if email exists
+            } else {
+                error_log("Password reset email sent successfully to {$email}");
+            }
+
             return true;
+        } catch (\Exception $e) {
+            error_log("ForgotPassword Exception: " . $e->getMessage());
+            throw $e;
         }
-
-        // Generate password reset token
-        $token = $this->jwtService->generatePasswordResetToken($email);
-        
-        // Store password reset token
-        $this->storePasswordResetToken($email, $token);
-
-        // Here you would send email with reset link
-        // For now, we'll just log it (in production, use proper email service)
-        error_log("Password reset token for {$email}: {$token}");
-
-        return true;
     }
 
     public function resetPassword(string $token, string $newPassword): bool

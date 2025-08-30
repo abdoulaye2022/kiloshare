@@ -234,14 +234,36 @@ class AuthController
     public function forgotPassword(Request $request, Response $response): Response
     {
         try {
+            error_log("AuthController: forgotPassword called");
+            
+            // Get request data with fallback
             $data = $request->getParsedBody();
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            error_log("AuthController: Request data: " . json_encode($data));
             
             if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+                error_log("AuthController: Invalid email provided");
                 throw new \RuntimeException('Valid email is required', 400);
             }
             
-            // Request password reset
-            $this->authService->forgotPassword($data['email']);
+            error_log("AuthController: Email valid, proceeding...");
+            
+            // Ensure we have authService
+            if (!$this->authService) {
+                error_log("AuthController: AuthService not injected!");
+                throw new \RuntimeException('Service not available', 500);
+            }
+            
+            error_log("AuthController: Calling authService->forgotPassword");
+            
+            // Request password reset with error handling
+            $result = $this->authService->forgotPassword($data['email']);
+            
+            error_log("AuthController: forgotPassword completed successfully");
             
             // Always return success to prevent email enumeration
             $response->getBody()->write(json_encode([
@@ -254,6 +276,9 @@ class AuthController
                 ->withHeader('Content-Type', 'application/json');
                 
         } catch (\Exception $e) {
+            error_log("AuthController: Exception in forgotPassword: " . $e->getMessage());
+            error_log("AuthController: Exception trace: " . $e->getTraceAsString());
+            
             $response->getBody()->write(json_encode([
                 'success' => false,
                 'message' => 'Password reset request failed',
@@ -269,7 +294,13 @@ class AuthController
     public function resetPassword(Request $request, Response $response): Response
     {
         try {
-            $data = $request->getParsedBody();
+            $data = $request->getParsedBody() ?? [];
+            
+            // Fallback: Also try raw body if parsed body is empty
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
             
             if (empty($data['token']) || empty($data['password'])) {
                 throw new \RuntimeException('Token and new password are required', 400);

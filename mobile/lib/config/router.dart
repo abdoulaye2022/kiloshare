@@ -6,6 +6,7 @@ import '../modules/auth/screens/register_screen.dart';
 import '../modules/auth/screens/forgot_password_screen.dart';
 import '../modules/auth/screens/email_verification_screen.dart';
 import '../modules/auth/screens/phone_auth_screen.dart';
+import '../modules/auth/screens/reset_password_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -37,6 +38,14 @@ GoRouter createRouter() {
         path: '/phone-auth',
         name: 'phone-auth',
         builder: (context, state) => const PhoneAuthScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        name: 'reset-password',
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'];
+          return ResetPasswordScreen(token: token);
+        },
       ),
       
       // Placeholder for home until implemented

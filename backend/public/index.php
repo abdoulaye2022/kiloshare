@@ -39,7 +39,7 @@ $containerBuilder->addDefinitions([
     
     // Services
     \KiloShare\Services\JWTService::class => function ($container) {
-        return new \KiloShare\Services\JWTService($container->get('settings'));
+        return new \KiloShare\Services\JWTService(Config::get());
     },
     
     \KiloShare\Services\EmailService::class => function ($container) {

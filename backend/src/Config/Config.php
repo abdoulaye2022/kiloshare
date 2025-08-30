@@ -37,8 +37,8 @@ class Config
             'app' => [
                 'name' => $_ENV['APP_NAME'] ?? 'KiloShare',
                 'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'url' => $_ENV['APP_URL'] ?? 'http://localhost:3000',
                 'timezone' => $_ENV['APP_TIMEZONE'] ?? 'UTC',
-                'url' => $_ENV['APP_URL'] ?? 'http://localhost',
                 'version' => '1.0.0'
             ],
             

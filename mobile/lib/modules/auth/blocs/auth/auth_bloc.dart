@@ -23,6 +23,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthGoogleLoginRequested>(_onAuthGoogleLoginRequested);
     on<AuthAppleLoginRequested>(_onAuthAppleLoginRequested);
     on<AuthForgotPasswordRequested>(_onAuthForgotPasswordRequested);
+    on<AuthPasswordResetRequested>(_onAuthPasswordResetRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthTokenRefreshRequested>(_onAuthTokenRefreshRequested);
     on<AuthErrorCleared>(_onAuthErrorCleared);
@@ -219,6 +220,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _authService.forgotPassword(event.email);
       emit(AuthPasswordResetSent(email: event.email));
+    } catch (e) {
+      emit(AuthError(message: e.toString()));
+    }
+  }
+
+  Future<void> _onAuthPasswordResetRequested(
+    AuthPasswordResetRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    try {
+      await _authService.resetPassword(event.token, event.newPassword);
+      emit(AuthPasswordResetSuccess());
     } catch (e) {
       emit(AuthError(message: e.toString()));
     }
