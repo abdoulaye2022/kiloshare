@@ -78,6 +78,12 @@ class Config
                 'brevo_api_key' => $_ENV['BREVO_API_KEY'] ?? $_ENV['CRON_SECRET_KEY'] ?? ''
             ],
             
+            'twilio' => [
+                'sid' => $_ENV['TWILIO_SID'] ?? '',
+                'token' => $_ENV['TWILIO_TOKEN'] ?? '',
+                'from' => $_ENV['TWILIO_FROM'] ?? ''
+            ],
+            
             'security' => [
                 'bcrypt_cost' => (int)($_ENV['BCRYPT_COST'] ?? 12),
                 'max_login_attempts' => (int)($_ENV['MAX_LOGIN_ATTEMPTS'] ?? 5),

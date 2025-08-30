@@ -42,6 +42,25 @@ $containerBuilder->addDefinitions([
         return new \KiloShare\Services\JWTService($container->get('settings'));
     },
     
+    \KiloShare\Services\EmailService::class => function ($container) {
+        return new \KiloShare\Services\EmailService(Config::get());
+    },
+    
+    \KiloShare\Services\TwilioSmsService::class => function ($container) {
+        return new \KiloShare\Services\TwilioSmsService(
+            Config::get('twilio.sid'),
+            Config::get('twilio.token'),
+            Config::get('twilio.from')
+        );
+    },
+    
+    \KiloShare\Services\PhoneVerificationService::class => function ($container) {
+        return new \KiloShare\Services\PhoneVerificationService(
+            $container->get(PDO::class),
+            $container->get(\KiloShare\Services\TwilioSmsService::class)
+        );
+    },
+    
     // Models
     \KiloShare\Models\User::class => function ($container) {
         return new \KiloShare\Models\User($container->get(PDO::class));
@@ -52,6 +71,7 @@ $containerBuilder->addDefinitions([
         return new \KiloShare\Services\AuthService(
             $container->get(\KiloShare\Models\User::class),
             $container->get(\KiloShare\Services\JWTService::class),
+            $container->get(\KiloShare\Services\EmailService::class),
             $container->get(PDO::class)
         );
     },
@@ -60,6 +80,7 @@ $containerBuilder->addDefinitions([
         return new \KiloShare\Services\SocialAuthService(
             $container->get(\KiloShare\Models\User::class),
             $container->get(\KiloShare\Services\JWTService::class),
+            $container->get(\KiloShare\Services\EmailService::class),
             Config::get('social') // Configuration sociale depuis Config.php
         );
     },
@@ -74,6 +95,21 @@ $containerBuilder->addDefinitions([
     \KiloShare\Controllers\SocialAuthController::class => function ($container) {
         return new \KiloShare\Controllers\SocialAuthController(
             $container->get(\KiloShare\Services\SocialAuthService::class)
+        );
+    },
+    
+    \KiloShare\Controllers\TestController::class => function ($container) {
+        return new \KiloShare\Controllers\TestController(
+            $container->get(\KiloShare\Services\EmailService::class)
+        );
+    },
+    
+    \KiloShare\Controllers\PhoneAuthController::class => function ($container) {
+        return new \KiloShare\Controllers\PhoneAuthController(
+            $container->get(PDO::class),
+            $container->get(\KiloShare\Services\JWTService::class),
+            $container->get(\KiloShare\Services\PhoneVerificationService::class),
+            $container->get(\KiloShare\Services\TwilioSmsService::class)
         );
     },
     

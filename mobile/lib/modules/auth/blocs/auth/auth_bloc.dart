@@ -1,13 +1,18 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kiloshare/modules/auth/services/auth_service.dart';
+import '../../services/phone_auth_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthService _authService;
+  final PhoneAuthService _phoneAuthService;
 
-  AuthBloc({required AuthService authService})
-      : _authService = authService,
+  AuthBloc({
+    required AuthService authService,
+    required PhoneAuthService phoneAuthService,
+  })  : _authService = authService,
+        _phoneAuthService = phoneAuthService,
         super(AuthInitial()) {
     on<AuthStarted>(_onAuthStarted);
     on<AuthLoginRequested>(_onAuthLoginRequested);
@@ -22,6 +27,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthTokenRefreshRequested>(_onAuthTokenRefreshRequested);
     on<AuthErrorCleared>(_onAuthErrorCleared);
     on<SocialSignInRequested>(_onSocialSignInRequested);
+    
+    // Nouveaux handlers pour l'authentification par téléphone
+    on<SendPhoneVerificationCode>(_onSendPhoneVerificationCode);
+    on<VerifyPhoneCode>(_onVerifyPhoneCode);
   }
 
   Future<void> _onAuthStarted(
@@ -283,6 +292,48 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   void _onAuthErrorCleared(AuthErrorCleared event, Emitter<AuthState> emit) {
     if (state is AuthError) {
       emit(AuthUnauthenticated());
+    }
+  }
+
+  // Handlers pour l'authentification par téléphone
+  Future<void> _onSendPhoneVerificationCode(
+    SendPhoneVerificationCode event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    try {
+      final result = await _phoneAuthService.sendVerificationCode(event.phoneNumber);
+      
+      if (result.success) {
+        emit(PhoneCodeSent(phoneNumber: result.phoneNumber ?? event.phoneNumber));
+      } else {
+        emit(AuthError(message: result.message));
+      }
+    } catch (e) {
+      emit(AuthError(message: 'Erreur lors de l\'envoi du SMS: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onVerifyPhoneCode(
+    VerifyPhoneCode event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    try {
+      final response = await _phoneAuthService.verifyCodeAndLogin(
+        phoneNumber: event.phoneNumber,
+        code: event.code,
+        firstName: event.firstName,
+        lastName: event.lastName,
+      );
+      
+      emit(AuthAuthenticated(
+        user: response.user,
+        accessToken: response.tokens.accessToken,
+        refreshToken: response.tokens.refreshToken,
+      ));
+    } catch (e) {
+      emit(AuthError(message: e.toString()));
     }
   }
 }

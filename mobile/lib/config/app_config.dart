@@ -1,9 +1,21 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConfig {
   static const String appName = 'KiloShare';
   static const String appVersion = '1.0.0';
   
   // API Configuration
-  static const String baseUrl = 'http://localhost:8080/api/v1';
+  static String get baseUrl {
+    // Récupérer l'URL depuis .env ou utiliser une valeur par défaut
+    String apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    
+    // Note: Pour appareil physique Android, utiliser l'IP du réseau local (192.168.2.22)
+    // Pour émulateur Android, utiliser 10.0.2.2
+    // L'IP correcte est maintenant configurée dans le fichier .env
+    
+    return apiUrl;
+  }
+  
   static const int connectionTimeout = 30000;
   static const int receiveTimeout = 30000;
   

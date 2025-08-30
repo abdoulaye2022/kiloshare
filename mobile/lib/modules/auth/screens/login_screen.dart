@@ -109,6 +109,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Social login buttons
                 const SocialLoginButtons(),
                 
+                SizedBox(height: 16.h),
+                
+                // Phone authentication button
+                OutlinedButton.icon(
+                  onPressed: () => context.push('/phone-auth'),
+                  icon: const Icon(Icons.phone),
+                  label: const Text('Se connecter avec le téléphone'),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 24.w,
+                      vertical: 16.h,
+                    ),
+                  ),
+                ),
+                
                 SizedBox(height: 32.h),
                 
                 // Sign up link

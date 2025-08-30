@@ -35,14 +35,16 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: json['id'] as int,
-    uuid: json['uuid'] as String,
+    uuid: json['uuid'] as String? ?? '',
     email: json['email'] as String,
-    phone: json['phone'] as String?,
+    phone: json['phone'] as String? ?? json['phone_number'] as String?,
     firstName: json['first_name'] as String?,
     lastName: json['last_name'] as String?,
     isVerified: json['is_verified'] is bool 
         ? json['is_verified'] as bool 
-        : (json['is_verified'] as int) == 1,
+        : json['is_verified'] != null 
+            ? (json['is_verified'] as int) == 1
+            : false,
     emailVerifiedAt: json['email_verified_at'] != null 
         ? DateTime.parse(json['email_verified_at'] as String) 
         : null,
@@ -50,12 +52,14 @@ class User {
         ? DateTime.parse(json['phone_verified_at'] as String) 
         : null,
     profilePicture: json['profile_picture'] as String?,
-    status: json['status'] as String,
+    status: json['status'] as String? ?? 'active',
     lastLoginAt: json['last_login_at'] != null 
         ? DateTime.parse(json['last_login_at'] as String) 
         : null,
     createdAt: DateTime.parse(json['created_at'] as String),
-    updatedAt: DateTime.parse(json['updated_at'] as String),
+    updatedAt: json['updated_at'] != null 
+        ? DateTime.parse(json['updated_at'] as String)
+        : DateTime.parse(json['created_at'] as String),
   );
 
   Map<String, dynamic> toJson() => {
@@ -155,7 +159,7 @@ class AuthTokens {
   factory AuthTokens.fromJson(Map<String, dynamic> json) => AuthTokens(
     accessToken: json['access_token'] as String,
     refreshToken: json['refresh_token'] as String?,
-    tokenType: json['token_type'] as String,
+    tokenType: json['token_type'] as String? ?? 'Bearer',
     expiresIn: json['expires_in'] as int,
   );
 

@@ -7,6 +7,7 @@ namespace KiloShare\Services;
 use KiloShare\Models\User;
 use KiloShare\Models\EmailVerification;
 use KiloShare\Services\JWTService;
+use KiloShare\Services\EmailService;
 use KiloShare\Services\MailSender;
 use Ramsey\Uuid\Uuid;
 use PDO;
@@ -16,13 +17,15 @@ class AuthService
     private User $userModel;
     private EmailVerification $emailVerificationModel;
     private JWTService $jwtService;
+    private EmailService $emailService;
     private PDO $db;
 
-    public function __construct(User $userModel, JWTService $jwtService, PDO $db)
+    public function __construct(User $userModel, JWTService $jwtService, EmailService $emailService, PDO $db)
     {
         $this->userModel = $userModel;
         $this->emailVerificationModel = new EmailVerification($db);
         $this->jwtService = $jwtService;
+        $this->emailService = $emailService;
         $this->db = $db;
     }
 
@@ -63,6 +66,9 @@ class AuthService
         if (!empty($userData['phone'])) {
             $this->generateVerificationCode($user['id'], 'phone_verification');
         }
+
+        // Send welcome email
+        $this->emailService->sendWelcomeEmail($user);
 
         // Send email verification
         $this->sendEmailVerification($user);

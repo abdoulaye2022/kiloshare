@@ -3,9 +3,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import 'simple_social_auth_service.dart';
+import '../../../config/app_config.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://127.0.0.1:8080/api/v1';
   static const FlutterSecureStorage _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -24,7 +24,7 @@ class AuthService {
 
   static Dio _createDio() {
     final dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: AppConfig.baseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
@@ -123,7 +123,7 @@ class AuthService {
       print('==============================');
       
       final response = await _dio.post(
-        '/register', 
+        '/auth/register', 
         data: requestData,
         options: Options(
           headers: {
@@ -156,7 +156,7 @@ class AuthService {
 
   Future<AuthResponse> login(LoginRequest request) async {
     try {
-      final response = await _dio.post('/login', data: request.toJson());
+      final response = await _dio.post('/auth/login', data: request.toJson());
       
       final apiResponse = ApiResponse.fromJson(
         response.data,
@@ -184,7 +184,7 @@ class AuthService {
     
     if (refreshToken != null) {
       try {
-        await _dio.post('/logout', data: {'refresh_token': refreshToken});
+        await _dio.post('/auth/logout', data: {'refresh_token': refreshToken});
       } catch (e) {
         // Continue with local logout even if API call fails
       }
@@ -232,7 +232,7 @@ class AuthService {
 
   Future<void> sendPhoneVerification(String phone) async {
     try {
-      final response = await _dio.post('/phone/send-verification', data: {'phone': phone});
+      final response = await _dio.post('/auth/phone/send-verification', data: {'phone': phone});
       
       final apiResponse = ApiResponse.fromJson(response.data, (json) => json);
       if (!apiResponse.success) {
@@ -248,7 +248,7 @@ class AuthService {
     required String code,
   }) async {
     try {
-      final response = await _dio.post('/phone/verify', data: {
+      final response = await _dio.post('/auth/phone/verify', data: {
         'phone': phone,
         'code': code,
       });
@@ -295,7 +295,7 @@ class AuthService {
     }
 
     try {
-      final response = await _dio.post('/refresh-token', data: {
+      final response = await _dio.post('/auth/refresh', data: {
         'refresh_token': refreshToken,
       });
       
@@ -331,7 +331,7 @@ class AuthService {
     if (token == null) throw AuthException('Not authenticated');
 
     try {
-      final response = await _dio.post('/verify-phone',
+      final response = await _dio.post('/auth/verify-phone',
         data: {'code': code},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
@@ -357,7 +357,7 @@ class AuthService {
 
   Future<void> forgotPassword(String email) async {
     try {
-      final response = await _dio.post('/forgot-password', data: {'email': email});
+      final response = await _dio.post('/auth/forgot-password', data: {'email': email});
       
       final apiResponse = ApiResponse.fromJson(response.data, (json) => json);
 
@@ -373,7 +373,7 @@ class AuthService {
 
   Future<void> resetPassword(String token, String newPassword) async {
     try {
-      final response = await _dio.post('/reset-password', data: {
+      final response = await _dio.post('/auth/reset-password', data: {
         'token': token,
         'password': newPassword,
       });
@@ -398,7 +398,7 @@ class AuthService {
     if (token == null) throw AuthException('Not authenticated');
 
     try {
-      final response = await _dio.get('/me',
+      final response = await _dio.get('/auth/me',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       

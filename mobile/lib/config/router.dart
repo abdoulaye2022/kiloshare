@@ -5,6 +5,7 @@ import '../modules/auth/screens/login_screen.dart';
 import '../modules/auth/screens/register_screen.dart';
 import '../modules/auth/screens/forgot_password_screen.dart';
 import '../modules/auth/screens/email_verification_screen.dart';
+import '../modules/auth/screens/phone_auth_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -31,6 +32,11 @@ GoRouter createRouter() {
         path: '/email-verification',
         name: 'email-verification',
         builder: (context, state) => const EmailVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/phone-auth',
+        name: 'phone-auth',
+        builder: (context, state) => const PhoneAuthScreen(),
       ),
       
       // Placeholder for home until implemented

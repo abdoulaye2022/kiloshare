@@ -164,7 +164,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
             child: IconButton(
-              onPressed: () => context.pop(),
+              onPressed: () => context.go('/login'),
               icon: Icon(
                 Icons.arrow_back_ios_new,
                 color: theme.colorScheme.onSurface,

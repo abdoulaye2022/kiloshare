@@ -104,3 +104,30 @@ final class SocialSignInRequested extends AuthEvent {
   @override
   List<Object> get props => [provider];
 }
+
+// Nouveaux événements pour l'authentification par téléphone
+class SendPhoneVerificationCode extends AuthEvent {
+  final String phoneNumber;
+
+  const SendPhoneVerificationCode(this.phoneNumber);
+
+  @override
+  List<Object?> get props => [phoneNumber];
+}
+
+class VerifyPhoneCode extends AuthEvent {
+  final String phoneNumber;
+  final String code;
+  final String? firstName;
+  final String? lastName;
+
+  const VerifyPhoneCode(
+    this.phoneNumber,
+    this.code, {
+    this.firstName,
+    this.lastName,
+  });
+
+  @override
+  List<Object?> get props => [phoneNumber, code, firstName, lastName];
+}

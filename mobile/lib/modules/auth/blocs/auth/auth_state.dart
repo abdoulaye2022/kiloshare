@@ -87,3 +87,17 @@ class AuthEmailVerificationRequired extends AuthState {
   @override
   List<Object?> get props => [user, accessToken, refreshToken];
 }
+
+// Nouveaux états pour l'authentification par téléphone
+class PhoneCodeSent extends AuthState {
+  final String phoneNumber;
+
+  const PhoneCodeSent({required this.phoneNumber});
+
+  @override
+  List<Object?> get props => [phoneNumber];
+}
+
+// Alias pour la compatibilité
+typedef AuthSuccess = AuthAuthenticated;
+typedef AuthFailure = AuthError;

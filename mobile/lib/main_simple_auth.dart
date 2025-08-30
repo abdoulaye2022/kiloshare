@@ -5,6 +5,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'config/theme.dart';
 import 'modules/auth/blocs/bloc.dart';
 import 'modules/auth/services/auth_service.dart';
+import 'modules/auth/services/phone_auth_service.dart';
+import 'package:dio/dio.dart';
 
 void main() {
   runApp(const KiloShareSimpleAuth());
@@ -18,7 +20,13 @@ class KiloShareSimpleAuth extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(
-          create: (context) => AuthBloc(authService: AuthService()),
+          create: (context) {
+            final dio = Dio();
+            return AuthBloc(
+              authService: AuthService(),
+              phoneAuthService: PhoneAuthService(dio),
+            );
+          },
         ),
       ],
       child: ScreenUtilInit(

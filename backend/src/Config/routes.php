@@ -6,6 +6,8 @@ use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\SocialAuthController;
+use KiloShare\Controllers\PhoneAuthController;
+use KiloShare\Controllers\TestController;
 use KiloShare\Middleware\AuthMiddleware;
 use KiloShare\Middleware\OptionalAuthMiddleware;
 use KiloShare\Middleware\AdminAuthMiddleware;
@@ -49,6 +51,10 @@ return function (App $app) {
             $authGroup->post('/change-password', [AuthController::class, 'changePassword'])
                 ->add(AuthMiddleware::class);
                 
+            // Phone Authentication Routes
+            $authGroup->post('/phone/send-code', [PhoneAuthController::class, 'sendVerificationCode']);
+            $authGroup->post('/phone/verify-login', [PhoneAuthController::class, 'verifyCodeAndLogin']);
+            
             // Social Authentication Routes
             $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
             $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
@@ -87,6 +93,10 @@ return function (App $app) {
                 $authGroup->post('/change-password', [AuthController::class, 'changePassword'])
                     ->add(AuthMiddleware::class);
                     
+                // Phone Authentication Routes
+                $authGroup->post('/phone/send-code', [PhoneAuthController::class, 'sendVerificationCode']);
+                $authGroup->post('/phone/verify-login', [PhoneAuthController::class, 'verifyCodeAndLogin']);
+                
                 // Social Authentication Routes
                 $authGroup->get('/social/providers', [SocialAuthController::class, 'getProviders']);
                 $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
@@ -98,6 +108,13 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
                 $authGroup->delete('/social/unlink/{provider}', [SocialAuthController::class, 'unlinkSocialAccount'])
                     ->add(AuthMiddleware::class);
+            });
+            
+            // Test routes (development only)
+            $v1Group->group('/test', function (RouteCollectorProxy $testGroup) {
+                $testGroup->get('/email/config', [TestController::class, 'getEmailConfig']);
+                $testGroup->post('/email/welcome', [TestController::class, 'testWelcomeEmail']);
+                $testGroup->post('/email/verification', [TestController::class, 'testVerificationEmail']);
             });
         });
     });
