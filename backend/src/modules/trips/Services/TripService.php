@@ -54,11 +54,11 @@ class TripService
                 $trip->getDepartureCity(),
                 $trip->getDepartureCountry(),
                 $trip->getDepartureAirportCode(),
-                $trip->getDepartureDate(),
+                $this->formatDateTimeForDB($trip->getDepartureDate()),
                 $trip->getArrivalCity(),
                 $trip->getArrivalCountry(),
                 $trip->getArrivalAirportCode(),
-                $trip->getArrivalDate(),
+                $this->formatDateTimeForDB($trip->getArrivalDate()),
                 $trip->getAvailableWeightKg(),
                 $trip->getPricePerKg(),
                 $trip->getCurrency(),
@@ -98,7 +98,7 @@ class TripService
                    tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
-            WHERE t.id = ?
+            WHERE t.id = ? AND t.deleted_at IS NULL
         ");
         
         $stmt->execute([$id]);
@@ -108,12 +108,17 @@ class TripService
             return null;
         }
         
-        // Parse JSON fields
-        if ($result['restricted_categories']) {
+        // Parse JSON fields safely
+        if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
             $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+        } else {
+            $result['restricted_categories'] = null;
         }
-        if ($result['restricted_items']) {
+        
+        if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
             $result['restricted_items'] = json_decode($result['restricted_items'], true);
+        } else {
+            $result['restricted_items'] = null;
         }
         
         return new Trip($result);
@@ -129,7 +134,7 @@ class TripService
                    tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
-            WHERE t.uuid = ?
+            WHERE t.uuid = ? AND t.deleted_at IS NULL
         ");
         
         $stmt->execute([$uuid]);
@@ -139,12 +144,17 @@ class TripService
             return null;
         }
         
-        // Parse JSON fields
-        if ($result['restricted_categories']) {
+        // Parse JSON fields safely
+        if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
             $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+        } else {
+            $result['restricted_categories'] = null;
         }
-        if ($result['restricted_items']) {
+        
+        if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
             $result['restricted_items'] = json_decode($result['restricted_items'], true);
+        } else {
+            $result['restricted_items'] = null;
         }
         
         return new Trip($result);
@@ -159,11 +169,13 @@ class TripService
         
         $stmt = $this->db->prepare("
             SELECT t.*, 
+                   tr.restricted_categories, tr.restricted_items, tr.restriction_notes,
                    COUNT(tv.id) as view_count_calculated
             FROM trips t
+            LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
             LEFT JOIN trip_views tv ON t.id = tv.trip_id
-            WHERE t.user_id = ?
-            GROUP BY t.id
+            WHERE t.user_id = ? AND t.deleted_at IS NULL
+            GROUP BY t.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             ORDER BY t.created_at DESC
             LIMIT ? OFFSET ?
         ");
@@ -173,6 +185,19 @@ class TripService
         
         $trips = [];
         foreach ($results as $result) {
+            // Parse JSON fields safely
+            if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
+                $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+            } else {
+                $result['restricted_categories'] = null;
+            }
+            
+            if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
+                $result['restricted_items'] = json_decode($result['restricted_items'], true);
+            } else {
+                $result['restricted_items'] = null;
+            }
+            
             $trips[] = new Trip($result);
         }
         
@@ -185,7 +210,7 @@ class TripService
     public function searchTrips(array $filters, int $page = 1, int $limit = 20): array
     {
         $offset = ($page - 1) * $limit;
-        $whereConditions = ["t.status = 'published'", "t.departure_date > NOW()"];
+        $whereConditions = ["t.status = 'published'", "t.departure_date > NOW()", "t.deleted_at IS NULL"];
         $params = [];
         
         // Apply filters
@@ -248,13 +273,15 @@ class TripService
         
         $stmt = $this->db->prepare("
             SELECT t.*, 
+                   tr.restricted_categories, tr.restricted_items, tr.restriction_notes,
                    u.first_name, u.last_name, u.profile_picture, u.is_verified,
                    COUNT(tv.id) as view_count_calculated
             FROM trips t
             JOIN users u ON t.user_id = u.id
+            LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
             LEFT JOIN trip_views tv ON t.id = tv.trip_id
             WHERE {$whereClause}
-            GROUP BY t.id, u.id
+            GROUP BY t.id, u.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             ORDER BY t.departure_date ASC
             LIMIT ? OFFSET ?
         ");
@@ -264,6 +291,19 @@ class TripService
         
         $trips = [];
         foreach ($results as $result) {
+            // Parse JSON fields safely
+            if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
+                $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+            } else {
+                $result['restricted_categories'] = null;
+            }
+            
+            if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
+                $result['restricted_items'] = json_decode($result['restricted_items'], true);
+            } else {
+                $result['restricted_items'] = null;
+            }
+            
             $trip = new Trip($result);
             
             // Add user information
@@ -329,11 +369,11 @@ class TripService
                 $trip->getDepartureCity(),
                 $trip->getDepartureCountry(),
                 $trip->getDepartureAirportCode(),
-                $trip->getDepartureDate(),
+                $this->formatDateTimeForDB($trip->getDepartureDate()),
                 $trip->getArrivalCity(),
                 $trip->getArrivalCountry(),
                 $trip->getArrivalAirportCode(),
-                $trip->getArrivalDate(),
+                $this->formatDateTimeForDB($trip->getArrivalDate()),
                 $trip->getAvailableWeightKg(),
                 $trip->getPricePerKg(),
                 $trip->getCurrency(),
@@ -345,14 +385,33 @@ class TripService
                 $tripId
             ]);
             
-            // Update restrictions
-            if (isset($data['restricted_categories']) || isset($data['restricted_items'])) {
+            // Update restrictions - only if there are actual values to save
+            $hasRestrictedCategories = isset($data['restricted_categories']) && 
+                                     !empty($data['restricted_categories']) && 
+                                     $data['restricted_categories'] !== '[]' && 
+                                     $data['restricted_categories'] !== [];
+                                     
+            $hasRestrictedItems = isset($data['restricted_items']) && 
+                                !empty($data['restricted_items']) && 
+                                $data['restricted_items'] !== '[]' && 
+                                $data['restricted_items'] !== [];
+            
+            error_log("TripService::updateTrip - Restrictions Debug:");
+            error_log("  - restricted_categories: " . json_encode($data['restricted_categories'] ?? null));
+            error_log("  - restricted_items: " . json_encode($data['restricted_items'] ?? null));
+            error_log("  - restriction_notes: " . ($data['restriction_notes'] ?? 'null'));
+            error_log("  - hasRestrictedCategories: " . ($hasRestrictedCategories ? 'true' : 'false'));
+            error_log("  - hasRestrictedItems: " . ($hasRestrictedItems ? 'true' : 'false'));
+                                
+            if ($hasRestrictedCategories || $hasRestrictedItems || isset($data['restriction_notes'])) {
                 // Delete existing restrictions
                 $stmt = $this->db->prepare("DELETE FROM trip_restrictions WHERE trip_id = ?");
                 $stmt->execute([$tripId]);
                 
-                // Insert new restrictions
-                $this->saveRestrictions($tripId, $data);
+                // Insert new restrictions only if there's something to save
+                if ($hasRestrictedCategories || $hasRestrictedItems || !empty($data['restriction_notes'])) {
+                    $this->saveRestrictions($tripId, $data);
+                }
             }
             
             $this->db->commit();
@@ -361,6 +420,8 @@ class TripService
             
         } catch (Exception $e) {
             $this->db->rollBack();
+            error_log('TripService::updateTrip Error: ' . $e->getMessage());
+            error_log('TripService::updateTrip Data: ' . json_encode($data));
             throw new Exception('Failed to update trip: ' . $e->getMessage());
         }
     }
@@ -382,14 +443,12 @@ class TripService
         try {
             $this->db->beginTransaction();
             
-            // Delete related data (CASCADE should handle this, but being explicit)
-            $this->db->prepare("DELETE FROM trip_restrictions WHERE trip_id = ?")->execute([$tripId]);
-            $this->db->prepare("DELETE FROM trip_views WHERE trip_id = ?")->execute([$tripId]);
-            // $this->db->prepare("DELETE FROM trip_images WHERE trip_id = ?")->execute([$tripId]); // Table doesn't exist yet
-            
-            // Delete trip
-            $stmt = $this->db->prepare("DELETE FROM trips WHERE id = ?");
+            // Soft delete: Set deleted_at timestamp
+            $stmt = $this->db->prepare("UPDATE trips SET deleted_at = NOW(), updated_at = NOW() WHERE id = ?");
             $stmt->execute([$tripId]);
+            
+            // Log the action
+            $this->logTripAction($tripId, $userId, 'delete', 'Trip soft deleted');
             
             $this->db->commit();
             
@@ -503,6 +562,31 @@ class TripService
             return;
         }
         
+        // Handle different data formats safely
+        $restrictedCategories = null;
+        $restrictedItems = null;
+        
+        if (isset($data['restricted_categories'])) {
+            if (is_array($data['restricted_categories'])) {
+                $restrictedCategories = json_encode($data['restricted_categories']);
+            } elseif (is_string($data['restricted_categories'])) {
+                // Already JSON string, use as is
+                $restrictedCategories = $data['restricted_categories'];
+            }
+        }
+        
+        if (isset($data['restricted_items'])) {
+            if (is_array($data['restricted_items'])) {
+                $restrictedItems = json_encode($data['restricted_items']);
+            } elseif (is_string($data['restricted_items'])) {
+                // Already JSON string, use as is  
+                $restrictedItems = $data['restricted_items'];
+            }
+        }
+        
+        error_log('TripService::saveRestrictions - Categories: ' . ($restrictedCategories ?? 'null'));
+        error_log('TripService::saveRestrictions - Items: ' . ($restrictedItems ?? 'null'));
+        
         $stmt = $this->db->prepare("
             INSERT INTO trip_restrictions (trip_id, restricted_categories, restricted_items, restriction_notes)
             VALUES (?, ?, ?, ?)
@@ -510,10 +594,30 @@ class TripService
         
         $stmt->execute([
             $tripId,
-            isset($data['restricted_categories']) ? json_encode($data['restricted_categories']) : null,
-            isset($data['restricted_items']) ? json_encode($data['restricted_items']) : null,
+            $restrictedCategories,
+            $restrictedItems,
             $data['restriction_notes'] ?? null
         ]);
+    }
+
+    /**
+     * Format datetime for database storage (MySQL format)
+     */
+    private function formatDateTimeForDB(?string $dateTime): ?string
+    {
+        if (empty($dateTime)) {
+            return null;
+        }
+        
+        try {
+            // Parse ISO8601 format from frontend and convert to MySQL format
+            $date = new \DateTime($dateTime);
+            return $date->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            error_log('TripService::formatDateTimeForDB - Invalid date format: ' . $dateTime . ' Error: ' . $e->getMessage());
+            // Try to parse as-is if it's already in MySQL format
+            return $dateTime;
+        }
     }
 
     /**
@@ -652,6 +756,457 @@ class TripService
             $this->db->rollBack();
             throw new Exception('Failed to reject trip: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Get user drafts
+     */
+    public function getUserDrafts(int $userId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+        
+        $stmt = $this->db->prepare("
+            SELECT * FROM trips 
+            WHERE user_id = ? AND status = 'draft' AND deleted_at IS NULL
+            ORDER BY updated_at DESC
+            LIMIT ? OFFSET ?
+        ");
+        $stmt->execute([$userId, $limit, $offset]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $drafts = [];
+        foreach ($results as $row) {
+            $drafts[] = (new Trip($row))->toJson();
+        }
+        
+        return $drafts;
+    }
+
+    /**
+     * Get user favorites
+     */
+    public function getUserFavorites(int $userId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+        
+        $stmt = $this->db->prepare("
+            SELECT t.* FROM trips t
+            INNER JOIN trip_favorites tf ON t.id = tf.trip_id
+            WHERE tf.user_id = ?
+            ORDER BY tf.created_at DESC
+            LIMIT ? OFFSET ?
+        ");
+        $stmt->execute([$userId, $limit, $offset]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $favorites = [];
+        foreach ($results as $row) {
+            $favorites[] = (new Trip($row))->toJson();
+        }
+        
+        return $favorites;
+    }
+
+    /**
+     * Publish trip (draft to active/pending_review)
+     */
+    public function publishTrip(int $tripId, int $userId): Trip
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        if (!$trip->canBePublished()) {
+            throw new Exception('Trip cannot be published in current state');
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // Determine target status based on auto-approval logic
+            $status = $trip->getAutoApproved() ? 'active' : 'pending_review';
+            $publishedAt = date('Y-m-d H:i:s');
+
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET status = ?, published_at = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$status, $publishedAt, $tripId]);
+
+            $this->db->commit();
+            return $this->getTripById($tripId);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw new Exception('Failed to publish trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Pause trip
+     */
+    public function pauseTrip(int $tripId, int $userId, ?string $reason = null): Trip
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        if (!in_array($trip->getStatus(), ['active', 'pending_review'])) {
+            throw new Exception('Only active or pending review trips can be paused');
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET status = 'paused', paused_at = NOW(), pause_reason = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$reason, $tripId]);
+
+            // Log the action
+            $this->logTripAction($tripId, $userId, 'pause', $reason);
+
+            $this->db->commit();
+            return $this->getTripById($tripId);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw new Exception('Failed to pause trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Resume trip
+     */
+    public function resumeTrip(int $tripId, int $userId): Trip
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        if ($trip->getStatus() !== 'paused') {
+            throw new Exception('Only paused trips can be resumed');
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET status = 'active', paused_at = NULL, pause_reason = NULL, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$tripId]);
+
+            // Log the action
+            $this->logTripAction($tripId, $userId, 'resume');
+
+            $this->db->commit();
+            return $this->getTripById($tripId);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw new Exception('Failed to resume trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Cancel trip
+     */
+    public function cancelTrip(int $tripId, int $userId, ?string $reason = null, ?string $details = null): Trip
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        $allowedStatuses = ['draft', 'pending_review', 'active', 'paused', 'booked', 'in_progress'];
+        if (!in_array($trip->getStatus(), $allowedStatuses)) {
+            throw new Exception('Trip cannot be cancelled in current state');
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET status = 'cancelled', cancelled_at = NOW(), 
+                    cancellation_reason = ?, cancellation_details = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$reason, $details, $tripId]);
+
+            // Log the action
+            $this->logTripAction($tripId, $userId, 'cancel', $reason);
+
+            $this->db->commit();
+            return $this->getTripById($tripId);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw new Exception('Failed to cancel trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Complete trip
+     */
+    public function completeTrip(int $tripId, int $userId): Trip
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        $allowedStatuses = ['booked', 'in_progress'];
+        if (!in_array($trip->getStatus(), $allowedStatuses)) {
+            throw new Exception('Trip cannot be completed in current state');
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$tripId]);
+
+            // Log the action
+            $this->logTripAction($tripId, $userId, 'complete');
+
+            $this->db->commit();
+            return $this->getTripById($tripId);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw new Exception('Failed to complete trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Add trip to favorites
+     */
+    public function addToFavorites(int $tripId, int $userId): void
+    {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT IGNORE INTO trip_favorites (trip_id, user_id, created_at)
+                VALUES (?, ?, NOW())
+            ");
+            $stmt->execute([$tripId, $userId]);
+
+            // Update favorite count
+            $this->updateFavoriteCount($tripId);
+
+        } catch (Exception $e) {
+            throw new Exception('Failed to add to favorites: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove trip from favorites
+     */
+    public function removeFromFavorites(int $tripId, int $userId): void
+    {
+        try {
+            $stmt = $this->db->prepare("
+                DELETE FROM trip_favorites 
+                WHERE trip_id = ? AND user_id = ?
+            ");
+            $stmt->execute([$tripId, $userId]);
+
+            // Update favorite count
+            $this->updateFavoriteCount($tripId);
+
+        } catch (Exception $e) {
+            throw new Exception('Failed to remove from favorites: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Report trip
+     */
+    public function reportTrip(int $tripId, int $userId, string $reportType, ?string $description = null): void
+    {
+        $validTypes = ['spam', 'fraud', 'inappropriate', 'misleading', 'prohibited_items', 'suspicious_price', 'other'];
+        if (!in_array($reportType, $validTypes)) {
+            throw new Exception('Invalid report type');
+        }
+
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO trip_reports (trip_id, reported_by, report_type, description, status, created_at)
+                VALUES (?, ?, ?, ?, 'pending', NOW())
+            ");
+            $stmt->execute([$tripId, $userId, $reportType, $description]);
+
+            // Update report count
+            $this->updateReportCount($tripId);
+
+        } catch (Exception $e) {
+            throw new Exception('Failed to report trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get trip analytics
+     */
+    public function getTripAnalytics(int $tripId, int $userId): array
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip || $trip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        return [
+            'views' => $trip->getViewCount(),
+            'favorites' => $trip->getFavoriteCount(),
+            'shares' => $trip->getShareCount(),
+            'reports' => $trip->getReportCount(),
+            'bookings' => $trip->getBookingCount(),
+            'remaining_weight' => $trip->getRemainingWeight(),
+            'conversion_rate' => $trip->getViewCount() > 0 ? ($trip->getBookingCount() / $trip->getViewCount()) * 100 : 0
+        ];
+    }
+
+    /**
+     * Share trip
+     */
+    public function shareTrip(int $tripId, int $userId): array
+    {
+        $trip = $this->getTripById($tripId);
+        if (!$trip) {
+            throw new Exception('Trip not found');
+        }
+
+        try {
+            // Increment share count
+            $stmt = $this->db->prepare("
+                UPDATE trips 
+                SET share_count = share_count + 1, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$tripId]);
+
+            // Generate share URL
+            $shareUrl = "https://kiloshare.com/trips/" . $trip->getUuid();
+            if ($trip->getShareToken()) {
+                $shareUrl .= "?token=" . $trip->getShareToken();
+            }
+
+            return ['share_url' => $shareUrl];
+
+        } catch (Exception $e) {
+            throw new Exception('Failed to share trip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Duplicate trip
+     */
+    public function duplicateTrip(int $tripId, int $userId): Trip
+    {
+        $originalTrip = $this->getTripById($tripId);
+        if (!$originalTrip || $originalTrip->getUserId() != $userId) {
+            throw new Exception('Trip not found or access denied');
+        }
+
+        $tripData = $originalTrip->toArray();
+        
+        // Remove fields that shouldn't be duplicated
+        unset($tripData['id'], $tripData['uuid'], $tripData['created_at'], $tripData['updated_at']);
+        unset($tripData['published_at'], $tripData['view_count'], $tripData['booking_count']);
+        unset($tripData['share_count'], $tripData['favorite_count'], $tripData['report_count']);
+        
+        // Set as draft and reference original
+        $tripData['status'] = 'draft';
+        $tripData['original_trip_id'] = $tripId;
+        $tripData['duplicate_count'] = 0;
+
+        return $this->createTrip($tripData, $userId);
+    }
+
+    /**
+     * Log trip action
+     */
+    private function logTripAction(int $tripId, int $userId, string $action, ?string $reason = null): void
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO trip_action_logs (trip_id, user_id, action, reason, created_at)
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([$tripId, $userId, $action, $reason]);
+    }
+
+    /**
+     * Update favorite count
+     */
+    private function updateFavoriteCount(int $tripId): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE trips 
+            SET favorite_count = (
+                SELECT COUNT(*) FROM trip_favorites WHERE trip_id = ?
+            )
+            WHERE id = ?
+        ");
+        $stmt->execute([$tripId, $tripId]);
+    }
+
+    /**
+     * Get public trips (approved and published)
+     */
+    public function getPublicTrips(int $limit = 10): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT t.*, u.first_name, u.last_name, u.is_verified,
+                   COUNT(tr.id) as report_count
+            FROM trips t
+            LEFT JOIN users u ON t.user_id = u.id
+            LEFT JOIN trip_reports tr ON t.id = tr.trip_id
+            WHERE t.status IN ('published', 'active') 
+                AND t.deleted_at IS NULL
+                AND t.is_approved = 1
+                AND t.departure_date > NOW()
+            GROUP BY t.id
+            HAVING report_count <= 3
+            ORDER BY t.created_at DESC
+            LIMIT ?
+        ");
+        
+        $stmt->execute([$limit]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $trips = [];
+        foreach ($results as $result) {
+            $trip = new Trip($result);
+            $trips[] = $trip->toArray();
+        }
+        
+        return $trips;
+    }
+
+    /**
+     * Update report count
+     */
+    private function updateReportCount(int $tripId): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE trips 
+            SET report_count = (
+                SELECT COUNT(*) FROM trip_reports WHERE trip_id = ?
+            )
+            WHERE id = ?
+        ");
+        $stmt->execute([$tripId, $tripId]);
     }
 
     /**

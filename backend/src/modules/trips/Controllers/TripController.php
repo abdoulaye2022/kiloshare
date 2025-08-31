@@ -474,7 +474,7 @@ class TripController
             
             return $this->success($response, [
                 'message' => 'Trip paused successfully',
-                'trip' => $trip
+                'trip' => $trip->toJson()
             ]);
             
         } catch (Exception $e) {
@@ -501,7 +501,7 @@ class TripController
             
             return $this->success($response, [
                 'message' => 'Trip resumed successfully',
-                'trip' => $trip
+                'trip' => $trip->toJson()
             ]);
             
         } catch (Exception $e) {
@@ -531,7 +531,7 @@ class TripController
             
             return $this->success($response, [
                 'message' => 'Trip cancelled successfully',
-                'trip' => $trip
+                'trip' => $trip->toJson()
             ]);
             
         } catch (Exception $e) {
@@ -558,7 +558,7 @@ class TripController
             
             return $this->success($response, [
                 'message' => 'Trip completed successfully',
-                'trip' => $trip
+                'trip' => $trip->toJson()
             ]);
             
         } catch (Exception $e) {
@@ -577,18 +577,30 @@ class TripController
             $tripId = (int) $args['id'];
             $user = $request->getAttribute('user');
             
+            error_log("TripController: Publishing trip ID: $tripId for user: " . $user['id']);
+            
             if (!$tripId) {
                 return $this->error($response, 'Trip ID is required', 400);
             }
 
             $trip = $this->tripService->publishTrip($tripId, $user['id']);
             
+            error_log("TripController: Trip service returned: " . ($trip ? 'Trip object' : 'null'));
+            
+            if (!$trip) {
+                return $this->error($response, 'Failed to publish trip: service returned null', 500);
+            }
+            
+            $tripJson = $trip->toJson();
+            error_log("TripController: Trip toJson() returned: " . ($tripJson ? 'Array' : 'null'));
+            
             return $this->success($response, [
                 'message' => 'Trip published successfully',
-                'trip' => $trip->toJson()
+                'trip' => $tripJson
             ]);
             
         } catch (Exception $e) {
+            error_log('TripController: Exception in publishTrip: ' . $e->getMessage());
             $this->logger->error('Failed to publish trip: ' . $e->getMessage());
             return $this->error($response, $e->getMessage());
         }
