@@ -15,9 +15,14 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   late final TripService _tripService;
 
   TripBloc() : super(const TripInitial()) {
+    print('=== DEBUG: TripBloc constructor called ===');
     _tripService = AuthTokenService.instance.tripService;
+    print('DEBUG: TripService instance from AuthTokenService: $_tripService');
     
-    on<LoadTrips>(_onLoadTrips);
+    on<LoadTrips>((event, emit) async {
+      print('=== DEBUG: LoadTrips event received ===');
+      await _onLoadTrips(event, emit);
+    });
     on<LoadTripById>(_onLoadTripById);
     on<RefreshTrips>(_onRefreshTrips);
     on<CreateTrip>(_onCreateTrip);
@@ -373,15 +378,26 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   }
 
   Future<void> _onLoadPublicTrips(LoadPublicTrips event, Emitter<TripState> emit) async {
+    print('=== DEBUG: _onLoadPublicTrips START ===');
+    print('DEBUG: Loading public trips with limit: ${event.limit}');
     emit(const TripLoading());
     try {
       // Create a separate TripService instance for public operations (no auth required)
+      print('DEBUG: Creating TripService instance for public operations');
       final publicTripService = TripService();
+      print('DEBUG: Calling getPublicTrips...');
       final trips = await publicTripService.getPublicTrips(limit: event.limit);
+      print('DEBUG: getPublicTrips completed successfully - ${trips.length} trips loaded');
       emit(PublicTripsLoaded(trips: trips));
+      print('DEBUG: PublicTripsLoaded state emitted');
     } catch (error) {
+      print('=== DEBUG: Error in _onLoadPublicTrips ===');
+      print('DEBUG: Error type: ${error.runtimeType}');
+      print('DEBUG: Error message: $error');
+      print('DEBUG: Error string: ${error.toString()}');
       emit(TripError('Failed to load public trips: ${error.toString()}', error: error));
     }
+    print('=== DEBUG: _onLoadPublicTrips END ===');
   }
 
   // Filter handlers for user trips

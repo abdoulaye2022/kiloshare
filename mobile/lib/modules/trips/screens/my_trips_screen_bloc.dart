@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../bloc/trip_bloc.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_status_widget.dart';
+import '../../auth/blocs/auth/auth_bloc.dart';
+import '../../auth/blocs/auth/auth_state.dart';
 
 class MyTripsScreenBloc extends StatelessWidget {
   const MyTripsScreenBloc({super.key});
@@ -48,11 +50,15 @@ class _MyTripsViewState extends State<_MyTripsView>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     
-    // Load initial data for the first tab immediately
+    // Load initial data for the first tab immediately (only if authenticated)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final bloc = context.read<TripBloc>();
-        bloc.add(const LoadTrips());
+        // Check if user is authenticated before loading trips
+        final authState = context.read<AuthBloc>().state;
+        if (authState is AuthAuthenticated) {
+          final bloc = context.read<TripBloc>();
+          bloc.add(const LoadTrips());
+        }
       }
     });
   }
@@ -67,6 +73,10 @@ class _MyTripsViewState extends State<_MyTripsView>
   }
 
   void _onTabChanged() {
+    // Check if user is authenticated before loading any data
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    
     final bloc = context.read<TripBloc>();
     
     switch (_tabController.index) {
@@ -163,7 +173,10 @@ class _MyTripsViewState extends State<_MyTripsView>
 
     if (state is TripError) {
       return _buildErrorView(context, state.message, () {
-        context.read<TripBloc>().add(const LoadTrips());
+        final authState = context.read<AuthBloc>().state;
+        if (authState is AuthAuthenticated) {
+          context.read<TripBloc>().add(const LoadTrips());
+        }
       });
     }
 
@@ -179,11 +192,14 @@ class _MyTripsViewState extends State<_MyTripsView>
       return _buildTripsList(context, state.trips);
     }
 
-    // Initial state - trigger loading if not already loading
+    // Initial state - trigger loading if not already loading (only if authenticated)
     if (state is TripInitial) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          context.read<TripBloc>().add(const LoadTrips());
+          final authState = context.read<AuthBloc>().state;
+          if (authState is AuthAuthenticated) {
+            context.read<TripBloc>().add(const LoadTrips());
+          }
         }
       });
       return const Center(child: CircularProgressIndicator());
@@ -292,7 +308,14 @@ class _MyTripsViewState extends State<_MyTripsView>
       margin: const EdgeInsets.only(bottom: 16.0),
       child: InkWell(
         onTap: () {
-          context.push('/trips/${trip.id}');
+          print('TripCard: Clicked on trip ID: "${trip.id}", Status: ${trip.status.value}, UUID: "${trip.uuid}"');
+          if (trip.id.isEmpty) {
+            print('TripCard: ERROR - Trip ID is empty, cannot navigate!');
+            print('TripCard: Using UUID for navigation instead: ${trip.uuid}');
+            context.push('/trips/${trip.uuid}'); // fallback to UUID
+          } else {
+            context.push('/trips/${trip.id}');
+          }
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),

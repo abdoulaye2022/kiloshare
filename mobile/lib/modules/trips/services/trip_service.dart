@@ -1008,7 +1008,11 @@ class TripService {
 
   /// Get public trips (approved and published)
   Future<List<Trip>> getPublicTrips({int limit = 10}) async {
+    print('=== DEBUG: getPublicTrips START ===');
+    print('DEBUG: Requesting public trips with limit: $limit');
+    print('DEBUG: No authentication token will be used for public trips');
     try {
+      print('DEBUG: Making GET request to /trips/public');
       final response = await _dio.get('/trips/public',
         queryParameters: {
           'limit': limit,
@@ -1021,15 +1025,34 @@ class TripService {
           },
         ),
       );
+      print('DEBUG: Response received - Status: ${response.statusCode}');
+      print('DEBUG: Response data type: ${response.data?.runtimeType}');
       
       if (response.data['success'] == true) {
+        print('DEBUG: Success response received');
         final tripsData = response.data['trips'] as List<dynamic>;
-        return tripsData.map((json) => Trip.fromJson(json)).toList();
+        print('DEBUG: Found ${tripsData.length} trips in response');
+        final trips = tripsData.map((json) => Trip.fromJson(json)).toList();
+        print('DEBUG: Successfully parsed ${trips.length} Trip objects');
+        print('=== DEBUG: getPublicTrips END - SUCCESS ===');
+        return trips;
       } else {
+        print('DEBUG: Error response - success: false');
+        print('DEBUG: Error message: ${response.data['message']}');
         throw TripException(response.data['message'] ?? 'Failed to fetch public trips');
       }
     } on DioException catch (e) {
+      print('=== DEBUG: DioException in getPublicTrips ===');
+      print('DEBUG: DioException type: ${e.type}');
+      print('DEBUG: DioException message: ${e.message}');
+      print('DEBUG: DioException response: ${e.response?.data}');
+      print('DEBUG: DioException status: ${e.response?.statusCode}');
       throw _handleDioException(e);
+    } catch (e) {
+      print('=== DEBUG: General Exception in getPublicTrips ===');
+      print('DEBUG: Exception type: ${e.runtimeType}');
+      print('DEBUG: Exception message: $e');
+      rethrow;
     }
   }
 }
