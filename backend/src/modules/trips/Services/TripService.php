@@ -174,7 +174,7 @@ class TripService
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
             LEFT JOIN trip_views tv ON t.id = tv.trip_id
-            WHERE t.user_id = ? AND t.deleted_at IS NULL
+            WHERE t.user_id = ? AND t.status != 'draft' AND t.deleted_at IS NULL
             GROUP BY t.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             ORDER BY t.created_at DESC
             LIMIT ? OFFSET ?
@@ -766,17 +766,36 @@ class TripService
         $offset = ($page - 1) * $limit;
         
         $stmt = $this->db->prepare("
-            SELECT * FROM trips 
-            WHERE user_id = ? AND status = 'draft' AND deleted_at IS NULL
-            ORDER BY updated_at DESC
+            SELECT t.*, 
+                   tr.restricted_categories, tr.restricted_items, tr.restriction_notes,
+                   COUNT(tv.id) as view_count_calculated
+            FROM trips t
+            LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
+            LEFT JOIN trip_views tv ON t.id = tv.trip_id
+            WHERE t.user_id = ? AND t.status = 'draft' AND t.deleted_at IS NULL
+            GROUP BY t.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes
+            ORDER BY t.updated_at DESC
             LIMIT ? OFFSET ?
         ");
         $stmt->execute([$userId, $limit, $offset]);
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $drafts = [];
-        foreach ($results as $row) {
-            $drafts[] = (new Trip($row))->toJson();
+        foreach ($results as $result) {
+            // Parse JSON fields safely
+            if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
+                $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+            } else {
+                $result['restricted_categories'] = null;
+            }
+            
+            if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
+                $result['restricted_items'] = json_decode($result['restricted_items'], true);
+            } else {
+                $result['restricted_items'] = null;
+            }
+            
+            $drafts[] = new Trip($result);
         }
         
         return $drafts;
@@ -790,9 +809,15 @@ class TripService
         $offset = ($page - 1) * $limit;
         
         $stmt = $this->db->prepare("
-            SELECT t.* FROM trips t
+            SELECT t.*, 
+                   tr.restricted_categories, tr.restricted_items, tr.restriction_notes,
+                   COUNT(tv.id) as view_count_calculated
+            FROM trips t
+            LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
+            LEFT JOIN trip_views tv ON t.id = tv.trip_id
             INNER JOIN trip_favorites tf ON t.id = tf.trip_id
-            WHERE tf.user_id = ?
+            WHERE tf.user_id = ? AND t.deleted_at IS NULL
+            GROUP BY t.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes, tf.created_at
             ORDER BY tf.created_at DESC
             LIMIT ? OFFSET ?
         ");
@@ -800,8 +825,21 @@ class TripService
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $favorites = [];
-        foreach ($results as $row) {
-            $favorites[] = (new Trip($row))->toJson();
+        foreach ($results as $result) {
+            // Parse JSON fields safely
+            if ($result['restricted_categories'] && $result['restricted_categories'] !== 'null') {
+                $result['restricted_categories'] = json_decode($result['restricted_categories'], true);
+            } else {
+                $result['restricted_categories'] = null;
+            }
+            
+            if ($result['restricted_items'] && $result['restricted_items'] !== 'null') {
+                $result['restricted_items'] = json_decode($result['restricted_items'], true);
+            } else {
+                $result['restricted_items'] = null;
+            }
+            
+            $favorites[] = new Trip($result);
         }
         
         return $favorites;
