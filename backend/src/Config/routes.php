@@ -308,7 +308,7 @@ return function (App $app) {
         $group->group('/auth', function (RouteCollectorProxy $authGroup) {
             $authGroup->post('/register', [AuthController::class, 'register']);
             $authGroup->post('/login', [AuthController::class, 'login']);
-            $authGroup->post('/refresh', [AuthController::class, 'refresh']);
+            $authGroup->post('/refresh', [AuthController::class, 'refreshToken']);
             $authGroup->post('/forgot-password', [AuthController::class, 'forgotPassword']);
             $authGroup->post('/reset-password', [AuthController::class, 'resetPassword']);
             $authGroup->post('/verify-email', [AuthController::class, 'verifyEmail']);
@@ -350,7 +350,7 @@ return function (App $app) {
             $v1Group->group('/auth', function (RouteCollectorProxy $authGroup) {
                 $authGroup->post('/register', [AuthController::class, 'register']);
                 $authGroup->post('/login', [AuthController::class, 'login']);
-                $authGroup->post('/refresh', [AuthController::class, 'refresh']);
+                $authGroup->post('/refresh', [AuthController::class, 'refreshToken']);
                 $authGroup->post('/forgot-password', [AuthController::class, 'forgotPassword']);
                 $authGroup->post('/reset-password', [AuthController::class, 'resetPassword']);
                 $authGroup->post('/verify-email', [AuthController::class, 'verifyEmail']);
@@ -419,6 +419,7 @@ return function (App $app) {
             // Trip routes
             $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
                 // Public routes (specific routes first)
+                $tripGroup->get('/public', [TripController::class, 'getPublicTrips']);
                 $tripGroup->get('/search', [TripController::class, 'search']);
                 $tripGroup->get('/price-suggestion', [TripController::class, 'getPriceSuggestion']);
                 $tripGroup->get('/price-breakdown', [TripController::class, 'getPriceBreakdown']);
@@ -428,9 +429,54 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
                 $tripGroup->get('/list', [TripController::class, 'list'])
                     ->add(AuthMiddleware::class);
+                
+                // Favorites routes
+                $tripGroup->get('/favorites', [TripController::class, 'getUserFavorites'])
+                    ->add(AuthMiddleware::class);
+                
+                // Draft routes
+                $tripGroup->post('/drafts/save', [TripController::class, 'saveDraft'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/drafts', [TripController::class, 'getUserDrafts'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/drafts/{id}', [TripController::class, 'loadDraft'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->delete('/drafts/{id}', [TripController::class, 'deleteDraft'])
+                    ->add(AuthMiddleware::class);
                     
+                // Trip actions routes (must come before generic {id} routes)
+                $tripGroup->post('/{id}/pause', [TripController::class, 'pauseTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/resume', [TripController::class, 'resumeTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/cancel', [TripController::class, 'cancelTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/duplicate', [TripController::class, 'duplicateTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/publish', [TripController::class, 'publishTrip'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/share', [TripController::class, 'shareTrip'])
+                    ->add(AuthMiddleware::class);
+                    
+                // Favorites and reporting routes
+                $tripGroup->post('/{id}/favorite', [TripController::class, 'addToFavorites'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->delete('/{id}/favorite', [TripController::class, 'removeFromFavorites'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/report', [TripController::class, 'reportTrip'])
+                    ->add(AuthMiddleware::class);
+                    
+                // Analytics and history routes
+                $tripGroup->get('/{id}/analytics', [TripController::class, 'getTripAnalytics'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/{id}/history', [TripController::class, 'getTripHistory'])
+                    ->add(AuthMiddleware::class);
+
                 // Generic routes with parameters (must come last)
-                $tripGroup->get('/{id}', [TripController::class, 'get']);
+                $tripGroup->get('/{id}', [TripController::class, 'get'])
+                    ->add(OptionalAuthMiddleware::class);
                 $tripGroup->put('/{id}/update', [TripController::class, 'update'])
                     ->add(AuthMiddleware::class);
                 $tripGroup->delete('/{id}/delete', [TripController::class, 'delete'])

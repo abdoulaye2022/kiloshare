@@ -204,13 +204,24 @@ class TripService {
   /// Get trip by ID
   Future<Trip> getTripById(String id) async {
     try {
+      print('=== TRIP SERVICE GET BY ID DEBUG START ===');
+      print('TripService: getTripById called with ID: "$id"');
+      print('TripService: ID type: ${id.runtimeType}');
+      print('TripService: ID length: ${id.length}');
+      
       // Try to get token but don't fail if not available (public access)
       String? token;
       try {
         token = await _authService.getValidAccessToken();
+        print('TripService: Auth token retrieved successfully');
+        if (token != null) {
+          print('TripService: Token length: ${token.length}');
+          print('TripService: Token preview: ${token.length > 20 ? token.substring(0, 20) : token}...');
+        }
       } catch (e) {
         // Token not available or expired - continue without auth for public access
-        print('TripService: No auth token available for getTripById, trying public access');
+        print('TripService: No auth token available for getTripById - Error: $e');
+        print('TripService: Continuing with public access');
       }
       
       // Prepare headers - include auth if available, but don't require it
@@ -226,19 +237,68 @@ class TripService {
         print('TripService: Using public request for getTripById');
       }
 
+      print('TripService: Request headers: ${headers.keys.toList()}');
+      print('TripService: Making GET request to: ${_dio.options.baseUrl}/trips/$id');
+
       final response = await _dio.get('/trips/$id',
         options: Options(
           headers: headers,
         ),
       );
       
+      print('TripService: Response received');
+      print('TripService: - Status Code: ${response.statusCode}');
+      print('TripService: - Response Headers: ${response.headers.map}');
+      print('TripService: - Response Data Type: ${response.data.runtimeType}');
+      print('TripService: - Response Success Field: ${response.data?['success']}');
+      print('TripService: - Response Message Field: ${response.data?['message']}');
+      print('TripService: - Response Trip Field Present: ${response.data?['trip'] != null}');
+      
+      if (response.data is Map) {
+        print('TripService: Full response data keys: ${response.data.keys.toList()}');
+      }
+      print('=== TRIP SERVICE API RESPONSE DEBUG ===');
+      
       if (response.data['success'] == true) {
-        return Trip.fromJson(response.data['trip']);
+        print('TripService: Response indicates success, parsing trip data...');
+        final tripData = response.data['trip'];
+        print('TripService: Trip data type: ${tripData.runtimeType}');
+        if (tripData is Map) {
+          print('TripService: Trip data keys: ${tripData.keys.toList()}');
+          print('TripService: Trip ID from response: ${tripData['id']}');
+          print('TripService: Trip status from response: ${tripData['status']}');
+          print('TripService: Trip user_id from response: ${tripData['user_id']}');
+        }
+        
+        final trip = Trip.fromJson(response.data['trip']);
+        print('TripService: Trip parsed successfully');
+        print('TripService: - Parsed Trip ID: ${trip.id}');
+        print('TripService: - Parsed Trip Status: ${trip.status}');
+        print('TripService: - Parsed Trip User ID: ${trip.userId}');
+        print('=== TRIP SERVICE GET BY ID DEBUG SUCCESS ===');
+        return trip;
       } else {
+        print('TripService: Response indicates failure');
+        print('TripService: - Error message: ${response.data['message']}');
+        print('=== TRIP SERVICE GET BY ID DEBUG FAILURE ===');
         throw TripException(response.data['message'] ?? 'Trip not found');
       }
     } on DioException catch (e) {
+      print('=== TRIP SERVICE GET BY ID DIO EXCEPTION ===');
+      print('TripService: DioException caught in getTripById');
+      print('TripService: - Exception Type: ${e.type}');
+      print('TripService: - Exception Message: ${e.message}');
+      print('TripService: - Response Status Code: ${e.response?.statusCode}');
+      print('TripService: - Response Data: ${e.response?.data}');
+      print('=== TRIP SERVICE DIO EXCEPTION END ===');
       throw _handleDioException(e);
+    } catch (e) {
+      print('=== TRIP SERVICE GET BY ID GENERAL EXCEPTION ===');
+      print('TripService: General exception caught in getTripById');
+      print('TripService: - Exception Type: ${e.runtimeType}');
+      print('TripService: - Exception Message: $e');
+      print('=== TRIP SERVICE GENERAL EXCEPTION END ===');
+      rethrow;
     }
   }
 

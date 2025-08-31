@@ -17,7 +17,7 @@ import '../modules/profile/screens/linked_accounts_screen.dart';
 import '../modules/trips/screens/trip_type_selection_screen.dart';
 import '../modules/trips/screens/create_trip_screen.dart';
 import '../modules/trips/screens/my_trips_screen_bloc.dart';
-import '../modules/trips/screens/trip_details_static.dart';
+import '../modules/trips/screens/trip_details_final.dart';
 import '../modules/trips/screens/search_trips_screen.dart';
 
 GoRouter createRouter() {
@@ -126,7 +126,7 @@ GoRouter createRouter() {
         name: 'trip-details',
         builder: (context, state) {
           final tripId = state.pathParameters['id']!;
-          return TripDetailsStatic(tripId: tripId);
+          return TripDetailsFinal(tripId: tripId);
         },
       ),
       GoRoute(
