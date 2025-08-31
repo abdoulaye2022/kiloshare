@@ -9,6 +9,7 @@ use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\PhoneAuthController;
 use KiloShare\Controllers\TestController;
 use App\Modules\Profile\Controllers\ProfileController;
+use App\Modules\Trips\Controllers\TripController;
 use KiloShare\Middleware\AuthMiddleware;
 use KiloShare\Middleware\OptionalAuthMiddleware;
 use KiloShare\Middleware\AdminAuthMiddleware;
@@ -413,6 +414,49 @@ return function (App $app) {
                 // Verification status
                 $profileGroup->get('/verification-status', [ProfileController::class, 'getVerificationStatus'])
                     ->add(AuthMiddleware::class);
+            });
+            
+            // Trip routes
+            $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
+                // Public routes (specific routes first)
+                $tripGroup->get('/search', [TripController::class, 'search']);
+                $tripGroup->get('/price-suggestion', [TripController::class, 'getPriceSuggestion']);
+                $tripGroup->get('/price-breakdown', [TripController::class, 'getPriceBreakdown']);
+                
+                // Protected routes (specific routes first)
+                $tripGroup->post('/create', [TripController::class, 'create'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/list', [TripController::class, 'list'])
+                    ->add(AuthMiddleware::class);
+                    
+                // Generic routes with parameters (must come last)
+                $tripGroup->get('/{id}', [TripController::class, 'get']);
+                $tripGroup->put('/{id}/update', [TripController::class, 'update'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->delete('/{id}/delete', [TripController::class, 'delete'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->post('/{id}/validate-ticket', [TripController::class, 'validateTicket'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Admin routes (admin only access)
+            $v1Group->group('/admin', function (RouteCollectorProxy $adminGroup) {
+                // Auth routes for admin
+                $adminGroup->post('/auth/login', [AuthController::class, 'adminLogin']);
+                
+                // Trip management (admin only)
+                $adminGroup->get('/trips/pending', [TripController::class, 'getPendingTrips'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/trips/{id}/approve', [TripController::class, 'approveTrip'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/trips/{id}/reject', [TripController::class, 'rejectTrip'])
+                    ->add(AdminAuthMiddleware::class);
+                    
+                // User management (admin only)
+                $adminGroup->get('/users', [AuthController::class, 'getAllUsers'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->put('/users/{id}/role', [AuthController::class, 'updateUserRole'])
+                    ->add(AdminAuthMiddleware::class);
             });
             
             // Test routes (development only)

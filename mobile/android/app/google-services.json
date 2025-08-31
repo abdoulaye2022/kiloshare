@@ -14,10 +14,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "325498754106-m0gsjqh3v9o8218lqpnb4l2vnbta3ejm.apps.googleusercontent.com",
-          "client_type": 1
-        },
-        {
           "client_id": "325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com",
           "client_type": 3
         }

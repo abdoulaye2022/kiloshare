@@ -51,7 +51,7 @@ class User
     {
         try {
             $sql = "SELECT id, uuid, email, phone, first_name, last_name, is_verified, 
-                           email_verified_at, phone_verified_at, profile_picture, status, 
+                           email_verified_at, phone_verified_at, profile_picture, status, role,
                            last_login_at, social_provider, social_id, created_at, updated_at 
                     FROM users WHERE id = :id AND status != 'deleted'";
             
@@ -70,7 +70,7 @@ class User
         try {
             $sql = "SELECT id, uuid, email, phone, password_hash, first_name, last_name, 
                            is_verified, email_verified_at, phone_verified_at, profile_picture, 
-                           status, last_login_at, social_provider, social_id, created_at, updated_at 
+                           status, role, last_login_at, social_provider, social_id, created_at, updated_at 
                     FROM users WHERE email = :email AND status != 'deleted'";
             
             $stmt = $this->db->prepare($sql);

@@ -41,7 +41,8 @@ class JWTService
                 'phone' => $user['phone'] ?? null,
                 'first_name' => $user['first_name'] ?? null,
                 'last_name' => $user['last_name'] ?? null,
-                'is_verified' => (bool)$user['is_verified']
+                'is_verified' => (bool)$user['is_verified'],
+                'role' => $user['role'] ?? 'user'
             ],
             'type' => 'access'
         ];

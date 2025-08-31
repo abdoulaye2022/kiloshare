@@ -140,6 +140,27 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    // Trip services
+    \App\Modules\Trips\Services\PriceCalculatorService::class => function ($container) {
+        return new \App\Modules\Trips\Services\PriceCalculatorService(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \App\Modules\Trips\Services\TripService::class => function ($container) {
+        return new \App\Modules\Trips\Services\TripService(
+            $container->get(\App\Modules\Trips\Services\PriceCalculatorService::class),
+            $container->get(PDO::class)
+        );
+    },
+    
+    \App\Modules\Trips\Controllers\TripController::class => function ($container) {
+        return new \App\Modules\Trips\Controllers\TripController(
+            $container->get(\App\Modules\Trips\Services\TripService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
     // Middleware
     \KiloShare\Middleware\AuthMiddleware::class => function ($container) {
         return new \KiloShare\Middleware\AuthMiddleware(
@@ -155,7 +176,7 @@ $containerBuilder->addDefinitions([
     
     \KiloShare\Middleware\AdminAuthMiddleware::class => function ($container) {
         return new \KiloShare\Middleware\AdminAuthMiddleware(
-            $container->get(\KiloShare\Services\JWTService::class)
+            $container->get(PDO::class)
         );
     }
 ]);

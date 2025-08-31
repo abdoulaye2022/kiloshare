@@ -1,4 +1,5 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
 
 class AppConfig {
   static const String appName = 'KiloShare';
@@ -6,12 +7,19 @@ class AppConfig {
   
   // API Configuration
   static String get baseUrl {
-    // Récupérer l'URL depuis .env ou utiliser une valeur par défaut
-    String apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    // Configuration automatique selon la plateforme
+    String defaultUrl;
     
-    // Note: Pour appareil physique Android, utiliser l'IP du réseau local (192.168.2.22)
-    // Pour émulateur Android, utiliser 10.0.2.2
-    // L'IP correcte est maintenant configurée dans le fichier .env
+    if (Platform.isAndroid) {
+      // Android émulateur : 10.0.2.2 mappe vers localhost de l'hôte
+      defaultUrl = 'http://10.0.2.2:8080/api';
+    } else {
+      // iOS/Desktop : utiliser localhost directement
+      defaultUrl = 'http://127.0.0.1:8080/api';
+    }
+    
+    // Permettre la surcharge via .env si besoin
+    String apiUrl = dotenv.env['API_BASE_URL'] ?? defaultUrl;
     
     return apiUrl;
   }

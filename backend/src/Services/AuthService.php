@@ -599,4 +599,103 @@ class AuthService
             throw $e;
         }
     }
+
+    public function adminLogin(string $email, string $password): array
+    {
+        // Check if user exists and verify password
+        $user = $this->userModel->findByEmail($email);
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            throw new \RuntimeException('Invalid credentials', 401);
+        }
+
+        // Verify user has admin role
+        if ($user['role'] !== 'admin') {
+            throw new \RuntimeException('Access denied - Admin privileges required', 403);
+        }
+
+        // Generate JWT tokens
+        $accessToken = $this->jwtService->generateAccessToken($user);
+        $refreshToken = $this->jwtService->generateRefreshToken($user);
+
+        // Update last login
+        $this->userModel->updateLastLogin($user['id']);
+
+        return [
+            'user' => [
+                'id' => $user['id'],
+                'uuid' => $user['uuid'],
+                'email' => $user['email'],
+                'first_name' => $user['first_name'],
+                'last_name' => $user['last_name'],
+                'role' => $user['role']
+            ],
+            'tokens' => [
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+                'token_type' => 'Bearer',
+                'expires_in' => 3600
+            ]
+        ];
+    }
+
+    public function getAllUsers(): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT 
+                id, 
+                uuid, 
+                email, 
+                first_name, 
+                last_name, 
+                role, 
+                is_verified, 
+                email_verified_at, 
+                phone_verified_at,
+                trust_score,
+                completed_trips,
+                total_trips,
+                status,
+                created_at,
+                updated_at
+            FROM users 
+            ORDER BY created_at DESC
+        ");
+        
+        $stmt->execute();
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $users ?: [];
+    }
+
+    public function updateUserRole(int $userId, string $role): array
+    {
+        if (!in_array($role, ['user', 'admin', 'moderator'])) {
+            throw new \RuntimeException('Invalid role specified', 400);
+        }
+
+        // Get user first to verify they exist
+        $user = $this->userModel->findById($userId);
+        if (!$user) {
+            throw new \RuntimeException('User not found', 404);
+        }
+
+        // Update the role
+        $stmt = $this->db->prepare("UPDATE users SET role = ? WHERE id = ?");
+        $success = $stmt->execute([$role, $userId]);
+
+        if (!$success) {
+            throw new \RuntimeException('Failed to update user role', 500);
+        }
+
+        // Return updated user data
+        $updatedUser = $this->userModel->findById($userId);
+        
+        return [
+            'id' => $updatedUser['id'],
+            'email' => $updatedUser['email'],
+            'first_name' => $updatedUser['first_name'],
+            'last_name' => $updatedUser['last_name'],
+            'role' => $updatedUser['role']
+        ];
+    }
 }

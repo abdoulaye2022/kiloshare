@@ -746,4 +746,137 @@ class AuthController
                 ->withHeader('Content-Type', 'application/json');
         }
     }
+
+    public function adminLogin(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody() ?? [];
+            
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['email']) || empty($data['password'])) {
+                throw new \RuntimeException('Email and password are required', 400);
+            }
+            
+            // Login with admin role verification
+            $result = $this->authService->adminLogin($data['email'], $data['password']);
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Admin login successful',
+                'data' => $result
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'ADMIN_LOGIN_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Admin login failed',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function getAllUsers(Request $request, Response $response): Response
+    {
+        try {
+            $result = $this->authService->getAllUsers();
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'data' => $result
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Failed to fetch users',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function updateUserRole(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $userId = $args['id'];
+            $data = $request->getParsedBody() ?? [];
+            
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['role']) || !in_array($data['role'], ['user', 'admin', 'moderator'])) {
+                throw new \RuntimeException('Valid role is required (user, admin, moderator)', 400);
+            }
+            
+            $result = $this->authService->updateUserRole((int)$userId, $data['role']);
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'User role updated successfully',
+                'data' => $result
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'UPDATE_ROLE_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Failed to update user role',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
 }

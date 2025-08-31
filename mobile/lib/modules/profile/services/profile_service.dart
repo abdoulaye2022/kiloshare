@@ -22,7 +22,7 @@ class ProfileService {
 
   static Dio _createDio() {
     final dio = Dio(BaseOptions(
-      baseUrl: '${AppConfig.baseUrl}/api/v1',
+      baseUrl: '${AppConfig.baseUrl}/v1',
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {

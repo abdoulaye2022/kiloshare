@@ -1,18 +1,16 @@
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
 import '../models/user_model.dart';
-
-// Import conditionnel pour Apple Sign-In (iOS seulement)
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class SimpleSocialAuthService {
   final Dio _dio;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    // Sur iOS, utiliser le client ID explicite
-    // Sur Android, laisser vide pour utiliser google-services.json
+    // iOS needs clientId, Android needs serverClientId
     clientId: Platform.isIOS ? '325498754106-2pnias80tkj3c1uvc75c3vonhv1m1bli.apps.googleusercontent.com' : null,
+    serverClientId: '325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com',
   );
 
   SimpleSocialAuthService(this._dio);
@@ -72,11 +70,6 @@ class SimpleSocialAuthService {
   Future<AuthResponse?> signInWithApple() async {
     try {
       print('🍎 Starting Simple Apple Sign-In...');
-      
-      // Vérifier si on est sur iOS
-      if (!Platform.isIOS) {
-        throw Exception('Apple Sign-In is only available on iOS');
-      }
       
       // Apple Sign-In direct
       final appleCredential = await SignInWithApple.getAppleIDCredential(

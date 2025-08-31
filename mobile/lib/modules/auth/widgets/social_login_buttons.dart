@@ -70,16 +70,21 @@ class SocialLoginButtons extends StatelessWidget {
       width: 24.w,
       height: 24.h,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(2),
+        borderRadius: BorderRadius.circular(4),
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade300, width: 0.5),
       ),
-      child: Image.network(
-        'https://developers.google.com/identity/images/g-logo.png',
-        width: 24.w,
-        height: 24.h,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Icons.g_mobiledata,
-          color: Colors.blue,
-          size: 24.sp,
+      child: Center(
+        child: Container(
+          width: 18.w,
+          height: 18.h,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: CustomPaint(
+            painter: GoogleLogoPainter(),
+            size: Size(18.w, 18.h),
+          ),
         ),
       ),
     );
@@ -138,8 +143,50 @@ class _SocialButton extends StatelessWidget {
             fontWeight: FontWeight.w500,
             color: textColor,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
   }
+}
+
+class GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    
+    // Background white circle
+    paint.color = Colors.white;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        const Radius.circular(2),
+      ),
+      paint,
+    );
+    
+    // Google "G" avec les bonnes couleurs
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: 'G',
+        style: TextStyle(
+          fontSize: size.width * 0.8,
+          fontWeight: FontWeight.w500,
+          color: const Color(0xFF4285F4), // Google Blue
+          fontFamily: 'Roboto',
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    
+    textPainter.layout();
+    
+    final centerX = (size.width - textPainter.width) / 2;
+    final centerY = (size.height - textPainter.height) / 2;
+    
+    textPainter.paint(canvas, Offset(centerX, centerY));
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -24,8 +24,11 @@
     "autoload": {
         "psr-4": {
             "KiloShare\\": "src/",
-            "KiloShare\\Modules\\": "src/modules/"
-        }
+            "App\\": "src/"
+        },
+        "classmap": [
+            "src/modules/"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
