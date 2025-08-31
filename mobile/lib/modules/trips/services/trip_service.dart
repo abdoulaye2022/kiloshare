@@ -132,9 +132,9 @@ class TripService {
         print('TripService: Trip status: ${trip.status.value}');
         if (trip.status == TripStatus.pendingApproval) {
           print('TripService: Trip submitted for approval');
-        } else if (trip.status == TripStatus.published) {
+        } else if (trip.status == TripStatus.active) {
           print('TripService: Trip published immediately');
-        } else if (trip.status == TripStatus.flaggedForReview) {
+        } else if (trip.status == TripStatus.pendingReview) {
           print('TripService: Trip flagged for review');
         }
         
@@ -160,6 +160,7 @@ class TripService {
         throw const TripException('Authentication token is required. Please log in again.');
       }
 
+      print('TripService: Making request to /trips/list...');
       final response = await _dio.get('/trips/list', 
         queryParameters: {
           'page': page,
@@ -174,8 +175,23 @@ class TripService {
         ),
       );
       
+      print('TripService: Response status: ${response.statusCode}');
+      print('TripService: Response data: ${response.data}');
+      print('TripService: Response data type: ${response.data.runtimeType}');
+      
+      if (response.data == null) {
+        throw const TripException('Empty response from server');
+      }
+      
       if (response.data['success'] == true) {
-        final List<dynamic> tripsData = response.data['data']['trips'];
+        if (response.data['trips'] == null) {
+          print('TripService: No trips data in response');
+          return <Trip>[];
+        }
+        
+        final tripsData = response.data['trips'] as List<dynamic>;
+        print('TripService: Found ${tripsData.length} trips in response');
+        
         return tripsData.map((json) => Trip.fromJson(json)).toList();
       } else {
         throw TripException(response.data['message'] ?? 'Failed to fetch trips');
@@ -188,23 +204,36 @@ class TripService {
   /// Get trip by ID
   Future<Trip> getTripById(String id) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
+      // Try to get token but don't fail if not available (public access)
+      String? token;
+      try {
+        token = await _authService.getValidAccessToken();
+      } catch (e) {
+        // Token not available or expired - continue without auth for public access
+        print('TripService: No auth token available for getTripById, trying public access');
+      }
+      
+      // Prepare headers - include auth if available, but don't require it
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+        print('TripService: Using authenticated request for getTripById');
+      } else {
+        print('TripService: Using public request for getTripById');
       }
 
       final response = await _dio.get('/trips/$id',
         options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
+          headers: headers,
         ),
       );
       
       if (response.data['success'] == true) {
-        return Trip.fromJson(response.data['data']['trip']);
+        return Trip.fromJson(response.data['trip']);
       } else {
         throw TripException(response.data['message'] ?? 'Trip not found');
       }
@@ -401,6 +430,400 @@ class TripService {
     }
   }
 
+  /// Publish trip (draft to active)
+  Future<Trip> publishTrip(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/publish',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to publish trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Pause trip
+  Future<Trip> pauseTrip(String tripId, {String? reason}) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final data = <String, dynamic>{};
+      if (reason != null) data['reason'] = reason;
+
+      final response = await _dio.post('/trips/$tripId/pause',
+        data: data,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to pause trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Resume trip
+  Future<Trip> resumeTrip(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/resume',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to resume trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Cancel trip
+  Future<Trip> cancelTrip(String tripId, {String? reason, String? details}) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final data = <String, dynamic>{};
+      if (reason != null) data['reason'] = reason;
+      if (details != null) data['details'] = details;
+
+      final response = await _dio.post('/trips/$tripId/cancel',
+        data: data,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to cancel trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Complete trip
+  Future<Trip> completeTrip(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/complete',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to complete trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Add trip to favorites
+  Future<void> addToFavorites(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/favorite',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] != true) {
+        throw TripException(response.data['message'] ?? 'Failed to add trip to favorites');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Remove trip from favorites
+  Future<void> removeFromFavorites(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.delete('/trips/$tripId/favorite',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] != true) {
+        throw TripException(response.data['message'] ?? 'Failed to remove trip from favorites');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Report trip
+  Future<void> reportTrip(String tripId, {
+    required String reportType,
+    String? description,
+  }) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final data = {
+        'report_type': reportType,
+        if (description != null) 'description': description,
+      };
+
+      final response = await _dio.post('/trips/$tripId/report',
+        data: data,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] != true) {
+        throw TripException(response.data['message'] ?? 'Failed to report trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get user's drafts
+  Future<List<Trip>> getDrafts({int page = 1, int limit = 20}) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.get('/trips/drafts',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        if (response.data['drafts'] == null) {
+          return <Trip>[];
+        }
+        
+        final draftsData = response.data['drafts'] as List<dynamic>;
+        return draftsData.map((json) => Trip.fromJson(json)).toList();
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to fetch drafts');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get user's favorites
+  Future<List<Trip>> getFavorites({int page = 1, int limit = 20}) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.get('/trips/favorites',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        if (response.data['trips'] == null) {
+          return <Trip>[];
+        }
+        
+        final tripsData = response.data['trips'] as List<dynamic>;
+        return tripsData.map((json) => Trip.fromJson(json)).toList();
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to fetch favorites');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get trip analytics
+  Future<Map<String, dynamic>> getTripAnalytics(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.get('/trips/$tripId/analytics',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return response.data['analytics'];
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to fetch trip analytics');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Share trip
+  Future<String> shareTrip(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/share',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return response.data['share_url'];
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to share trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Duplicate trip
+  Future<Trip> duplicateTrip(String tripId) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/duplicate',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        return Trip.fromJson(response.data['trip']);
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to duplicate trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   TripException _handleDioException(DioException e) {
     if (e.response != null && e.response!.data != null) {
       final data = e.response!.data;
@@ -437,6 +860,33 @@ class TripService {
   /// Get countries for selection
   List<Map<String, String>> getCountries() {
     return LocationsData.countries;
+  }
+
+  /// Get public trips (approved and published)
+  Future<List<Trip>> getPublicTrips({int limit = 10}) async {
+    try {
+      final response = await _dio.get('/trips/public',
+        queryParameters: {
+          'limit': limit,
+          'status': 'published',
+        },
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] == true) {
+        final tripsData = response.data['trips'] as List<dynamic>;
+        return tripsData.map((json) => Trip.fromJson(json)).toList();
+      } else {
+        throw TripException(response.data['message'] ?? 'Failed to fetch public trips');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
   }
 }
 

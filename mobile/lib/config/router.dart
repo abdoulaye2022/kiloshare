@@ -14,12 +14,23 @@ import '../modules/profile/screens/notification_settings_screen.dart';
 import '../modules/profile/screens/privacy_settings_screen.dart';
 import '../modules/profile/screens/delete_account_screen.dart';
 import '../modules/profile/screens/linked_accounts_screen.dart';
+import '../modules/trips/screens/trip_type_selection_screen.dart';
+import '../modules/trips/screens/create_trip_screen.dart';
+import '../modules/trips/screens/my_trips_screen_bloc.dart';
+import '../modules/trips/screens/trip_details_static.dart';
+import '../modules/trips/screens/search_trips_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/home',
     debugLogDiagnostics: true,
     routes: [
+      // Root redirect to home
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/home',
+      ),
+      
       // Authentication
       GoRoute(
         path: '/login',
@@ -92,6 +103,39 @@ GoRouter createRouter() {
         path: '/profile/delete-account',
         name: 'delete-account',
         builder: (context, state) => const DeleteAccountScreen(),
+      ),
+      
+      // Trip routes
+      GoRoute(
+        path: '/trips/create',
+        name: 'create-trip',
+        builder: (context, state) => const TripTypeSelectionScreen(),
+      ),
+      GoRoute(
+        path: '/trips/my-trips',
+        name: 'my-trips',
+        builder: (context, state) => const MyTripsScreenBloc(),
+      ),
+      GoRoute(
+        path: '/trips/search',
+        name: 'search-trips',
+        builder: (context, state) => const SearchTripsScreen(),
+      ),
+      GoRoute(
+        path: '/trips/:id',
+        name: 'trip-details',
+        builder: (context, state) {
+          final tripId = state.pathParameters['id']!;
+          return TripDetailsStatic(tripId: tripId);
+        },
+      ),
+      GoRoute(
+        path: '/trips/edit/:id',
+        name: 'edit-trip',
+        builder: (context, state) {
+          final tripId = state.pathParameters['id']!;
+          return CreateTripScreen(tripId: tripId);
+        },
       ),
     ],
     
