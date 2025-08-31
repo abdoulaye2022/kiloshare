@@ -19,10 +19,12 @@ import '../../auth/blocs/auth/auth_state.dart';
 
 class CreateTripScreen extends StatefulWidget {
   final TransportType? initialTransportType;
+  final String? tripId; // For edit mode
   
   const CreateTripScreen({
     super.key,
     this.initialTransportType,
+    this.tripId,
   });
 
   @override
@@ -56,6 +58,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     if (widget.initialTransportType != null) {
       _tripData['transport_type'] = widget.initialTransportType!.value;
     }
+    
+    // Load trip data if in edit mode
+    if (widget.tripId != null) {
+      _loadTripForEdit();
+    }
   }
 
   @override
@@ -66,6 +73,69 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     _descriptionController.dispose();
     _specialNotesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTripForEdit() async {
+    if (widget.tripId == null) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final trip = await _tripService.getTripById(widget.tripId!);
+      
+      // Populate form data
+      setState(() {
+        _tripData.addAll({
+          'transport_type': trip.transportType,
+          'departure_city': trip.departureCity,
+          'departure_country': trip.departureCountry,
+          'departure_airport_code': trip.departureAirportCode,
+          'arrival_city': trip.arrivalCity,
+          'arrival_country': trip.arrivalCountry,
+          'arrival_airport_code': trip.arrivalAirportCode,
+          'departure_date': trip.departureDate,
+          'departure_time': TimeOfDay.fromDateTime(trip.departureDate),
+          'arrival_date': trip.arrivalDate,
+          'arrival_time': TimeOfDay.fromDateTime(trip.arrivalDate),
+          'available_weight_kg': trip.availableWeightKg,
+          'price_per_kg': trip.pricePerKg,
+          'currency': trip.currency,
+          'description': trip.description ?? '',
+          'special_notes': trip.specialNotes ?? '',
+          'restricted_items': trip.restrictedItems ?? [],
+          'restricted_categories': trip.restrictedCategories ?? [],
+          'restriction_notes': trip.restrictionNotes ?? '',
+        });
+        
+        // Debug logging for restrictions
+        print('CreateTripScreen: Loaded trip restrictions:');
+        print('  restricted_categories: ${trip.restrictedCategories}');
+        print('  restricted_items: ${trip.restrictedItems}');
+        print('  restriction_notes: ${trip.restrictionNotes}');
+        print('  _tripData restricted_categories: ${_tripData['restricted_categories']}');
+        print('  _tripData restricted_items: ${_tripData['restricted_items']}');
+        
+        // Update text controllers
+        _flightNumberController.text = trip.flightNumber ?? '';
+        _airlineController.text = trip.airline ?? '';
+        _descriptionController.text = trip.description ?? '';
+        _specialNotesController.text = trip.specialNotes ?? '';
+      });
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement du voyage: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _validateRoute() {
@@ -134,7 +204,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   Widget _buildCreateTripScreen(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Créer un voyage'),
+        title: Text(widget.tripId != null ? 'Modifier voyage' : 'Créer un voyage'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           TextButton(
@@ -206,7 +276,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       case 0: return 'Itinéraire';
       case 1: return 'Dates et heures';
       case 2: return 'Capacité et prix';
-      case 3: return 'Détails du vol';
+      case 3: return _tripData['transport_type'] == 'flight' 
+          ? 'Détails du vol' 
+          : _tripData['transport_type'] == 'car' 
+            ? 'Détails du voyage'
+            : 'Détails du transport';
       case 4: return 'Restrictions';
       default: return '';
     }
@@ -230,6 +304,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             'Sélectionnez vos villes de départ et d\'arrivée',
             style: TextStyle(color: Colors.grey),
           ),
+          const SizedBox(height: 24),
+          
+          // Transport type selection (especially useful in edit mode)
+          _buildTransportTypeSelector(),
+          
           const SizedBox(height: 24),
           
           CityAutocompleteField(
@@ -327,6 +406,117 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // Transport type selector widget
+  Widget _buildTransportTypeSelector() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.directions,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Moyen de transport',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTransportOption(
+                    transportType: TransportType.flight,
+                    icon: Icons.flight,
+                    label: 'Avion',
+                    description: 'Vol commercial',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTransportOption(
+                    transportType: TransportType.car,
+                    icon: Icons.directions_car,
+                    label: 'Voiture',
+                    description: 'Route terrestre',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransportOption({
+    required TransportType transportType,
+    required IconData icon,
+    required String label,
+    required String description,
+  }) {
+    final isSelected = _tripData['transport_type'] == transportType.value;
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _tripData['transport_type'] = transportType.value;
+          // Reset airport codes when changing transport type
+          if (transportType != TransportType.flight) {
+            _tripData['departure_airport_code'] = null;
+            _tripData['arrival_airport_code'] = null;
+          }
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : null,
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -434,10 +624,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           const SizedBox(height: 24),
           
           WeightSliderWidget(
-            weight: _tripData['available_weight_kg']?.toDouble() ?? 10.0,
+            weight: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
             onWeightChanged: (weight) {
+              print('DEBUG: Weight changed to: $weight');
               setState(() {
                 _tripData['available_weight_kg'] = weight;
+                print('DEBUG: _tripData after weight change: $_tripData');
               });
             },
           ),
@@ -450,14 +642,16 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               departureCountry: _tripData['departure_country'],
               arrivalCity: _tripData['arrival_city'],
               arrivalCountry: _tripData['arrival_country'],
-              weightKg: _tripData['available_weight_kg']?.toDouble() ?? 10.0,
+              weightKg: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
               transportType: _tripData['transport_type'] != null 
                   ? TransportType.fromString(_tripData['transport_type'])
                   : null,
               onPriceSelected: (pricePerKg, currency) {
+                print('DEBUG: Price selected - pricePerKg: $pricePerKg, currency: $currency');
                 setState(() {
                   _tripData['price_per_kg'] = pricePerKg;
                   _tripData['currency'] = currency;
+                  print('DEBUG: _tripData after price selection: $_tripData');
                 });
               },
             ),
@@ -757,7 +951,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(_currentStep < _totalSteps - 1 ? 'Suivant' : 'Créer le voyage'),
+                  : Text(_currentStep < _totalSteps - 1 
+                      ? 'Suivant' 
+                      : (widget.tripId != null ? 'Modifier l\'annonce' : 'Créer l\'annonce')),
             ),
           ),
         ],
@@ -803,7 +999,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      _createTrip();
+      _submitTrip();
     }
   }
 
@@ -838,48 +1034,175 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     }
   }
 
-  Future<void> _createTrip() async {
+  Future<void> _submitTrip() async {
+    print('=== DEBUG: _submitTrip() START ===');
+    print('DEBUG: _tripData full contents: $_tripData');
+    print('DEBUG: _tripData keys: ${_tripData.keys.toList()}');
+    print('DEBUG: _tripData is null: ${_tripData == null}');
+    
+    // Debug each key access that might be null
+    print('DEBUG: Checking individual keys...');
+    print('DEBUG: transport_type: ${_tripData['transport_type']} (type: ${_tripData['transport_type']?.runtimeType})');
+    print('DEBUG: departure_city: ${_tripData['departure_city']} (type: ${_tripData['departure_city']?.runtimeType})');
+    print('DEBUG: departure_country: ${_tripData['departure_country']} (type: ${_tripData['departure_country']?.runtimeType})');
+    print('DEBUG: arrival_city: ${_tripData['arrival_city']} (type: ${_tripData['arrival_city']?.runtimeType})');
+    print('DEBUG: arrival_country: ${_tripData['arrival_country']} (type: ${_tripData['arrival_country']?.runtimeType})');
+    print('DEBUG: departure_date: ${_tripData['departure_date']} (type: ${_tripData['departure_date']?.runtimeType})');
+    print('DEBUG: arrival_date: ${_tripData['arrival_date']} (type: ${_tripData['arrival_date']?.runtimeType})');
+    print('DEBUG: available_weight_kg: ${_tripData['available_weight_kg']} (type: ${_tripData['available_weight_kg']?.runtimeType})');
+    print('DEBUG: price_per_kg: ${_tripData['price_per_kg']} (type: ${_tripData['price_per_kg']?.runtimeType})');
+    print('DEBUG: currency: ${_tripData['currency']} (type: ${_tripData['currency']?.runtimeType})');
+    print('DEBUG: departure_airport_code: ${_tripData['departure_airport_code']} (type: ${_tripData['departure_airport_code']?.runtimeType})');
+    print('DEBUG: arrival_airport_code: ${_tripData['arrival_airport_code']} (type: ${_tripData['arrival_airport_code']?.runtimeType})');
+    print('DEBUG: restricted_categories: ${_tripData['restricted_categories']} (type: ${_tripData['restricted_categories']?.runtimeType})');
+    print('DEBUG: restricted_items: ${_tripData['restricted_items']} (type: ${_tripData['restricted_items']?.runtimeType})');
+    
+    // Debug controllers
+    print('DEBUG: _descriptionController.text: "${_descriptionController.text}"');
+    print('DEBUG: _specialNotesController.text: "${_specialNotesController.text}"');
+    print('DEBUG: _flightNumberController.text: "${_flightNumberController.text}"');
+    print('DEBUG: _airlineController.text: "${_airlineController.text}"');
+    
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _tripService.createTrip(
-        transportType: _tripData['transport_type'],
-        departureCity: _tripData['departure_city'],
-        departureCountry: _tripData['departure_country'],
-        departureAirportCode: _tripData['departure_airport_code'],
-        departureDate: _tripData['departure_date'],
-        arrivalCity: _tripData['arrival_city'],
-        arrivalCountry: _tripData['arrival_country'],
-        arrivalAirportCode: _tripData['arrival_airport_code'],
-        arrivalDate: _tripData['arrival_date'],
-        availableWeightKg: _tripData['available_weight_kg'].toDouble(),
-        pricePerKg: _tripData['price_per_kg'].toDouble(),
-        currency: _tripData['currency'] ?? 'CAD',
-        flightNumber: _flightNumberController.text.trim().isEmpty 
-            ? null : _flightNumberController.text.trim(),
-        airline: _airlineController.text.trim().isEmpty 
-            ? null : _airlineController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty 
-            ? null : _descriptionController.text.trim(),
-        specialNotes: _specialNotesController.text.trim().isEmpty 
-            ? null : _specialNotesController.text.trim(),
-        restrictedCategories: _tripData['restricted_categories'],
-        restrictedItems: _tripData['restricted_items'],
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Voyage créé avec succès !'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      final isEditMode = widget.tripId != null;
+      print('DEBUG: isEditMode: $isEditMode');
+      
+      if (isEditMode) {
+        // Edit existing trip
+        print('DEBUG: Creating updateData for edit mode...');
+        late final Map<String, dynamic> updateData;
+        try {
+          updateData = {
+            'transport_type': _tripData['transport_type'],
+            'departure_city': _tripData['departure_city'],
+            'departure_country': _tripData['departure_country'],
+            'departure_date': _tripData['departure_date']?.toIso8601String(),
+            'arrival_city': _tripData['arrival_city'],
+            'arrival_country': _tripData['arrival_country'],
+            'arrival_date': _tripData['arrival_date']?.toIso8601String(),
+            'available_weight_kg': _tripData['available_weight_kg']?.toDouble(),
+            'price_per_kg': _tripData['price_per_kg']?.toDouble(),
+            'currency': _tripData['currency'] ?? 'CAD',
+            'description': _descriptionController.text.trim().isEmpty 
+                ? null : _descriptionController.text.trim(),
+            'special_notes': _specialNotesController.text.trim().isEmpty 
+                ? null : _specialNotesController.text.trim(),
+            'restricted_categories': (_tripData['restricted_categories'] as List?)?.isEmpty == false 
+                ? _tripData['restricted_categories'] : null,
+            'restricted_items': (_tripData['restricted_items'] as List?)?.isEmpty == false 
+                ? _tripData['restricted_items'] : null,
+          };
+          print('DEBUG: updateData created successfully: $updateData');
+        } catch (e) {
+          print('DEBUG: ERROR creating updateData: $e');
+          print('DEBUG: Error type: ${e.runtimeType}');
+          rethrow;
+        }
         
-        context.go('/home');
+        // Add flight-specific fields only for flight transport
+        if (_tripData['transport_type'] == 'flight') {
+          updateData.addAll({
+            'departure_airport_code': _tripData['departure_airport_code'],
+            'arrival_airport_code': _tripData['arrival_airport_code'],
+            'flight_number': _flightNumberController.text.trim().isEmpty 
+                ? null : _flightNumberController.text.trim(),
+            'airline': _airlineController.text.trim().isEmpty 
+                ? null : _airlineController.text.trim(),
+          });
+        } else {
+          // For non-flight transport, explicitly set airport codes to null
+          updateData.addAll({
+            'departure_airport_code': null,
+            'arrival_airport_code': null,
+            'flight_number': null,
+            'airline': null,
+          });
+        }
+        
+        await _tripService.updateTrip(widget.tripId!, updateData);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voyage modifié avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          context.pop(); // Go back to trip details
+        }
+      } else {
+        // Create new trip
+        print('DEBUG: Creating new trip...');
+        try {
+          print('DEBUG: About to call _tripService.createTrip with:');
+          print('DEBUG: transportType: ${_tripData['transport_type']}');
+          print('DEBUG: departureCity: ${_tripData['departure_city']}');
+          print('DEBUG: departureCountry: ${_tripData['departure_country']}');
+          print('DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null}');
+          print('DEBUG: departureDate: ${_tripData['departure_date']}');
+          print('DEBUG: arrivalCity: ${_tripData['arrival_city']}');
+          print('DEBUG: arrivalCountry: ${_tripData['arrival_country']}');
+          print('DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null}');
+          print('DEBUG: arrivalDate: ${_tripData['arrival_date']}');
+          print('DEBUG: availableWeightKg: ${(_tripData['available_weight_kg'] ?? 0).toDouble()}');
+          print('DEBUG: pricePerKg: ${(_tripData['price_per_kg'] ?? 0).toDouble()}');
+          print('DEBUG: currency: ${_tripData['currency'] ?? 'CAD'}');
+          print('DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
+          print('DEBUG: restrictedItems: ${(_tripData['restricted_items'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_items']) : null}');
+          
+          await _tripService.createTrip(
+            transportType: _tripData['transport_type'],
+            departureCity: _tripData['departure_city'],
+            departureCountry: _tripData['departure_country'],
+            departureAirportCode: _tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null,
+            departureDate: _tripData['departure_date'],
+            arrivalCity: _tripData['arrival_city'],
+            arrivalCountry: _tripData['arrival_country'],
+            arrivalAirportCode: _tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null,
+            arrivalDate: _tripData['arrival_date'],
+            availableWeightKg: (_tripData['available_weight_kg'] ?? 0).toDouble(),
+            pricePerKg: (_tripData['price_per_kg'] ?? 0).toDouble(),
+            currency: _tripData['currency'] ?? 'CAD',
+            flightNumber: _tripData['transport_type'] == 'flight' && !_flightNumberController.text.trim().isEmpty 
+                ? _flightNumberController.text.trim() : null,
+            airline: _tripData['transport_type'] == 'flight' && !_airlineController.text.trim().isEmpty 
+                ? _airlineController.text.trim() : null,
+            description: _descriptionController.text.trim().isEmpty 
+                ? null : _descriptionController.text.trim(),
+            specialNotes: _specialNotesController.text.trim().isEmpty 
+                ? null : _specialNotesController.text.trim(),
+            restrictedCategories: (_tripData['restricted_categories'] as List?)?.isEmpty == false 
+                ? List<String>.from(_tripData['restricted_categories']) : null,
+            restrictedItems: (_tripData['restricted_items'] as List?)?.isEmpty == false 
+                ? List<String>.from(_tripData['restricted_items']) : null,
+          );
+          print('DEBUG: _tripService.createTrip completed successfully');
+        } catch (e) {
+          print('DEBUG: ERROR in createTrip: $e');
+          print('DEBUG: Error type: ${e.runtimeType}');
+          rethrow;
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voyage créé avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          context.go('/home');
+        }
       }
     } catch (e) {
+      print('=== DEBUG: Final catch block - error: $e');
+      print('DEBUG: Error type: ${e.runtimeType}');
+      print('DEBUG: Error stack trace: ${StackTrace.current}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

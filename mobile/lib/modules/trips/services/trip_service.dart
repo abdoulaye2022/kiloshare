@@ -114,6 +114,14 @@ class TripService {
       print('TripService: API call completed');
       print('TripService: Response status: ${response.statusCode}');
       print('TripService: Response data: ${response.data}');
+      print('TripService: Response data is null: ${response.data == null}');
+      print('TripService: Response data type: ${response.data?.runtimeType}');
+      
+      // Vérifier si response.data est null
+      if (response.data == null) {
+        print('TripService: ERROR - response.data is null');
+        throw const TripException('Server response is empty');
+      }
       
       if (response.data['success'] == true) {
         print('TripService: Trip created successfully');
@@ -145,9 +153,15 @@ class TripService {
       }
     } on DioException catch (e) {
       print('TripService: DioException caught: $e');
+      print('TripService: DioException type: ${e.type}');
+      print('TripService: DioException message: ${e.message}');
+      print('TripService: DioException response: ${e.response}');
+      print('TripService: DioException response data: ${e.response?.data}');
+      print('TripService: DioException response status: ${e.response?.statusCode}');
       throw _handleDioException(e);
     } catch (e) {
       print('TripService: General exception caught: $e');
+      print('TripService: Exception type: ${e.runtimeType}');
       throw TripException('Failed to create trip: $e');
     }
   }
@@ -352,11 +366,27 @@ class TripService {
   /// Update trip
   Future<Trip> updateTrip(String tripId, Map<String, dynamic> updates) async {
     try {
+      print('TripService: Updating trip $tripId');
+      print('TripService: Updates data: ${updates}');
+      print('TripService: Updates keys: ${updates.keys.toList()}');
+      
+      // Debug restriction fields specifically
+      if (updates.containsKey('restricted_categories')) {
+        print('TripService: restricted_categories = ${updates['restricted_categories']} (${updates['restricted_categories'].runtimeType})');
+      }
+      if (updates.containsKey('restricted_items')) {
+        print('TripService: restricted_items = ${updates['restricted_items']} (${updates['restricted_items'].runtimeType})');
+      }
+      if (updates.containsKey('restriction_notes')) {
+        print('TripService: restriction_notes = ${updates['restriction_notes']}');
+      }
+      
       final token = await _authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
         throw const TripException('Authentication token is required. Please log in again.');
       }
 
+      print('TripService: Making PUT request to /trips/$tripId/update');
       final response = await _dio.put('/trips/$tripId/update', 
         data: updates,
         options: Options(
@@ -368,8 +398,19 @@ class TripService {
         ),
       );
       
+      print('TripService: Update response status: ${response.statusCode}');
+      print('TripService: Update response data: ${response.data}');
+      
+      // Vérifier si response.data est null
+      if (response.data == null) {
+        print('TripService: ERROR - response.data is null in updateTrip');
+        throw const TripException('Server response is empty');
+      }
+      
       if (response.data['success'] == true) {
-        return Trip.fromJson(response.data['data']['trip']);
+        // La structure de réponse est: {success: true, trip: {...}}
+        // Pas {success: true, data: {trip: {...}}}
+        return Trip.fromJson(response.data['trip']);
       } else {
         throw TripException(response.data['message'] ?? 'Failed to update trip');
       }
@@ -458,7 +499,12 @@ class TripService {
       });
       
       if (response.data['success'] == true) {
-        return PriceSuggestion.fromJson(response.data['data']['price_suggestion']);
+        // Price suggestion is directly in response.data, not in data.price_suggestion
+        final priceSuggestionData = response.data['price_suggestion'];
+        if (priceSuggestionData == null) {
+          throw TripException('Price suggestion field is missing from response data');
+        }
+        return PriceSuggestion.fromJson(priceSuggestionData);
       } else {
         throw TripException(response.data['message'] ?? 'Failed to get price suggestion');
       }
@@ -481,7 +527,12 @@ class TripService {
       });
       
       if (response.data['success'] == true) {
-        return PriceBreakdown.fromJson(response.data['data']['breakdown']);
+        // Breakdown is directly in response.data, not in data.breakdown
+        final breakdownData = response.data['breakdown'];
+        if (breakdownData == null) {
+          throw TripException('Price breakdown field is missing from response data');
+        }
+        return PriceBreakdown.fromJson(breakdownData);
       } else {
         throw TripException(response.data['message'] ?? 'Failed to get price breakdown');
       }
@@ -493,11 +544,14 @@ class TripService {
   /// Publish trip (draft to active)
   Future<Trip> publishTrip(String tripId) async {
     try {
+      print('TripService: Publishing trip with ID: $tripId');
+      
       final token = await _authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
         throw const TripException('Authentication token is required. Please log in again.');
       }
 
+      print('TripService: Making POST request to /trips/$tripId/publish');
       final response = await _dio.post('/trips/$tripId/publish',
         options: Options(
           headers: {
@@ -508,13 +562,36 @@ class TripService {
         ),
       );
       
+      print('TripService: Publish response received');
+      print('TripService: - Status Code: ${response.statusCode}');
+      print('TripService: - Response Data Type: ${response.data.runtimeType}');
+      print('TripService: - Response Data: ${response.data}');
+      
+      if (response.data == null) {
+        throw const TripException('Server returned null response');
+      }
+      
       if (response.data['success'] == true) {
-        return Trip.fromJson(response.data['trip']);
+        print('TripService: Success field is true, parsing trip data');
+        final tripData = response.data['trip'];
+        
+        if (tripData == null) {
+          throw const TripException('Trip data is null in successful response');
+        }
+        
+        print('TripService: Trip data type: ${tripData.runtimeType}');
+        return Trip.fromJson(tripData);
       } else {
-        throw TripException(response.data['message'] ?? 'Failed to publish trip');
+        final message = response.data['message'] ?? 'Failed to publish trip';
+        print('TripService: Publish failed with message: $message');
+        throw TripException(message);
       }
     } on DioException catch (e) {
+      print('TripService: DioException in publishTrip: ${e.message}');
       throw _handleDioException(e);
+    } catch (e) {
+      print('TripService: Unexpected error in publishTrip: $e');
+      rethrow;
     }
   }
 
@@ -729,10 +806,12 @@ class TripService {
   /// Get user's drafts
   Future<List<Trip>> getDrafts({int page = 1, int limit = 20}) async {
     try {
+      print('TripService: getDrafts() called - fetching user drafts...');
       final token = await _authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
         throw const TripException('Authentication token is required. Please log in again.');
       }
+      print('TripService: Making request to /trips/drafts...');
 
       final response = await _dio.get('/trips/drafts',
         queryParameters: {
@@ -748,13 +827,18 @@ class TripService {
         ),
       );
       
+      print('TripService: getDrafts response status: ${response.statusCode}');
       if (response.data['success'] == true) {
-        if (response.data['drafts'] == null) {
+        if (response.data['trips'] == null) {
+          print('TripService: No drafts found in response');
           return <Trip>[];
         }
         
-        final draftsData = response.data['drafts'] as List<dynamic>;
-        return draftsData.map((json) => Trip.fromJson(json)).toList();
+        final draftsData = response.data['trips'] as List<dynamic>;
+        print('TripService: Found ${draftsData.length} drafts in response');
+        final drafts = draftsData.map((json) => Trip.fromJson(json)).toList();
+        print('TripService: Parsed ${drafts.length} draft objects successfully');
+        return drafts;
       } else {
         throw TripException(response.data['message'] ?? 'Failed to fetch drafts');
       }
