@@ -19,14 +19,27 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   // Search parameters
   String? _departureCity;
   String? _arrivalCity;
+  String? _departureCountry;
+  String? _arrivalCountry;
   DateTime? _departureDate;
+  DateTime? _departureDateTo;
   double? _maxPricePerKg;
   double? _minWeightKg;
+  bool _verifiedOnly = false;
+  bool _ticketVerifiedOnly = false;
   
   List<Trip> _searchResults = [];
+  List<Trip> _filteredResults = [];
   bool _isLoading = false;
   bool _hasSearched = false;
   String? _error;
+  
+  // Sorting and filtering
+  String _sortBy = 'departure_date';
+  bool _sortAscending = true;
+  
+  // Recent searches
+  List<Map<String, String>> _recentSearches = [];
 
   @override
   Widget build(BuildContext context) {
@@ -81,11 +94,18 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
                     onCitySelected: (city, country, code) {
                       setState(() {
                         _departureCity = city;
+                        _departureCountry = country;
                       });
                     },
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _swapCities,
+                  icon: Icon(Icons.swap_horiz, color: Theme.of(context).primaryColor),
+                  tooltip: 'Inverser départ/arrivée',
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: CityAutocompleteField(
                     label: 'Arrivée',
@@ -94,6 +114,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
                     onCitySelected: (city, country, code) {
                       setState(() {
                         _arrivalCity = city;
+                        _arrivalCountry = country;
                       });
                     },
                   ),
@@ -308,10 +329,12 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   }
 
   Widget _buildEmptyResultsState() {
-    return Center(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
           Icon(
             Icons.flight_takeoff,
             size: 64,
@@ -325,12 +348,15 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Essayez d\'ajuster vos critères de recherche',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[500],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'Essayez d\'ajuster vos critères de recherche',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
@@ -338,16 +364,19 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             icon: const Icon(Icons.refresh),
             label: const Text('Nouvelle recherche'),
           ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
         ],
       ),
     );
   }
 
   Widget _buildErrorState() {
-    return Center(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
           Icon(
             Icons.error_outline,
             size: 64,
@@ -361,12 +390,15 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            _error!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[600],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _error!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -374,6 +406,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             icon: const Icon(Icons.refresh),
             label: const Text('Réessayer'),
           ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.1),
         ],
       ),
     );
@@ -400,7 +433,25 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   }
 
   Future<void> _searchTrips() async {
-    if (!_canSearch()) return;
+    print('=== DEBUG: _searchTrips START ===');
+    print('DEBUG: Can search: ${_canSearch()}');
+    
+    if (!_canSearch()) {
+      print('DEBUG: Cannot search - requirements not met');
+      return;
+    }
+
+    print('DEBUG: Search parameters:');
+    print('  - departureCity: $_departureCity');
+    print('  - arrivalCity: $_arrivalCity');
+    print('  - departureCountry: $_departureCountry');
+    print('  - arrivalCountry: $_arrivalCountry');
+    print('  - departureDate: $_departureDate');
+    print('  - departureDateFrom: ${_departureDate?.toIso8601String()}');
+    print('  - maxPricePerKg: $_maxPricePerKg');
+    print('  - minWeightKg: $_minWeightKg');
+    print('  - verifiedOnly: $_verifiedOnly');
+    print('  - ticketVerifiedOnly: $_ticketVerifiedOnly');
 
     setState(() {
       _isLoading = true;
@@ -408,6 +459,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
     });
 
     try {
+      print('DEBUG: Calling AuthTokenService.instance.tripService.searchTrips...');
       final results = await AuthTokenService.instance.tripService.searchTrips(
         departureCity: _departureCity,
         arrivalCity: _arrivalCity,
@@ -416,12 +468,23 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
         minWeight: _minWeightKg,
       );
       
+      print('DEBUG: Search completed successfully');
+      print('DEBUG: Results count: ${results.length}');
+      print('DEBUG: Results: ${results.map((t) => '${t.id}: ${t.departureCity} → ${t.arrivalCity}').join(', ')}');
+      
       setState(() {
         _searchResults = results;
         _hasSearched = true;
         _isLoading = false;
       });
+      
+      print('=== DEBUG: _searchTrips END - SUCCESS ===');
     } catch (e) {
+      print('=== DEBUG: _searchTrips ERROR ===');
+      print('DEBUG: Error type: ${e.runtimeType}');
+      print('DEBUG: Error message: $e');
+      print('DEBUG: Error toString: ${e.toString()}');
+      
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -429,14 +492,31 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
     }
   }
 
+  void _swapCities() {
+    setState(() {
+      final tempCity = _departureCity;
+      final tempCountry = _departureCountry;
+      _departureCity = _arrivalCity;
+      _departureCountry = _arrivalCountry;
+      _arrivalCity = tempCity;
+      _arrivalCountry = tempCountry;
+    });
+  }
+
   void _clearSearch() {
     setState(() {
       _departureCity = null;
       _arrivalCity = null;
+      _departureCountry = null;
+      _arrivalCountry = null;
       _departureDate = null;
+      _departureDateTo = null;
       _maxPricePerKg = null;
       _minWeightKg = null;
+      _verifiedOnly = false;
+      _ticketVerifiedOnly = false;
       _searchResults = [];
+      _filteredResults = [];
       _hasSearched = false;
       _error = null;
     });

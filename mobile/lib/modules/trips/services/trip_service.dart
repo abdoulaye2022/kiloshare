@@ -332,6 +332,22 @@ class TripService {
     int page = 1,
     int limit = 20,
   }) async {
+    print('=== DEBUG: TripService.searchTrips START ===');
+    print('DEBUG: Search parameters received:');
+    print('  - departureCity: $departureCity');
+    print('  - arrivalCity: $arrivalCity');
+    print('  - departureCountry: $departureCountry');
+    print('  - arrivalCountry: $arrivalCountry');
+    print('  - departureDateFrom: $departureDateFrom');
+    print('  - departureDateTo: $departureDateTo');
+    print('  - minWeight: $minWeight');
+    print('  - maxPricePerKg: $maxPricePerKg');
+    print('  - currency: $currency');
+    print('  - verifiedOnly: $verifiedOnly');
+    print('  - ticketVerified: $ticketVerified');
+    print('  - page: $page');
+    print('  - limit: $limit');
+    
     try {
       final queryParams = <String, dynamic>{
         'page': page,
@@ -342,24 +358,66 @@ class TripService {
       if (arrivalCity != null) queryParams['arrival_city'] = arrivalCity;
       if (departureCountry != null) queryParams['departure_country'] = departureCountry;
       if (arrivalCountry != null) queryParams['arrival_country'] = arrivalCountry;
-      if (departureDateFrom != null) queryParams['departure_date_from'] = departureDateFrom;
+      if (departureDateFrom != null) queryParams['departure_date'] = departureDateFrom;
       if (departureDateTo != null) queryParams['departure_date_to'] = departureDateTo;
       if (minWeight != null) queryParams['min_weight'] = minWeight;
-      if (maxPricePerKg != null) queryParams['max_price_per_kg'] = maxPricePerKg;
+      if (maxPricePerKg != null) queryParams['max_price'] = maxPricePerKg;
       if (currency != null) queryParams['currency'] = currency;
       if (verifiedOnly != null) queryParams['verified_only'] = verifiedOnly;
       if (ticketVerified != null) queryParams['ticket_verified'] = ticketVerified;
 
-      final response = await _dio.get('/trips/search', queryParameters: queryParams);
+      print('DEBUG: Final queryParams: $queryParams');
+      print('DEBUG: Making GET request to /search/trips');
+
+      final response = await _dio.get('/search/trips', queryParameters: queryParams);
+      
+      print('DEBUG: Response received - Status: ${response.statusCode}');
+      print('DEBUG: Response data type: ${response.data?.runtimeType}');
+      print('DEBUG: Response data keys: ${response.data?.keys?.toList()}');
       
       if (response.data['success'] == true) {
-        final List<dynamic> tripsData = response.data['data']['trips'];
-        return tripsData.map((json) => Trip.fromJson(json)).toList();
+        print('DEBUG: Success response received');
+        print('DEBUG: Response structure: ${response.data.keys.toList()}');
+        
+        // Check different possible response structures
+        dynamic tripsData;
+        if (response.data['data'] != null && response.data['data']['trips'] != null) {
+          tripsData = response.data['data']['trips'];
+          print('DEBUG: Found trips in data.trips');
+        } else if (response.data['trips'] != null) {
+          tripsData = response.data['trips'];
+          print('DEBUG: Found trips directly in response');
+        } else {
+          print('DEBUG: ERROR - No trips found in response structure');
+          print('DEBUG: Available keys: ${response.data.keys.toList()}');
+          throw TripException('No trips data found in response');
+        }
+        
+        print('DEBUG: Trips data type: ${tripsData.runtimeType}');
+        print('DEBUG: Trips count: ${(tripsData as List?)?.length ?? 0}');
+        
+        final trips = (tripsData as List<dynamic>).map((json) => Trip.fromJson(json)).toList();
+        print('DEBUG: Successfully parsed ${trips.length} Trip objects');
+        print('=== DEBUG: TripService.searchTrips END - SUCCESS ===');
+        
+        return trips;
       } else {
+        print('DEBUG: Error response - success: false');
+        print('DEBUG: Error message: ${response.data['message']}');
         throw TripException(response.data['message'] ?? 'Failed to search trips');
       }
     } on DioException catch (e) {
+      print('=== DEBUG: DioException in searchTrips ===');
+      print('DEBUG: DioException type: ${e.type}');
+      print('DEBUG: DioException message: ${e.message}');
+      print('DEBUG: DioException response: ${e.response?.data}');
+      print('DEBUG: DioException status: ${e.response?.statusCode}');
       throw _handleDioException(e);
+    } catch (e) {
+      print('=== DEBUG: General Exception in searchTrips ===');
+      print('DEBUG: Exception type: ${e.runtimeType}');
+      print('DEBUG: Exception message: $e');
+      rethrow;
     }
   }
 
@@ -943,10 +1001,17 @@ class TripService {
   /// Duplicate trip
   Future<Trip> duplicateTrip(String tripId) async {
     try {
+      print('=== DEBUG DUPLICATE TRIP START ===');
+      print('Trip ID to duplicate: $tripId');
+      
       final token = await _authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
+        print('ERROR: No authentication token');
         throw const TripException('Authentication token is required. Please log in again.');
       }
+      
+      print('Token available, length: ${token.length}');
+      print('Making request to: /trips/$tripId/duplicate');
 
       final response = await _dio.post('/trips/$tripId/duplicate',
         options: Options(
@@ -958,12 +1023,24 @@ class TripService {
         ),
       );
       
+      print('Response status: ${response.statusCode}');
+      print('Response data: ${jsonEncode(response.data)}');
+      
       if (response.data['success'] == true) {
-        return Trip.fromJson(response.data['trip']);
+        print('SUCCESS: Trip duplicated successfully');
+        final trip = Trip.fromJson(response.data['trip']);
+        print('New trip ID: ${trip.id}');
+        print('=== DEBUG DUPLICATE TRIP END ===');
+        return trip;
       } else {
+        print('ERROR: Duplicate failed - ${response.data['message']}');
         throw TripException(response.data['message'] ?? 'Failed to duplicate trip');
       }
     } on DioException catch (e) {
+      print('=== DEBUG DUPLICATE TRIP ERROR ===');
+      print('DioException: ${e.message}');
+      print('Response data: ${e.response?.data}');
+      print('Status code: ${e.response?.statusCode}');
       throw _handleDioException(e);
     }
   }
@@ -1008,11 +1085,7 @@ class TripService {
 
   /// Get public trips (approved and published)
   Future<List<Trip>> getPublicTrips({int limit = 10}) async {
-    print('=== DEBUG: getPublicTrips START ===');
-    print('DEBUG: Requesting public trips with limit: $limit');
-    print('DEBUG: No authentication token will be used for public trips');
     try {
-      print('DEBUG: Making GET request to /trips/public');
       final response = await _dio.get('/trips/public',
         queryParameters: {
           'limit': limit,
@@ -1025,33 +1098,17 @@ class TripService {
           },
         ),
       );
-      print('DEBUG: Response received - Status: ${response.statusCode}');
-      print('DEBUG: Response data type: ${response.data?.runtimeType}');
       
       if (response.data['success'] == true) {
-        print('DEBUG: Success response received');
         final tripsData = response.data['trips'] as List<dynamic>;
-        print('DEBUG: Found ${tripsData.length} trips in response');
         final trips = tripsData.map((json) => Trip.fromJson(json)).toList();
-        print('DEBUG: Successfully parsed ${trips.length} Trip objects');
-        print('=== DEBUG: getPublicTrips END - SUCCESS ===');
         return trips;
       } else {
-        print('DEBUG: Error response - success: false');
-        print('DEBUG: Error message: ${response.data['message']}');
         throw TripException(response.data['message'] ?? 'Failed to fetch public trips');
       }
     } on DioException catch (e) {
-      print('=== DEBUG: DioException in getPublicTrips ===');
-      print('DEBUG: DioException type: ${e.type}');
-      print('DEBUG: DioException message: ${e.message}');
-      print('DEBUG: DioException response: ${e.response?.data}');
-      print('DEBUG: DioException status: ${e.response?.statusCode}');
       throw _handleDioException(e);
     } catch (e) {
-      print('=== DEBUG: General Exception in getPublicTrips ===');
-      print('DEBUG: Exception type: ${e.runtimeType}');
-      print('DEBUG: Exception message: $e');
       rethrow;
     }
   }

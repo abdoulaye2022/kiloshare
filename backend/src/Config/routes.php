@@ -10,6 +10,7 @@ use KiloShare\Controllers\PhoneAuthController;
 use KiloShare\Controllers\TestController;
 use App\Modules\Profile\Controllers\ProfileController;
 use App\Modules\Trips\Controllers\TripController;
+use App\Modules\Search\Controllers\SearchController;
 use KiloShare\Middleware\AuthMiddleware;
 use KiloShare\Middleware\OptionalAuthMiddleware;
 use KiloShare\Middleware\AdminAuthMiddleware;
@@ -490,6 +491,26 @@ return function (App $app) {
                 $tripGroup->delete('/{id}/delete', [TripController::class, 'delete'])
                     ->add(AuthMiddleware::class);
                 $tripGroup->post('/{id}/validate-ticket', [TripController::class, 'validateTicket'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Search routes
+            $v1Group->group('/search', function (RouteCollectorProxy $searchGroup) {
+                // Public search routes
+                $searchGroup->get('/trips', [SearchController::class, 'searchTrips']);
+                $searchGroup->get('/suggestions', [SearchController::class, 'getCitySuggestions']);
+                $searchGroup->get('/popular-routes', [SearchController::class, 'getPopularRoutes']);
+                
+                // Protected search routes (authentication required)
+                $searchGroup->post('/save-alert', [SearchController::class, 'saveSearchAlert'])
+                    ->add(AuthMiddleware::class);
+                $searchGroup->get('/recent', [SearchController::class, 'getRecentSearches'])
+                    ->add(AuthMiddleware::class);
+                $searchGroup->get('/alerts', [SearchController::class, 'getUserSearchAlerts'])
+                    ->add(AuthMiddleware::class);
+                $searchGroup->delete('/alerts/{id}', [SearchController::class, 'deleteSearchAlert'])
+                    ->add(AuthMiddleware::class);
+                $searchGroup->patch('/alerts/{id}/toggle', [SearchController::class, 'toggleSearchAlert'])
                     ->add(AuthMiddleware::class);
             });
             

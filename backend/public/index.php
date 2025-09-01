@@ -168,6 +168,22 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    // Search services
+    \App\Modules\Search\Services\SearchService::class => function ($container) {
+        return new \App\Modules\Search\Services\SearchService(
+            $container->get(PDO::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
+    \App\Modules\Search\Controllers\SearchController::class => function ($container) {
+        return new \App\Modules\Search\Controllers\SearchController(
+            $container->get(\App\Modules\Search\Services\SearchService::class),
+            $container->get(\KiloShare\Services\JWTService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
     // Middleware
     \KiloShare\Middleware\AuthMiddleware::class => function ($container) {
         return new \KiloShare\Middleware\AuthMiddleware(
