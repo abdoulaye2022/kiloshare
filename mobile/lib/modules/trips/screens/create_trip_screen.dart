@@ -8,14 +8,17 @@ import '../widgets/date_time_picker_field.dart';
 import '../widgets/weight_slider_widget.dart';
 import '../widgets/price_calculator_widget.dart';
 import '../widgets/restricted_items_selector.dart';
+import '../widgets/trip_image_picker.dart';
 import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
+import '../services/trip_image_service.dart';
 import '../../auth/services/auth_service.dart';
 import '../../../widgets/auth_guard.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/blocs/auth/auth_bloc.dart';
 import '../../auth/blocs/auth/auth_state.dart';
+import 'dart:io';
 
 class CreateTripScreen extends StatefulWidget {
   final TransportType? initialTransportType;
@@ -36,10 +39,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final TripService _tripService = TripService();
   
   int _currentStep = 0;
-  final int _totalSteps = 5;
+  final int _totalSteps = 6;
   
   // Form data
   final Map<String, dynamic> _tripData = {};
+  
+  // Images
+  List<File> _selectedImages = [];
+  List<TripImage> _existingImages = [];
+  final TripImageService _tripImageService = TripImageService();
   
   // Form controllers
   final _flightNumberController = TextEditingController();
@@ -121,6 +129,16 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         _descriptionController.text = trip.description ?? '';
         _specialNotesController.text = trip.specialNotes ?? '';
       });
+      
+      // Load existing images
+      try {
+        final images = await _tripImageService.getTripImages(widget.tripId!);
+        setState(() {
+          _existingImages = images;
+        });
+      } catch (e) {
+        print('Warning: Failed to load trip images: $e');
+      }
       
     } catch (e) {
       if (mounted) {
@@ -226,6 +244,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 _buildCapacityPricingStep(),
                 _buildTransportDetailsStep(),
                 _buildRestrictionsStep(),
+                _buildImagesStep(),
               ],
             ),
           ),
@@ -916,6 +935,75 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     );
   }
 
+  Widget _buildImagesStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Photos de l\'annonce',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ajoutez des photos pour rendre votre annonce plus attractive et gagner la confiance des expéditeurs.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          TripImagePicker(
+            initialImages: _selectedImages,
+            existingImages: _existingImages,
+            onImagesChanged: (images) {
+              setState(() {
+                _selectedImages = images;
+              });
+            },
+            onDeleteExisting: widget.tripId != null 
+              ? (image) async {
+                  try {
+                    await _tripImageService.deleteTripImage(widget.tripId!, image.id);
+                    setState(() {
+                      _existingImages.removeWhere((img) => img.id == image.id);
+                    });
+                    _showSnackBar('Photo supprimée avec succès', Colors.green);
+                  } catch (e) {
+                    _showSnackBar('Erreur lors de la suppression: $e', Colors.red);
+                  }
+                }
+              : null,
+          ),
+          
+          const SizedBox(height: 24),
+          
+          Card(
+            color: Colors.blue[50],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.blue[700]),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Les photos seront visibles après approbation par notre équipe. Assurez-vous qu\'elles sont claires et respectent nos conditions d\'utilisation.',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNavigationBar() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -977,6 +1065,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         return true;
       case 4: // Restrictions (optional)
         return true;
+      case 5: // Images (optional)
+        return true;
       default:
         return false;
     }
@@ -990,7 +1080,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   void _nextStep() {
+    print('=== DEBUG _nextStep called ===');
+    print('Current step: $_currentStep');
+    print('Total steps: $_totalSteps');
+    print('Can continue: ${_canContinue()}');
+    
     if (_currentStep < _totalSteps - 1) {
+      print('Moving to next step');
       setState(() {
         _currentStep++;
       });
@@ -999,6 +1095,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         curve: Curves.easeInOut,
       );
     } else {
+      print('Last step reached, calling _submitTrip()');
       _submitTrip();
     }
   }
@@ -1125,6 +1222,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         
         await _tripService.updateTrip(widget.tripId!, updateData);
         
+        // Upload images if any selected
+        if (_selectedImages.isNotEmpty) {
+          try {
+            await _tripImageService.uploadTripImages(widget.tripId!, _selectedImages);
+          } catch (e) {
+            print('Warning: Image upload failed: $e');
+          }
+        }
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1155,7 +1261,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           print('DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
           print('DEBUG: restrictedItems: ${(_tripData['restricted_items'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_items']) : null}');
           
-          await _tripService.createTrip(
+          final createdTrip = await _tripService.createTrip(
             transportType: _tripData['transport_type'],
             departureCity: _tripData['departure_city'],
             departureCountry: _tripData['departure_country'],
@@ -1182,6 +1288,18 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 ? List<String>.from(_tripData['restricted_items']) : null,
           );
           print('DEBUG: _tripService.createTrip completed successfully');
+          
+          // Upload images if any selected
+          if (_selectedImages.isNotEmpty && createdTrip.id != null) {
+            try {
+              print('DEBUG: Uploading ${_selectedImages.length} images for trip ${createdTrip.id}');
+              await _tripImageService.uploadTripImages(createdTrip.id.toString(), _selectedImages);
+              print('DEBUG: Images uploaded successfully');
+            } catch (e) {
+              print('Warning: Image upload failed: $e');
+            }
+          }
+          
         } catch (e) {
           print('DEBUG: ERROR in createTrip: $e');
           print('DEBUG: Error type: ${e.runtimeType}');
@@ -1203,10 +1321,27 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       print('=== DEBUG: Final catch block - error: $e');
       print('DEBUG: Error type: ${e.runtimeType}');
       print('DEBUG: Error stack trace: ${StackTrace.current}');
+      
+      // Extract user-friendly error message
+      String errorMessage = 'Une erreur est survenue';
+      if (e.toString().contains('TripException:')) {
+        // Extract message after "TripException: "
+        String fullError = e.toString();
+        if (fullError.contains('TripException: ')) {
+          errorMessage = fullError.split('TripException: ')[1];
+          // Remove any "Validation failed: " prefix
+          if (errorMessage.startsWith('Validation failed: ')) {
+            errorMessage = errorMessage.substring('Validation failed: '.length);
+          }
+        }
+      } else {
+        errorMessage = e.toString();
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );
@@ -1219,4 +1354,14 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       }
     }
   } // fin de _buildCreateTripScreen
+
+  void _showSnackBar(String message, Color backgroundColor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 }

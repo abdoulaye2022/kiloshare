@@ -2,6 +2,9 @@
 
 namespace App\Modules\Trips\Models;
 
+use DateTime;
+use InvalidArgumentException;
+
 class Trip
 {
     // Core properties
@@ -109,6 +112,11 @@ class Trip
     private $restrictedCategories;
     private $restrictedItems;
     private $restrictionNotes;
+    
+    // NEW: Images
+    private $hasImages = false;
+    private $imageCount = 0;
+    private $images = [];
 
     // Constructor
     public function __construct(array $data = [])
@@ -226,6 +234,11 @@ class Trip
         $this->restrictedItems = $data['restricted_items'] ?? null;
         $this->restrictionNotes = $data['restriction_notes'] ?? null;
         
+        // Images
+        $this->hasImages = $data['has_images'] ?? false;
+        $this->imageCount = $data['image_count'] ?? 0;
+        $this->images = $data['images'] ?? [];
+        
         return $this;
     }
 
@@ -336,6 +349,11 @@ class Trip
             'restricted_categories' => $this->restrictedCategories,
             'restricted_items' => $this->restrictedItems,
             'restriction_notes' => $this->restrictionNotes,
+            
+            // Images
+            'has_images' => $this->hasImages,
+            'image_count' => $this->imageCount,
+            'images' => $this->images,
         ];
     }
 
@@ -511,9 +529,9 @@ class Trip
                 $errors[] = 'Les voyages par avion doivent toujours inclure le Canada (départ ou arrivée)';
             }
         } else {
-            // Règles pour le transport terrestre (voiture, bus): seulement au Canada
+            // Règles pour le transport terrestre (voiture): seulement au Canada
             if ($this->departureCountry !== 'Canada' || $this->arrivalCountry !== 'Canada') {
-                $errors[] = 'Les voyages par route (voiture, bus) sont limités aux villes canadiennes uniquement';
+                $errors[] = 'Les voyages en voiture sont limités aux villes canadiennes uniquement';
             }
         }
         
@@ -787,4 +805,21 @@ class Trip
     
     public function getRestrictionNotes(): ?string { return $this->restrictionNotes; }
     public function setRestrictionNotes(?string $restrictionNotes): self { $this->restrictionNotes = $restrictionNotes; return $this; }
+    
+    // Images
+    public function getHasImages(): bool { return $this->hasImages; }
+    public function setHasImages(bool $hasImages): self { $this->hasImages = $hasImages; return $this; }
+    
+    public function getImageCount(): int { return $this->imageCount; }
+    public function setImageCount(int $imageCount): self { $this->imageCount = $imageCount; return $this; }
+    
+    public function getImages(): array { return $this->images; }
+    public function setImages(array $images): self { $this->images = $images; return $this; }
+    
+    public function addImage(array $image): self { 
+        $this->images[] = $image; 
+        $this->imageCount = count($this->images);
+        $this->hasImages = $this->imageCount > 0;
+        return $this; 
+    }
 }

@@ -497,31 +497,50 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     
     switch (status) {
       case TripStatus.draft:
-        return Row(
+        return Column(
           children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _editTrip(),
-                icon: const Icon(Icons.edit),
-                label: const Text('Modifier'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _editTrip(),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Modifier'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _publishTrip(),
+                    icon: const Icon(Icons.publish),
+                    label: const Text('Publier'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_canDeleteTrip()) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _deleteTrip(),
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Supprimer'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _publishTrip(),
-                icon: const Icon(Icons.publish),
-                label: const Text('Publier'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
+            ],
           ],
         );
         
@@ -547,30 +566,127 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         );
         
       case TripStatus.paused:
-        return Row(
+        return Column(
           children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _resumeTrip(),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Réactiver'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _resumeTrip(),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Réactiver'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _cancelTrip(),
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Annuler'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_canDeleteTrip()) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _deleteTrip(),
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Supprimer'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
                 ),
               ),
+            ],
+          ],
+        );
+        
+      case TripStatus.rejected:
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _editTrip(),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Modifier'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _duplicateTrip(),
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Dupliquer'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _cancelTrip(),
-                icon: const Icon(Icons.cancel),
-                label: const Text('Annuler'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
+            if (_canDeleteTrip()) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _deleteTrip(),
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Supprimer'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
                 ),
               ),
+            ],
+          ],
+        );
+      
+      case TripStatus.cancelled:
+        return Column(
+          children: [
+            ElevatedButton.icon(
+              onPressed: () => _duplicateTrip(),
+              icon: const Icon(Icons.copy),
+              label: const Text('Dupliquer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
             ),
+            if (_canDeleteTrip()) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _deleteTrip(),
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Supprimer'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
         
@@ -644,8 +760,31 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     context.push('/trips/edit/${_trip!.id}');
   }
 
-  void _publishTrip() {
-    _showMessage('Annonce publiée !', Colors.green);
+  void _publishTrip() async {
+    try {
+      print('=== DEBUG: Publishing trip ${_trip?.id} ===');
+      
+      if (_trip == null) {
+        _showMessage('Erreur: voyage non trouvé', Colors.red);
+        return;
+      }
+      
+      final tripService = TripService();
+      final publishedTrip = await tripService.publishTrip(_trip!.id.toString());
+      
+      print('DEBUG: Trip published successfully');
+      
+      // Update local trip data
+      setState(() {
+        _trip = publishedTrip;
+      });
+      
+      _showMessage('Annonce publiée avec succès !', Colors.green);
+      
+    } catch (e) {
+      print('ERROR: Failed to publish trip: $e');
+      _showMessage('Erreur lors de la publication: $e', Colors.red);
+    }
   }
 
   void _pauseTrip() {
@@ -660,8 +799,90 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     _showMessage('Annonce annulée', Colors.red);
   }
 
-  void _duplicateTrip() {
-    _showMessage('Annonce dupliquée', Colors.blue);
+  void _duplicateTrip() async {
+    try {
+      print('=== DEBUG DUPLICATE BUTTON PRESSED ===');
+      print('Trip ID: ${_trip?.id}');
+      
+      if (_trip == null) {
+        _showMessage('Erreur: voyage non trouvé', Colors.red);
+        return;
+      }
+      
+      final tripService = TripService();
+      final duplicatedTrip = await tripService.duplicateTrip(_trip!.id.toString());
+      
+      print('Duplication successful, new trip ID: ${duplicatedTrip.id}');
+      _showMessage('Annonce dupliquée avec succès', Colors.green);
+      
+      // Optionally navigate to the new trip or refresh
+      
+    } catch (e) {
+      print('Duplication failed: $e');
+      _showMessage('Erreur lors de la duplication: $e', Colors.red);
+    }
+  }
+
+  void _deleteTrip() async {
+    if (_trip == null) return;
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer l\'annonce'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.deleteTrip(_trip!.id.toString());
+      
+      _showMessage('Annonce supprimée avec succès', Colors.green);
+      
+      // Navigate back
+      if (mounted && context.canPop()) {
+        context.pop();
+      }
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la suppression: $e', Colors.red);
+    }
+  }
+
+  bool _canDeleteTrip() {
+    if (_trip == null) return false;
+    
+    // Règles de suppression selon le diagramme d'état:
+    // On peut supprimer uniquement dans ces états:
+    // - draft (brouillon)
+    // - rejected (rejeté) 
+    // - paused (mis en pause)
+    // - cancelled (annulé - déjà terminé mais on peut nettoyer)
+    
+    switch (_trip!.status) {
+      case TripStatus.draft:
+      case TripStatus.rejected: 
+      case TripStatus.paused:
+      case TripStatus.cancelled:
+        return true;
+      default:
+        return false;
+    }
   }
 
   void _contactOwner() {

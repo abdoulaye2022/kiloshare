@@ -21,7 +21,7 @@ class JWTService
     {
         $this->secretKey = $settings['jwt']['secret'];
         $this->algorithm = $settings['jwt']['algorithm'] ?? 'HS256';
-        $this->accessTokenExpiry = $settings['jwt']['access_expires_in'] ?? 3600; // 1 hour
+        $this->accessTokenExpiry = $settings['jwt']['access_expires_in'] ?? 43200; // 12 hours
         $this->refreshTokenExpiry = $settings['jwt']['refresh_expires_in'] ?? 604800; // 7 days
     }
 

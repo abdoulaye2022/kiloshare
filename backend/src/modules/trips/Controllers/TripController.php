@@ -5,17 +5,20 @@ namespace App\Modules\Trips\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Modules\Trips\Services\TripService;
+use App\Modules\Trips\Services\TripImageService;
 use Psr\Log\LoggerInterface;
 use Exception;
 
 class TripController
 {
     private TripService $tripService;
+    private TripImageService $tripImageService;
     private LoggerInterface $logger;
 
-    public function __construct(TripService $tripService, LoggerInterface $logger)
+    public function __construct(TripService $tripService, TripImageService $tripImageService, LoggerInterface $logger)
     {
         $this->tripService = $tripService;
+        $this->tripImageService = $tripImageService;
         $this->logger = $logger;
     }
 
@@ -124,13 +127,19 @@ class TripController
     public function get(Request $request, Response $response, array $args): Response
     {
         try {
-            $tripId = (int) $args['id'];
-            
+            $tripId = $args['id']; // Keep as string to handle both IDs and UUIDs
             
             // Try to get by UUID first, then by numeric ID
-            $trip = $this->tripService->getTripByUuid($tripId);
-            if (!$trip && is_numeric($tripId)) {
+            $trip = null;
+            if (!is_numeric($tripId)) {
+                // If it's not numeric, try UUID lookup
+                $trip = $this->tripService->getTripByUuid($tripId);
+            } else {
+                // If it's numeric, try ID lookup first, then UUID fallback
                 $trip = $this->tripService->getTripById((int) $tripId);
+                if (!$trip) {
+                    $trip = $this->tripService->getTripByUuid($tripId);
+                }
             }
             
             if (!$trip) {
@@ -790,8 +799,19 @@ class TripController
 
             $drafts = $this->tripService->getUserDrafts($user['id'], $page, $limit);
             
+            
+            // Convert Trip objects to arrays for JSON response
+            $draftsArray = [];
+            foreach ($drafts as $draft) {
+                if (method_exists($draft, 'toArray')) {
+                    $draftsArray[] = $draft->toArray();
+                } else {
+                    $draftsArray[] = $draft; // fallback if it's already an array
+                }
+            }
+            
             return $this->success($response, [
-                'trips' => $drafts,
+                'trips' => $draftsArray,
                 'pagination' => [
                     'page' => $page,
                     'limit' => $limit,
@@ -853,6 +873,137 @@ class TripController
             
         } catch (Exception $e) {
             $this->logger->error('Failed to get public trips: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Upload images for a trip
+     * POST /api/v1/trips/{id}/images
+     */
+    public function uploadTripImages(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            // Verify trip ownership
+            $trip = $this->tripService->getTripById($tripId);
+            if (!$trip || $trip->getUserId() != $user['id']) {
+                return $this->error($response, 'Trip not found or access denied', 404);
+            }
+
+            // Get uploaded files
+            $uploadedFiles = $request->getUploadedFiles();
+            if (empty($uploadedFiles) || !isset($uploadedFiles['images'])) {
+                return $this->error($response, 'No images uploaded', 400);
+            }
+
+            $images = $uploadedFiles['images'];
+            if (!is_array($images)) {
+                $images = [$images];
+            }
+
+            // Convert PSR-7 UploadedFiles to array format for processing
+            $filesArray = [];
+            foreach ($images as $uploadedFile) {
+                if ($uploadedFile->getError() === UPLOAD_ERR_OK) {
+                    $tempFile = tempnam(sys_get_temp_dir(), 'trip_image');
+                    $uploadedFile->moveTo($tempFile);
+                    
+                    $filesArray[] = [
+                        'name' => $uploadedFile->getClientFilename(),
+                        'tmp_name' => $tempFile,
+                        'size' => $uploadedFile->getSize(),
+                        'error' => $uploadedFile->getError(),
+                        'type' => $uploadedFile->getClientMediaType()
+                    ];
+                }
+            }
+
+            if (empty($filesArray)) {
+                return $this->error($response, 'No valid images to upload', 400);
+            }
+
+            $uploadedImages = $this->tripImageService->uploadTripImages($tripId, $filesArray);
+            
+            // Clean up temp files
+            foreach ($filesArray as $file) {
+                if (file_exists($file['tmp_name'])) {
+                    unlink($file['tmp_name']);
+                }
+            }
+            
+            return $this->success($response, [
+                'message' => 'Images uploaded successfully',
+                'images' => $uploadedImages
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to upload trip images: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get images for a trip
+     * GET /api/v1/trips/{id}/images
+     */
+    public function getTripImages(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $images = $this->tripImageService->getTripImages($tripId);
+            $imagesArray = array_map(fn($img) => $img->toArray(), $images);
+            
+            return $this->success($response, [
+                'images' => $imagesArray
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get trip images: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete a trip image
+     * DELETE /api/v1/trips/{id}/images/{imageId}
+     */
+    public function deleteTripImage(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $imageId = (int) $args['imageId'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId || !$imageId) {
+                return $this->error($response, 'Trip ID and Image ID are required', 400);
+            }
+
+            // Verify trip ownership
+            $trip = $this->tripService->getTripById($tripId);
+            if (!$trip || $trip->getUserId() != $user['id']) {
+                return $this->error($response, 'Trip not found or access denied', 404);
+            }
+
+            $this->tripImageService->deleteTripImage($tripId, $imageId);
+            
+            return $this->success($response, [
+                'message' => 'Image deleted successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to delete trip image: ' . $e->getMessage());
             return $this->error($response, $e->getMessage());
         }
     }

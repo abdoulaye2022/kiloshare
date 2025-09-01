@@ -6,6 +6,8 @@ import 'simple_social_auth_service.dart';
 import '../../../config/app_config.dart';
 
 class AuthService {
+  static AuthService? _instance;
+  
   static const FlutterSecureStorage _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -17,10 +19,67 @@ class AuthService {
 
   final Dio _dio;
   late final SimpleSocialAuthService _socialAuthService;
+  
+  Dio get dio => _dio;
 
-  AuthService({Dio? dio}) : _dio = dio ?? _createDio() {
+  AuthService._internal({Dio? dio}) : _dio = dio ?? _createDio() {
     _socialAuthService = SimpleSocialAuthService(_dio);
+    _setupAuthInterceptor();
   }
+  
+  void _setupAuthInterceptor() {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (RequestOptions options, RequestInterceptorHandler handler) async {
+        // Add access token to requests if available
+        final token = await _storage.read(key: 'access_token');
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        handler.next(options);
+      },
+      onError: (DioException err, ErrorInterceptorHandler handler) async {
+        // Check if this is a 401 error (Unauthorized)
+        if (err.response?.statusCode == 401) {
+          print('AuthService: Received 401, attempting token refresh...');
+          
+          final refreshToken = await _storage.read(key: 'refresh_token');
+          if (refreshToken == null) {
+            print('AuthService: No refresh token, clearing tokens');
+            await clearTokens();
+            handler.next(err);
+            return;
+          }
+
+          try {
+            // Attempt to refresh the token
+            await refreshTokens('');
+            print('AuthService: Token refresh successful, retrying request');
+            
+            // Retry the original request with the new token
+            final newToken = await _storage.read(key: 'access_token');
+            final requestOptions = err.requestOptions;
+            requestOptions.headers['Authorization'] = 'Bearer $newToken';
+            
+            final response = await _dio.fetch(requestOptions);
+            handler.resolve(response);
+            
+          } catch (refreshError) {
+            print('AuthService: Token refresh failed: $refreshError');
+            await clearTokens();
+            handler.next(err);
+          }
+        } else {
+          handler.next(err);
+        }
+      },
+    ));
+  }
+
+  factory AuthService({Dio? dio}) {
+    return _instance ??= AuthService._internal(dio: dio);
+  }
+
+  static AuthService get instance => _instance ??= AuthService._internal();
 
   static Dio _createDio() {
     final dio = Dio(BaseOptions(
@@ -39,22 +98,71 @@ class AuthService {
       responseBody: true,
       logPrint: (obj) => print(obj),
     ));
+    
+    // Add custom interceptor for debugging format exception
+    dio.interceptors.add(InterceptorsWrapper(
+      onResponse: (response, handler) {
+        print('=== Raw Response Debug ===');
+        print('Status: ${response.statusCode}');
+        print('Data type: ${response.data.runtimeType}');
+        print('Raw data: ${response.data}');
+        if (response.data is String) {
+          final dataStr = response.data as String;
+          print('String length: ${dataStr.length}');
+          if (dataStr.isNotEmpty) {
+            print('First char code: ${dataStr.codeUnitAt(0)}');
+            print('First 10 chars: "${dataStr.substring(0, dataStr.length > 10 ? 10 : dataStr.length)}"');
+          }
+        }
+        print('========================');
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        print('=== Interceptor Error Debug ===');
+        print('Error type: ${error.runtimeType}');
+        print('Message: ${error.message}');
+        print('Response: ${error.response}');
+        print('==============================');
+        handler.next(error);
+      },
+    ));
 
     return dio;
   }
 
   // Token management
   Future<void> _saveTokens(AuthTokens tokens) async {
-    await Future.wait([
-      _storage.write(key: 'access_token', value: tokens.accessToken),
-      if (tokens.refreshToken != null)
-        _storage.write(key: 'refresh_token', value: tokens.refreshToken!),
-      _storage.write(key: 'token_expires_at', value: tokens.expiryDate.toIso8601String()),
-    ]);
+    print('AuthService: _saveTokens() called');
+    print('AuthService: Access token length: ${tokens.accessToken.length}');
+    print('AuthService: Refresh token present: ${tokens.refreshToken != null}');
+    print('AuthService: Token expiry: ${tokens.expiryDate}');
+    
+    try {
+      await Future.wait([
+        _storage.write(key: 'access_token', value: tokens.accessToken),
+        if (tokens.refreshToken != null)
+          _storage.write(key: 'refresh_token', value: tokens.refreshToken!),
+        _storage.write(key: 'token_expires_at', value: tokens.expiryDate.toIso8601String()),
+      ]);
+      print('AuthService: Tokens saved successfully');
+      
+      // Vérification immédiate
+      final savedToken = await _storage.read(key: 'access_token');
+      print('AuthService: Verification - saved token length: ${savedToken?.length ?? 0}');
+    } catch (e) {
+      print('AuthService: Error saving tokens: $e');
+      rethrow;
+    }
   }
 
   Future<String?> getAccessToken() async {
-    return await _storage.read(key: 'access_token');
+    final token = await _storage.read(key: 'access_token');
+    print('AuthService: getAccessToken() - Token found: ${token != null}');
+    if (token != null) {
+      print('AuthService: Token length: ${token.length}');
+      print('AuthService: Token starts with: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
+    }
+    return token;
   }
 
   Future<String?> getRefreshToken() async {
@@ -66,9 +174,29 @@ class AuthService {
   }
 
   bool isTokenExpired(String token) {
-    // Simple JWT token expiry check
-    // In production, decode JWT and check exp claim
-    return false; // Placeholder for now
+    try {
+      // Decode JWT payload (basic validation without signature verification)
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      
+      // Decode the payload (second part)
+      final payload = parts[1];
+      // Add padding if necessary for base64 decoding
+      final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+      
+      final decoded = utf8.decode(base64Decode(normalizedPayload));
+      final Map<String, dynamic> claims = jsonDecode(decoded);
+      
+      // Check expiration time
+      final exp = claims['exp'];
+      if (exp == null) return true;
+      
+      final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      return DateTime.now().isAfter(expiryDate);
+    } catch (e) {
+      // If token parsing fails, consider it expired
+      return true;
+    }
   }
 
   Future<bool> isTokenExpiredStored() async {
@@ -91,6 +219,10 @@ class AuthService {
   // User data management
   Future<void> _saveUser(User user) async {
     await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
+  }
+
+  Future<void> saveUser(User user) async {
+    await _saveUser(user);
   }
 
   Future<User?> getCurrentUser() async {
@@ -130,11 +262,33 @@ class AuthService {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
+          responseType: ResponseType.plain, // Force plain text response
         ),
       );
       
+      // Manual JSON parsing with better error handling
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.data as String);
+      } catch (e) {
+        print('=== JSON Parsing Error ===');
+        print('Error: $e');
+        print('Raw response: "${response.data}"');
+        print('Response length: ${response.data?.toString().length ?? 0}');
+        print('=========================');
+        throw FormatException('Invalid JSON response from server');
+      }
+      
+      // Debug response content
+      print('=== Response Debug ===');
+      print('Status Code: ${response.statusCode}');
+      print('Response Headers: ${response.headers}');
+      print('Raw Response Type: ${response.data.runtimeType}');
+      print('Raw Response Content: ${response.data}');
+      print('=====================');
+      
       final apiResponse = ApiResponse.fromJson(
-        response.data,
+        responseData,
         (json) => AuthResponse.fromJson(json as Map<String, dynamic>),
       );
 
@@ -148,15 +302,37 @@ class AuthService {
 
       return authResponse;
     } on DioException catch (e) {
+      print('=== DioException Debug ===');
+      print('Type: ${e.type}');
+      print('Message: ${e.message}');
+      print('Response: ${e.response}');
+      if (e.response != null) {
+        print('Status Code: ${e.response!.statusCode}');
+        print('Response Data: ${e.response!.data}');
+      }
+      print('========================');
       throw _handleDioException(e);
+    } on FormatException catch (e) {
+      print('=== FormatException Debug ===');
+      print('Message: ${e.message}');
+      print('Source: ${e.source}');
+      print('Offset: ${e.offset}');
+      print('=============================');
+      throw AuthException('Invalid server response format: ${e.message}');
     } catch (e) {
+      print('=== Unknown Exception Debug ===');
+      print('Type: ${e.runtimeType}');
+      print('Message: $e');
+      print('===============================');
       throw AuthException('Registration failed: $e');
     }
   }
 
   Future<AuthResponse> login(LoginRequest request) async {
     try {
+      print('AuthService: Starting login for ${request.email}');
       final response = await _dio.post('/auth/login', data: request.toJson());
+      print('AuthService: Login response received, status: ${response.statusCode}');
       
       final apiResponse = ApiResponse.fromJson(
         response.data,
@@ -168,13 +344,19 @@ class AuthService {
       }
 
       final authResponse = apiResponse.data!;
+      print('AuthService: AuthResponse parsed successfully');
+      print('AuthService: Tokens - Access: ${authResponse.tokens.accessToken.length}, Refresh: ${authResponse.tokens.refreshToken?.length ?? 0}');
+      
       await _saveTokens(authResponse.tokens);
       await _saveUser(authResponse.user);
+      print('AuthService: Login completed successfully');
 
       return authResponse;
     } on DioException catch (e) {
+      print('AuthService: DioException during login - Status: ${e.response?.statusCode}, Type: ${e.type}');
       throw _handleDioException(e);
     } catch (e) {
+      print('AuthService: Exception during login: $e');
       throw AuthException('Login failed: $e');
     }
   }
@@ -273,18 +455,38 @@ class AuthService {
   }
 
   Future<AuthResponse> googleSignIn() async {
+    print('AuthService: Starting Google Sign-In...');
     final socialResponse = await _socialAuthService.signInWithGoogle();
     if (socialResponse == null) {
       throw const AuthException('Google Sign-In was cancelled');
     }
+    
+    print('AuthService: Google Sign-In successful, saving tokens...');
+    print('AuthService: Tokens - Access: ${socialResponse.tokens.accessToken.length}, Refresh: ${socialResponse.tokens.refreshToken?.length ?? 0}');
+    
+    // 🔥 CORRECTION: Sauvegarder les tokens et l'utilisateur
+    await _saveTokens(socialResponse.tokens);
+    await _saveUser(socialResponse.user);
+    print('AuthService: Google Sign-In tokens saved successfully');
+    
     return socialResponse;
   }
 
   Future<AuthResponse> appleSignIn() async {
+    print('AuthService: Starting Apple Sign-In...');
     final socialResponse = await _socialAuthService.signInWithApple();
     if (socialResponse == null) {
       throw const AuthException('Apple Sign-In was cancelled');
     }
+    
+    print('AuthService: Apple Sign-In successful, saving tokens...');
+    print('AuthService: Tokens - Access: ${socialResponse.tokens.accessToken.length}, Refresh: ${socialResponse.tokens.refreshToken?.length ?? 0}');
+    
+    // 🔥 CORRECTION: Sauvegarder les tokens et l'utilisateur
+    await _saveTokens(socialResponse.tokens);
+    await _saveUser(socialResponse.user);
+    print('AuthService: Apple Sign-In tokens saved successfully');
+    
     return socialResponse;
   }
 
@@ -311,9 +513,15 @@ class AuthService {
 
       final authResponse = apiResponse.data!;
       
-      // Save new access token (refresh token usually stays the same)
+      // Save new tokens
       await _storage.write(key: 'access_token', value: authResponse.tokens.accessToken);
       await _storage.write(key: 'token_expires_at', value: authResponse.tokens.expiryDate.toIso8601String());
+      
+      // Save new refresh token if provided
+      if (authResponse.tokens.refreshToken != null) {
+        await _storage.write(key: 'refresh_token', value: authResponse.tokens.refreshToken!);
+      }
+      
       await _saveUser(authResponse.user);
 
       return authResponse;
@@ -441,15 +649,41 @@ class AuthService {
 
   // Ensure valid token (refresh if needed)
   Future<String?> getValidAccessToken() async {
-    if (await isTokenExpiredStored()) {
+    print('AuthService: getValidAccessToken() - Starting validation...');
+    final token = await getAccessToken();
+    
+    if (token == null) {
+      print('AuthService: No access token found in storage');
+      return null;
+    }
+    
+    // Vérifier si le token est expiré
+    bool expired = isTokenExpired(token);
+    print('AuthService: Token expired: $expired');
+    
+    if (expired) {
+      print('AuthService: Token expired, attempting refresh...');
+      final refreshToken = await getRefreshToken();
+      
+      if (refreshToken == null) {
+        print('AuthService: No refresh token available, clearing tokens');
+        await clearTokens();
+        return null;
+      }
+      
       try {
-        await refreshTokens('');
+        await refreshTokens(refreshToken);
+        print('AuthService: Token refreshed successfully');
+        return await getAccessToken();
       } catch (e) {
+        print('AuthService: Token refresh failed: $e');
+        await clearTokens();
         return null;
       }
     }
 
-    return await getAccessToken();
+    print('AuthService: Returning valid token');
+    return token;
   }
 
   Future<void> changePassword({

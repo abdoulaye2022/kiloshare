@@ -154,9 +154,16 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    \App\Modules\Trips\Services\TripImageService::class => function ($container) {
+        return new \App\Modules\Trips\Services\TripImageService(
+            $container->get(PDO::class)
+        );
+    },
+    
     \App\Modules\Trips\Controllers\TripController::class => function ($container) {
         return new \App\Modules\Trips\Controllers\TripController(
             $container->get(\App\Modules\Trips\Services\TripService::class),
+            $container->get(\App\Modules\Trips\Services\TripImageService::class),
             $container->get(Psr\Log\LoggerInterface::class)
         );
     },

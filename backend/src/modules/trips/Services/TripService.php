@@ -3,6 +3,8 @@
 namespace App\Modules\Trips\Services;
 
 use App\Modules\Trips\Models\Trip;
+use App\Modules\Trips\Models\TripImage;
+use App\Modules\Trips\Services\TripImageService;
 use PDO;
 use Exception;
 
@@ -10,11 +12,13 @@ class TripService
 {
     private PDO $db;
     private PriceCalculatorService $priceCalculator;
+    private TripImageService $tripImageService;
 
     public function __construct(PriceCalculatorService $priceCalculator, PDO $db)
     {
         $this->db = $db;
         $this->priceCalculator = $priceCalculator;
+        $this->tripImageService = new TripImageService($db);
     }
 
     /**
@@ -121,7 +125,10 @@ class TripService
             $result['restricted_items'] = null;
         }
         
-        return new Trip($result);
+        $trip = new Trip($result);
+        
+        // Load images
+        return $this->loadTripImages($trip);
     }
 
     /**
@@ -632,7 +639,7 @@ class TripService
                     u.first_name, u.last_name, u.email
                 FROM trips t
                 LEFT JOIN users u ON t.user_id = u.id
-                WHERE t.status IN ('pending_approval', 'flagged_for_review')
+                WHERE t.status IN ('pending_review', 'flagged_for_review')
                 ORDER BY t.created_at DESC
             ");
             
@@ -642,6 +649,32 @@ class TripService
             // Format trips data
             $formattedTrips = [];
             foreach ($trips as $trip) {
+                // Get trip images
+                $imageStmt = $this->db->prepare("
+                    SELECT id, image_path, image_name, file_size, upload_order
+                    FROM trip_images 
+                    WHERE trip_id = ? 
+                    ORDER BY upload_order ASC
+                ");
+                $imageStmt->execute([$trip['id']]);
+                $images = $imageStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Format images with full URLs
+                $formattedImages = [];
+                foreach ($images as $image) {
+                    $formattedImages[] = [
+                        'id' => $image['id'],
+                        'image_path' => $image['image_path'],
+                        'image_name' => $image['image_name'],
+                        'file_size' => (int) $image['file_size'],
+                        'upload_order' => (int) $image['upload_order'],
+                        'image_url' => (strpos($image['image_path'], 'http') === 0) 
+                            ? $image['image_path'] 
+                            : 'http://localhost:8080/' . ltrim($image['image_path'], '/'),
+                        'formatted_file_size' => $this->formatFileSize((int) $image['file_size'])
+                    ];
+                }
+
                 $formattedTrips[] = [
                     'id' => $trip['id'],
                     'uuid' => $trip['uuid'],
@@ -656,6 +689,9 @@ class TripService
                     'price_per_kg' => (float) $trip['price_per_kg'],
                     'currency' => $trip['currency'],
                     'status' => $trip['status'],
+                    'has_images' => (bool) $trip['has_images'],
+                    'image_count' => (int) $trip['image_count'],
+                    'images' => $formattedImages,
                     'created_at' => $trip['created_at'],
                     'user' => [
                         'first_name' => $trip['first_name'],
@@ -1152,12 +1188,24 @@ class TripService
      */
     public function duplicateTrip(int $tripId, int $userId): Trip
     {
+        error_log("=== DEBUG DUPLICATE TRIP BACKEND START ===");
+        error_log("Trip ID to duplicate: $tripId");
+        error_log("User ID: $userId");
+        
         $originalTrip = $this->getTripById($tripId);
-        if (!$originalTrip || $originalTrip->getUserId() != $userId) {
+        if (!$originalTrip) {
+            error_log("ERROR: Original trip not found");
+            throw new Exception('Trip not found or access denied');
+        }
+        
+        if ($originalTrip->getUserId() != $userId) {
+            error_log("ERROR: Access denied - trip belongs to user " . $originalTrip->getUserId() . " but requesting user is $userId");
             throw new Exception('Trip not found or access denied');
         }
 
+        error_log("Original trip found, getting data...");
         $tripData = $originalTrip->toArray();
+        error_log("Original trip data keys: " . implode(', ', array_keys($tripData)));
         
         // Remove fields that shouldn't be duplicated
         unset($tripData['id'], $tripData['uuid'], $tripData['created_at'], $tripData['updated_at']);
@@ -1169,7 +1217,19 @@ class TripService
         $tripData['original_trip_id'] = $tripId;
         $tripData['duplicate_count'] = 0;
 
-        return $this->createTrip($tripData, $userId);
+        error_log("Trip data prepared for duplication, keys: " . implode(', ', array_keys($tripData)));
+        error_log("Calling createTrip...");
+
+        try {
+            $newTrip = $this->createTrip($tripData, $userId);
+            error_log("SUCCESS: New trip created with ID: " . $newTrip->getId());
+            error_log("=== DEBUG DUPLICATE TRIP BACKEND END ===");
+            return $newTrip;
+        } catch (Exception $e) {
+            error_log("ERROR: Failed to create duplicate trip: " . $e->getMessage());
+            error_log("=== DEBUG DUPLICATE TRIP BACKEND ERROR ===");
+            throw $e;
+        }
     }
 
     /**
@@ -1248,6 +1308,21 @@ class TripService
     }
 
     /**
+     * Load images for a trip
+     */
+    private function loadTripImages(Trip $trip): Trip
+    {
+        $images = $this->tripImageService->getTripImages($trip->getId());
+        $imageArray = array_map(fn($img) => $img->toArray(), $images);
+        
+        $trip->setImages($imageArray);
+        $trip->setImageCount(count($imageArray));
+        $trip->setHasImages(count($imageArray) > 0);
+        
+        return $trip;
+    }
+
+    /**
      * Generate UUID
      */
     private function generateUuid(): string
@@ -1260,5 +1335,19 @@ class TripService
             mt_rand(0, 0x3fff) | 0x8000,
             mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
+    }
+
+    /**
+     * Format file size in human readable format
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes . ' B';
+        } elseif ($bytes < 1048576) {
+            return round($bytes / 1024, 1) . ' KB';
+        } else {
+            return round($bytes / 1048576, 1) . ' MB';
+        }
     }
 }

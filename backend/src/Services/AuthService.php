@@ -36,11 +36,11 @@ class AuthService
 
         // Check if user already exists
         if ($this->userModel->emailExists($data['email'])) {
-            throw new \RuntimeException('Email already exists', 409);
+            throw new \RuntimeException('Cette adresse email est déjà utilisée', 409);
         }
 
         if (!empty($data['phone']) && $this->userModel->phoneExists($data['phone'])) {
-            throw new \RuntimeException('Phone number already exists', 409);
+            throw new \RuntimeException('Ce numéro de téléphone est déjà utilisé', 409);
         }
 
         // Hash password
@@ -92,7 +92,7 @@ class AuthService
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type' => 'bearer',
-                'expires_in' => 3600
+                'expires_in' => 43200
             ]
         ];
     }
@@ -106,12 +106,12 @@ class AuthService
         $user = $this->userModel->findByEmail(strtolower(trim($email)));
 
         if (!$user || !password_verify($password, $user['password_hash'])) {
-            throw new \RuntimeException('Invalid credentials', 401);
+            throw new \RuntimeException('Identifiants invalides', 401);
         }
 
         // Check account status
         if ($user['status'] !== 'active') {
-            throw new \RuntimeException('Account is not active', 403);
+            throw new \RuntimeException('Votre compte n\'est pas actif', 403);
         }
 
         // Update last login
@@ -139,7 +139,7 @@ class AuthService
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type' => 'bearer',
-                'expires_in' => 3600
+                'expires_in' => 43200
             ]
         ];
     }
@@ -158,11 +158,15 @@ class AuthService
             $user = $this->userModel->findById($tokenData['user_id']);
             
             if (!$user || $user['status'] !== 'active') {
-                throw new \RuntimeException('User not found or inactive', 401);
+                throw new \RuntimeException('Utilisateur introuvable ou inactif', 401);
             }
 
-            // Generate new access token
+            // Generate new tokens
             $newAccessToken = $this->jwtService->generateAccessToken($user);
+            $newRefreshToken = $this->jwtService->generateRefreshToken($user);
+
+            // Store new refresh token
+            $this->storeRefreshToken($tokenData['user_id'], $newRefreshToken);
 
             // Remove sensitive data
             unset($user['password_hash']);
@@ -174,8 +178,9 @@ class AuthService
                 'user' => $user,
                 'tokens' => [
                     'access_token' => $newAccessToken,
+                    'refresh_token' => $newRefreshToken,
                     'token_type' => 'bearer',
-                    'expires_in' => 3600
+                    'expires_in' => 43200
                 ]
             ];
         } catch (\Exception $e) {
@@ -246,7 +251,7 @@ class AuthService
             $user = $this->userModel->findByEmail($email);
             
             if (!$user) {
-                throw new \RuntimeException('User not found', 404);
+                throw new \RuntimeException('Utilisateur introuvable', 404);
             }
 
             // Validate password
@@ -468,7 +473,7 @@ class AuthService
             $user = $this->userModel->findByEmail($email);
             
             if (!$user) {
-                throw new \RuntimeException('User not found', 404);
+                throw new \RuntimeException('Utilisateur introuvable', 404);
             }
             
             if ($user['is_verified']) {
@@ -492,7 +497,7 @@ class AuthService
             $user = $this->userModel->findById($userId);
             
             if (!$user) {
-                throw new \RuntimeException('User not found', 404);
+                throw new \RuntimeException('Utilisateur introuvable', 404);
             }
             
             // Verify current password
@@ -532,7 +537,7 @@ class AuthService
             $user = $this->userModel->findById($userId);
             
             if (!$user) {
-                throw new \RuntimeException('User not found', 404);
+                throw new \RuntimeException('Utilisateur introuvable', 404);
             }
             
             // Verify password
@@ -605,12 +610,12 @@ class AuthService
         // Check if user exists and verify password
         $user = $this->userModel->findByEmail($email);
         if (!$user || !password_verify($password, $user['password_hash'])) {
-            throw new \RuntimeException('Invalid credentials', 401);
+            throw new \RuntimeException('Identifiants invalides', 401);
         }
 
         // Verify user has admin role
         if ($user['role'] !== 'admin') {
-            throw new \RuntimeException('Access denied - Admin privileges required', 403);
+            throw new \RuntimeException('Accès refusé - Privilèges administrateur requis', 403);
         }
 
         // Generate JWT tokens
@@ -633,7 +638,7 @@ class AuthService
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type' => 'Bearer',
-                'expires_in' => 3600
+                'expires_in' => 43200
             ]
         ];
     }
@@ -676,7 +681,7 @@ class AuthService
         // Get user first to verify they exist
         $user = $this->userModel->findById($userId);
         if (!$user) {
-            throw new \RuntimeException('User not found', 404);
+            throw new \RuntimeException('Utilisateur introuvable', 404);
         }
 
         // Update the role

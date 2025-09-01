@@ -614,15 +614,15 @@ class AuthController
 
     private function getStatusCodeFromMessage(string $message): int
     {
-        if (str_contains($message, 'already exists')) {
+        if (str_contains($message, 'already exists') || str_contains($message, 'déjà utilisée') || str_contains($message, 'déjà utilisé')) {
             return 409; // Conflict
         }
 
-        if (str_contains($message, 'Invalid credentials') || str_contains($message, 'expired')) {
+        if (str_contains($message, 'Invalid credentials') || str_contains($message, 'Identifiants invalides') || str_contains($message, 'expired')) {
             return 401; // Unauthorized
         }
 
-        if (str_contains($message, 'not active')) {
+        if (str_contains($message, 'not active') || str_contains($message, 'pas actif')) {
             return 403; // Forbidden
         }
 
@@ -871,6 +871,58 @@ class AuthController
             $response->getBody()->write(json_encode([
                 'success' => false,
                 'message' => 'Failed to update user role',
+                'error_code' => 'INTERNAL_ERROR'
+            ]));
+            
+            return $response
+                ->withStatus(500)
+                ->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    public function refreshToken(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody() ?? [];
+            
+            if (empty($data)) {
+                $rawBody = $request->getBody()->getContents();
+                $data = json_decode($rawBody, true) ?? [];
+            }
+            
+            if (empty($data['refresh_token'])) {
+                throw new \RuntimeException('Refresh token is required', 400);
+            }
+            
+            $result = $this->authService->refreshToken($data['refresh_token']);
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Token refreshed successfully',
+                'data' => $result
+            ]));
+            
+            return $response
+                ->withStatus(200)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\RuntimeException $e) {
+            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'REFRESH_TOKEN_FAILED'
+            ]));
+            
+            return $response
+                ->withStatus($statusCode)
+                ->withHeader('Content-Type', 'application/json');
+                
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'message' => 'Failed to refresh token',
                 'error_code' => 'INTERNAL_ERROR'
             ]));
             

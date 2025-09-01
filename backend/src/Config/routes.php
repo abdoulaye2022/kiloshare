@@ -473,6 +473,14 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
                 $tripGroup->get('/{id}/history', [TripController::class, 'getTripHistory'])
                     ->add(AuthMiddleware::class);
+                
+                // Image routes
+                $tripGroup->post('/{id}/images', [TripController::class, 'uploadTripImages'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/{id}/images', [TripController::class, 'getTripImages'])
+                    ->add(OptionalAuthMiddleware::class);
+                $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'deleteTripImage'])
+                    ->add(AuthMiddleware::class);
 
                 // Generic routes with parameters (must come last)
                 $tripGroup->get('/{id}', [TripController::class, 'get'])

@@ -55,7 +55,7 @@ class Config
             'jwt' => [
                 'secret' => $_ENV['JWT_SECRET'] ?? 'your-super-secret-jwt-key-change-this-in-production',
                 'algorithm' => $_ENV['JWT_ALGORITHM'] ?? 'HS256',
-                'access_expires_in' => (int)($_ENV['JWT_ACCESS_EXPIRES_IN'] ?? 3600), // 1 hour
+                'access_expires_in' => (int)($_ENV['JWT_ACCESS_EXPIRES_IN'] ?? 43200), // 12 hours
                 'refresh_expires_in' => (int)($_ENV['JWT_REFRESH_EXPIRES_IN'] ?? 604800) // 7 days
             ],
             
