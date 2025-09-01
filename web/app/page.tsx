@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { 
-  Luggage, 
+  Package, 
   Users, 
   Plane, 
   Shield, 
@@ -22,7 +22,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-2">
-              <Luggage className="h-8 w-8 text-primary" />
+              <Package className="h-8 w-8 text-primary" />
               <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
             </div>
             <nav className="hidden md:flex space-x-8">
@@ -152,7 +152,7 @@ export default function HomePage() {
                 step: "2", 
                 title: "Publiez ou cherchez",
                 description: "Proposez votre espace bagage libre ou trouvez un transport disponible",
-                icon: <Luggage className="h-8 w-8" />
+                icon: <Package className="h-8 w-8" />
               },
               {
                 step: "3",
@@ -222,7 +222,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-2">
               <div className="flex items-center space-x-2 mb-4">
-                <Luggage className="h-8 w-8 text-primary" />
+                <Package className="h-8 w-8 text-primary" />
                 <h4 className="text-2xl font-bold">KiloShare</h4>
               </div>
               <p className="text-gray-400 mb-4 max-w-md">

@@ -56,7 +56,7 @@ export default function Dashboard({ adminInfo, onLogout }: AdminDashboardProps) 
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await adminAuth.apiRequest('/api/admin/dashboard/stats');
+      const response = await adminAuth.apiRequest('/api/v1/admin/dashboard/stats');
       
       if (response.ok) {
         const data = await response.json();

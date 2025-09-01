@@ -55,3 +55,24 @@ a {
 .hero-gradient {
   background: linear-gradient(135deg, #4096FF 0%, #0070F3 100%);
 }
+
+/* Utilitaires CSS personnalisés */
+.text-primary {
+  color: #4096FF;
+}
+
+.bg-primary {
+  background-color: #4096FF;
+}
+
+.border-primary {
+  border-color: #4096FF;
+}
+
+.hover\:text-primary:hover {
+  color: #4096FF;
+}
+
+.hover\:bg-primary:hover {
+  background-color: #4096FF;
+}

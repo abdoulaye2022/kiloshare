@@ -57,7 +57,7 @@ export default function TripModerationPanel({ adminInfo, onLogout }: TripModerat
 
   const fetchPendingTrips = async () => {
     try {
-      const response = await adminAuth.apiRequest('/api/admin/trips/pending');
+      const response = await adminAuth.apiRequest('/api/v1/admin/trips/pending');
 
       if (response.ok) {
         const data = await response.json();
@@ -74,7 +74,7 @@ export default function TripModerationPanel({ adminInfo, onLogout }: TripModerat
 
   const handleApproveTrip = async (tripId: string) => {
     try {
-      const response = await adminAuth.apiRequest('/api/admin/trips/approve', {
+      const response = await adminAuth.apiRequest('/api/v1/admin/trips/approve', {
         method: 'POST',
         body: JSON.stringify({ id: tripId }),
       });
@@ -91,7 +91,7 @@ export default function TripModerationPanel({ adminInfo, onLogout }: TripModerat
     const reason = prompt('Raison du rejet (optionnel):');
     
     try {
-      const response = await adminAuth.apiRequest('/api/admin/trips/reject', {
+      const response = await adminAuth.apiRequest('/api/v1/admin/trips/reject', {
         method: 'POST',
         body: JSON.stringify({ id: tripId, reason }),
       });

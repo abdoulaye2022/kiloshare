@@ -584,6 +584,10 @@ return function (App $app) {
                 $bookingGroup->post('/{id}/negotiate', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'addNegotiation'])
                     ->add(AuthMiddleware::class);
                 
+                // Accept negotiation (by trip owner) - ⭐ NOUVELLE ROUTE
+                $bookingGroup->put('/{booking_id}/negotiations/{negotiation_id}/accept', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'acceptNegotiation'])
+                    ->add(AuthMiddleware::class);
+                
                 // Mark as ready for payment
                 $bookingGroup->put('/{id}/payment-ready', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'markPaymentReady'])
                     ->add(AuthMiddleware::class);
@@ -654,9 +658,43 @@ return function (App $app) {
                     ->add(AdminAuthMiddleware::class);
                     
                 // User management (admin only)
-                $adminGroup->get('/users', [AuthController::class, 'getAllUsers'])
+                $adminGroup->get('/users', [\App\Controllers\AdminUsersController::class, 'index'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/users/{id}', [\App\Controllers\AdminUsersController::class, 'show'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/users/{id}/block', [\App\Controllers\AdminUsersController::class, 'block'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/users/{id}/unblock', [\App\Controllers\AdminUsersController::class, 'unblock'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/users/{id}/verify', [\App\Controllers\AdminUsersController::class, 'verify'])
                     ->add(AdminAuthMiddleware::class);
                 $adminGroup->put('/users/{id}/role', [AuthController::class, 'updateUserRole'])
+                    ->add(AdminAuthMiddleware::class);
+                
+                // Dashboard stats (admin only)
+                $adminGroup->get('/dashboard/stats', [\App\Controllers\AdminDashboardController::class, 'getStats'])
+                    ->add(AdminAuthMiddleware::class);
+                
+                // Payment management (admin only)
+                $adminGroup->get('/payments/stats', [\App\Controllers\AdminPaymentsController::class, 'getStats'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/payments/transactions', [\App\Controllers\AdminPaymentsController::class, 'getTransactions'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/payments/transactions/{id}', [\App\Controllers\AdminPaymentsController::class, 'getTransaction'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/payments/transactions/{id}/refund', [\App\Controllers\AdminPaymentsController::class, 'refundTransaction'])
+                    ->add(AdminAuthMiddleware::class);
+                
+                // Stripe Connected Accounts management (admin only)
+                $adminGroup->get('/stripe/connected-accounts', [\App\Controllers\AdminStripeController::class, 'getConnectedAccounts'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/stripe/connected-accounts/stats', [\App\Controllers\AdminStripeController::class, 'getStats'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/stripe/connected-accounts/{id}', [\App\Controllers\AdminStripeController::class, 'getConnectedAccount'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->post('/stripe/connected-accounts/{id}/status', [\App\Controllers\AdminStripeController::class, 'updateAccountStatus'])
+                    ->add(AdminAuthMiddleware::class);
+                $adminGroup->get('/stripe/stats', [\App\Controllers\AdminStripeController::class, 'getStats'])
                     ->add(AdminAuthMiddleware::class);
                 
                 // Cloudinary monitoring (admin only)

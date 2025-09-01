@@ -76,12 +76,12 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
       if (filter !== 'all') queryParams.append('status', filter);
       if (typeFilter !== 'all') queryParams.append('type', typeFilter);
       
-      const response = await adminAuth.apiRequest(`/api/admin/payments/transactions?${queryParams}`);
+      const response = await adminAuth.apiRequest(`/api/v1/admin/payments/transactions?${queryParams}`);
       
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setTransactions(data.data.transactions || []);
+          setTransactions(data.transactions || []);
         } else {
           console.error('API returned error:', data.message);
         }
@@ -97,7 +97,7 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
 
   const fetchPaymentStats = async () => {
     try {
-      const response = await adminAuth.apiRequest('/api/admin/payments/stats');
+      const response = await adminAuth.apiRequest('/api/v1/admin/payments/stats');
       
       if (response.ok) {
         const data = await response.json();
@@ -116,7 +116,7 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
     if (!amount || parseFloat(amount) <= 0) return;
 
     try {
-      const response = await adminAuth.apiRequest('/api/admin/transactions/refund', {
+      const response = await adminAuth.apiRequest('/api/v1/admin/transactions/refund', {
         method: 'POST',
         body: JSON.stringify({
           transaction_id: transaction.id,
@@ -142,7 +142,7 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
     if (!confirm('Êtes-vous sûr de vouloir relancer ce paiement ?')) return;
 
     try {
-      const response = await adminAuth.apiRequest('/api/admin/transactions/retry', {
+      const response = await adminAuth.apiRequest('/api/v1/admin/transactions/retry', {
         method: 'POST',
         body: JSON.stringify({ transaction_id: transaction.id }),
       });
@@ -270,7 +270,12 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
           {/* Stats de Paiement */}
           {stats && (
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Statistiques Financières</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                <svg className="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                Statistiques Financières
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-6 rounded-lg shadow">
                   <div className="text-green-600 text-2xl font-bold">{formatCurrency(stats.total_revenue_today)}</div>
@@ -347,7 +352,10 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"
             >
-              🔄 Actualiser
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Actualiser
             </button>
           </div>
 

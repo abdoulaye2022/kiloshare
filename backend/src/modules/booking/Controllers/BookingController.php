@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use KiloShare\Modules\Booking\Models\Booking;
 use KiloShare\Modules\Booking\Models\Transaction;
+use KiloShare\Modules\Booking\Services\StripeAccountService;
 use Exception;
 use PDO;
 
@@ -16,12 +17,14 @@ class BookingController
     private PDO $db;
     private Booking $bookingModel;
     private Transaction $transactionModel;
+    private StripeAccountService $stripeAccountService;
 
     public function __construct(PDO $db)
     {
         $this->db = $db;
         $this->bookingModel = new Booking($db);
         $this->transactionModel = new Transaction($db);
+        $this->stripeAccountService = new StripeAccountService($db);
     }
 
     /**
@@ -225,17 +228,43 @@ class BookingController
                 return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
             }
             
-            $finalPrice = isset($data['final_price']) ? (float)$data['final_price'] : null;
+            $finalPrice = isset($data['final_price']) ? (float)$data['final_price'] : $booking['proposed_price'];
             
             $this->bookingModel->accept($bookingId, $finalPrice);
             
-            $updatedBooking = $this->bookingModel->getById($bookingId);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'booking' => $updatedBooking,
-                'message' => 'Réservation acceptée avec succès'
-            ]));
+            // ⭐ POINT CLÉ : Vérifier si le transporteur (receiver) a un compte Stripe
+            $transporterId = $booking['receiver_id'];
+            if (!$this->stripeAccountService->hasStripeAccount($transporterId)) {
+                // Créer automatiquement le compte Stripe
+                $stripeAccount = $this->stripeAccountService->createConnectedAccount(
+                    $transporterId, 
+                    $finalPrice
+                );
+                
+                $motivationalMessage = $this->stripeAccountService->getMotivationalMessage($finalPrice);
+                $updatedBooking = $this->bookingModel->getById($bookingId);
+                
+                // Retourner avec les infos de création du compte Stripe
+                $response->getBody()->write(json_encode([
+                    'success' => true,
+                    'booking' => $updatedBooking,
+                    'message' => 'Réservation acceptée avec succès',
+                    'stripe_account_created' => true,
+                    'stripe_account' => $stripeAccount,
+                    'motivational_message' => $motivationalMessage,
+                    'next_action' => 'setup_stripe_account'
+                ]));
+            } else {
+                $updatedBooking = $this->bookingModel->getById($bookingId);
+                
+                // L'utilisateur a déjà un compte Stripe
+                $response->getBody()->write(json_encode([
+                    'success' => true,
+                    'booking' => $updatedBooking,
+                    'message' => 'Réservation acceptée avec succès',
+                    'stripe_account_created' => false
+                ]));
+            }
 
             return $response->withStatus(200)->withHeader('Content-Type', 'application/json');
 
@@ -503,6 +532,123 @@ class BookingController
             $response->getBody()->write(json_encode([
                 'success' => false,
                 'error' => 'Erreur lors de l\'ajout de la photo'
+            ]));
+            
+            return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
+        }
+    }
+
+    /**
+     * Accepter une négociation de prix
+     */
+    public function acceptNegotiation(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $bookingId = (int)$args['booking_id'];
+            $negotiationId = (int)$args['negotiation_id'];
+            $user = $request->getAttribute('user');
+            $userId = $user['id'] ?? null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'error' => 'User ID not found in token'
+                ]));
+                return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            }
+            
+            // Récupérer la réservation
+            $booking = $this->bookingModel->getById($bookingId);
+            
+            // Vérifier que l'utilisateur est le propriétaire du voyage (receiver)
+            if ($booking['receiver_id'] != $userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'error' => 'Seul le propriétaire du voyage peut accepter une négociation'
+                ]));
+                return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
+            }
+            
+            // Récupérer la négociation spécifique
+            $stmt = $this->db->prepare("
+                SELECT * FROM booking_negotiations 
+                WHERE id = ? AND booking_id = ? AND is_accepted = 0
+            ");
+            $stmt->execute([$negotiationId, $bookingId]);
+            $negotiation = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$negotiation) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'error' => 'Négociation non trouvée ou déjà acceptée'
+                ]));
+                return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
+            }
+            
+            // Commencer la transaction
+            $this->db->beginTransaction();
+            
+            try {
+                // 1. Marquer la négociation comme acceptée
+                $updateNegotiation = $this->db->prepare("
+                    UPDATE booking_negotiations 
+                    SET is_accepted = 1, updated_at = NOW() 
+                    WHERE id = ?
+                ");
+                $updateNegotiation->execute([$negotiationId]);
+                
+                // 2. Mettre à jour la réservation avec le prix négocié
+                $finalPrice = (float)$negotiation['amount'];
+                $this->bookingModel->accept($bookingId, $finalPrice);
+                
+                // 3. ⭐ POINT CLÉ : Vérifier si le transporteur (receiver) a un compte Stripe
+                $transporterId = $booking['receiver_id'];
+                if (!$this->stripeAccountService->hasStripeAccount($transporterId)) {
+                    // Créer automatiquement le compte Stripe
+                    $stripeAccount = $this->stripeAccountService->createConnectedAccount(
+                        $transporterId, 
+                        $finalPrice
+                    );
+                    
+                    $motivationalMessage = $this->stripeAccountService->getMotivationalMessage($finalPrice);
+                    
+                    $this->db->commit();
+                    
+                    // Retourner avec les infos de création du compte Stripe
+                    $response->getBody()->write(json_encode([
+                        'success' => true,
+                        'message' => 'Négociation acceptée avec succès',
+                        'booking' => $this->bookingModel->getById($bookingId),
+                        'stripe_account_created' => true,
+                        'stripe_account' => $stripeAccount,
+                        'motivational_message' => $motivationalMessage,
+                        'next_action' => 'setup_stripe_account'
+                    ]));
+                } else {
+                    $this->db->commit();
+                    
+                    // L'utilisateur a déjà un compte Stripe
+                    $response->getBody()->write(json_encode([
+                        'success' => true,
+                        'message' => 'Négociation acceptée avec succès',
+                        'booking' => $this->bookingModel->getById($bookingId),
+                        'stripe_account_created' => false
+                    ]));
+                }
+                
+                return $response->withStatus(200)->withHeader('Content-Type', 'application/json');
+                
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                throw $e;
+            }
+            
+        } catch (Exception $e) {
+            error_log("Erreur BookingController::acceptNegotiation: " . $e->getMessage());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => 'Erreur lors de l\'acceptation de la négociation'
             ]));
             
             return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
