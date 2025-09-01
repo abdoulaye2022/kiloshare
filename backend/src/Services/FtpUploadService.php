@@ -27,7 +27,7 @@ class FtpUploadService
         ];
     }
 
-    public function uploadFile(UploadedFileInterface $uploadedFile, string $folder = ''): array
+    public function uploadFile(UploadedFileInterface $uploadedFile, string $folder = '', ?int $userId = null, ?int $tripId = null): array
     {
         try {
             // Valider le fichier
@@ -44,7 +44,7 @@ class FtpUploadService
             $fileName = $this->generateUniqueFileName($extension);
             
             // Construire le chemin de destination
-            $destinationPath = $this->buildDestinationPath($folder);
+            $destinationPath = $this->buildDestinationPath($folder, $userId, $tripId);
             $filePath = $destinationPath . '/' . $fileName;
             $fullPath = $this->uploadPath . $filePath;
 
@@ -154,11 +154,22 @@ class FtpUploadService
         return "file_{$timestamp}_{$random}.{$extension}";
     }
 
-    private function buildDestinationPath(string $folder = ''): string
+    private function buildDestinationPath(string $folder = '', ?int $userId = null, ?int $tripId = null): string
     {
         $datePath = date('Y/m/d');
         
         if ($folder) {
+            // Pour les avatars et documents utilisateur
+            if ($userId && in_array($folder, ['avatars', 'documents'])) {
+                return "{$folder}/user_{$userId}/{$datePath}";
+            }
+            
+            // Pour les images de voyages
+            if ($tripId && $folder === 'trips') {
+                return "{$folder}/trip_{$tripId}/{$datePath}";
+            }
+            
+            // Fallback vers l'ancienne structure
             return "{$folder}/{$datePath}";
         }
         
@@ -176,8 +187,8 @@ class FtpUploadService
 
     private function generateFileUrl(string $filePath): string
     {
-        $baseUrl = rtrim($_ENV['APP_URL'] ?? 'http://localhost:8080', '/');
-        return "{$baseUrl}/uploads/{$filePath}";
+        $baseUrl = rtrim($_ENV['BASE_UPLOADS_URL'] ?? 'http://localhost/kiloshare/backend/uploads/', '/');
+        return "{$baseUrl}/{$filePath}";
     }
 
     private function getUploadErrorMessage(int $error): string

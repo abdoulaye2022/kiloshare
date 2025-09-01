@@ -21,7 +21,8 @@ class ProfileService
             SELECT 
                 up.*,
                 u.email,
-                u.username,
+                u.first_name,
+                u.last_name,
                 u.created_at as user_created_at,
                 COUNT(tb.id) as badge_count
             FROM user_profiles up

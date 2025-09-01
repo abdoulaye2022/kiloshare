@@ -6,6 +6,7 @@ import '../services/trip_service.dart';
 import '../services/favorites_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import '../../auth/services/auth_service.dart';
+import '../../booking/screens/create_booking_screen.dart';
 
 class TripDetailsFinal extends StatefulWidget {
   final String tripId;
@@ -719,26 +720,42 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   }
 
   Widget _buildUserActions() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
+        // Bouton principal "Réserver"
+        SizedBox(
+          width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _contactOwner(),
-            icon: const Icon(Icons.message),
-            label: const Text('Contacter'),
+            onPressed: () => _createBookingRequest(),
+            icon: const Icon(Icons.local_shipping),
+            label: const Text('Réserver ce transport'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: Colors.green,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: EllipsisButton.outlined(
-            onPressed: () => _toggleFavorite(),
-            icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
-            text: _isFavorite ? 'Favoris ✓' : 'Favoris',
-          ),
+        const SizedBox(height: 12),
+        // Actions secondaires
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _contactOwner(),
+                icon: const Icon(Icons.message),
+                label: const Text('Contacter'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: EllipsisButton.outlined(
+                onPressed: () => _toggleFavorite(),
+                icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
+                text: _isFavorite ? 'Favoris ✓' : 'Favoris',
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -930,6 +947,27 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       }
     } catch (e) {
       _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
+    }
+  }
+
+  void _createBookingRequest() async {
+    if (_trip == null) return;
+    
+    try {
+      // Naviguer vers l'écran de création de réservation
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateBookingScreen(trip: _trip!),
+        ),
+      );
+      
+      if (result == true) {
+        _showMessage('Demande de réservation envoyée avec succès!', Colors.green);
+      }
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la création de la réservation: $e', Colors.red);
     }
   }
 

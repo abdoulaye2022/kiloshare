@@ -14,11 +14,16 @@ import '../modules/profile/screens/notification_settings_screen.dart';
 import '../modules/profile/screens/privacy_settings_screen.dart';
 import '../modules/profile/screens/delete_account_screen.dart';
 import '../modules/profile/screens/linked_accounts_screen.dart';
+import '../modules/profile/screens/edit_profile_screen.dart';
+import '../modules/profile/screens/trip_history_screen.dart';
 import '../modules/trips/screens/trip_type_selection_screen.dart';
 import '../modules/trips/screens/create_trip_screen.dart';
 import '../modules/trips/screens/my_trips_screen_bloc.dart';
 import '../modules/trips/screens/trip_details_final.dart';
 import '../modules/trips/screens/search_trips_screen.dart';
+import '../modules/booking/screens/bookings_list_screen.dart';
+import '../modules/booking/screens/booking_details_screen.dart';
+import '../modules/profile/screens/wallet_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -104,6 +109,21 @@ GoRouter createRouter() {
         name: 'delete-account',
         builder: (context, state) => const DeleteAccountScreen(),
       ),
+      GoRoute(
+        path: '/profile/edit',
+        name: 'edit-profile',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile/trip-history',
+        name: 'trip-history',
+        builder: (context, state) => const TripHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/profile/wallet',
+        name: 'wallet',
+        builder: (context, state) => const WalletScreen(),
+      ),
       
       // Trip routes
       GoRoute(
@@ -135,6 +155,21 @@ GoRouter createRouter() {
         builder: (context, state) {
           final tripId = state.pathParameters['id']!;
           return CreateTripScreen(tripId: tripId);
+        },
+      ),
+      
+      // Booking routes
+      GoRoute(
+        path: '/bookings',
+        name: 'bookings',
+        builder: (context, state) => const BookingsListScreen(),
+      ),
+      GoRoute(
+        path: '/bookings/:id',
+        name: 'booking-details',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['id']!;
+          return BookingDetailsScreen(bookingId: bookingId);
         },
       ),
     ],

@@ -60,10 +60,11 @@ class _DateTimePickerFieldState extends State<DateTimePickerField> {
   }
 
   String _formatDateTime(DateTime dateTime) {
+    final localDateTime = dateTime.toLocal();
     final dateFormatter = DateFormat('dd MMM yyyy', 'fr_FR');
     final timeFormatter = DateFormat('HH:mm', 'fr_FR');
     
-    return '${dateFormatter.format(dateTime)} à ${timeFormatter.format(dateTime)}';
+    return '${dateFormatter.format(localDateTime)} à ${timeFormatter.format(localDateTime)}';
   }
 
   Future<void> _selectDateTime(BuildContext context) async {

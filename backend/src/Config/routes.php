@@ -556,6 +556,90 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
             });
             
+            // Booking routes
+            $v1Group->group('/bookings', function (RouteCollectorProxy $bookingGroup) {
+                // All booking routes require authentication
+                
+                // Create booking request
+                $bookingGroup->post('/request', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'createBookingRequest'])
+                    ->add(AuthMiddleware::class);
+                
+                // Get user bookings list
+                $bookingGroup->get('/list', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'getUserBookings'])
+                    ->add(AuthMiddleware::class);
+                
+                // Get specific booking details
+                $bookingGroup->get('/{id}', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'getBooking'])
+                    ->add(AuthMiddleware::class);
+                
+                // Accept booking (by trip owner)
+                $bookingGroup->put('/{id}/accept', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'acceptBooking'])
+                    ->add(AuthMiddleware::class);
+                
+                // Reject booking (by trip owner)
+                $bookingGroup->put('/{id}/reject', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'rejectBooking'])
+                    ->add(AuthMiddleware::class);
+                
+                // Add price negotiation
+                $bookingGroup->post('/{id}/negotiate', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'addNegotiation'])
+                    ->add(AuthMiddleware::class);
+                
+                // Mark as ready for payment
+                $bookingGroup->put('/{id}/payment-ready', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'markPaymentReady'])
+                    ->add(AuthMiddleware::class);
+                
+                // Add package photo
+                $bookingGroup->post('/{id}/photos', [\KiloShare\Modules\Booking\Controllers\BookingController::class, 'addPackagePhoto'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Payment routes
+            $v1Group->group('/payments', function (RouteCollectorProxy $paymentGroup) {
+                // All payment routes require authentication
+                
+                // Create payment intent
+                $paymentGroup->post('/bookings/{booking_id}/intent', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'createPaymentIntent'])
+                    ->add(AuthMiddleware::class);
+                
+                // Confirm payment
+                $paymentGroup->post('/transactions/{transaction_id}/confirm', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'confirmPayment'])
+                    ->add(AuthMiddleware::class);
+                
+                // Release escrow funds
+                $paymentGroup->post('/transactions/{transaction_id}/release', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'releaseEscrow'])
+                    ->add(AuthMiddleware::class);
+                
+                // Refund payment
+                $paymentGroup->post('/transactions/{transaction_id}/refund', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'refundPayment'])
+                    ->add(AuthMiddleware::class);
+                
+                // Get user transactions
+                $paymentGroup->get('/transactions', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'getUserTransactions'])
+                    ->add(AuthMiddleware::class);
+                
+                // Get transaction details
+                $paymentGroup->get('/transactions/{transaction_id}', [\KiloShare\Modules\Booking\Controllers\PaymentController::class, 'getTransaction'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Stripe Connected Accounts routes
+            $v1Group->group('/stripe', function (RouteCollectorProxy $stripeGroup) {
+                // Create connected account
+                $stripeGroup->post('/account/create', [\KiloShare\Modules\Booking\Controllers\StripeController::class, 'createConnectedAccount'])
+                    ->add(AuthMiddleware::class);
+                
+                // Get account status
+                $stripeGroup->get('/account/status', [\KiloShare\Modules\Booking\Controllers\StripeController::class, 'getAccountStatus'])
+                    ->add(AuthMiddleware::class);
+                
+                // Refresh onboarding link
+                $stripeGroup->post('/account/refresh-link', [\KiloShare\Modules\Booking\Controllers\StripeController::class, 'refreshAccountLink'])
+                    ->add(AuthMiddleware::class);
+                
+                // Webhook endpoint (no auth required)
+                $stripeGroup->post('/webhook', [\KiloShare\Modules\Booking\Controllers\StripeController::class, 'handleWebhook']);
+            });
+            
             // Admin routes (admin only access)
             $v1Group->group('/admin', function (RouteCollectorProxy $adminGroup) {
                 // Auth routes for admin

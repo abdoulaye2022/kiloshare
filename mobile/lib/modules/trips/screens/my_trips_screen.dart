@@ -6,6 +6,8 @@ import '../widgets/trip_card_widget.dart';
 import '../widgets/trip_status_widget.dart';
 import '../services/trip_state_manager.dart';
 import '../services/trip_service.dart';
+import '../services/favorites_service.dart';
+import '../../../widgets/ellipsis_button.dart';
 
 class MyTripsScreen extends StatefulWidget {
   const MyTripsScreen({super.key});
@@ -77,7 +79,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       }
       
       try {
-        favorites = await _tripService.getFavorites();
+        favorites = await FavoritesService.instance.getFavoriteTrips();
         print('MyTripsScreen: Received ${favorites.length} favorites');
       } catch (e) {
         print('MyTripsScreen: Failed to load favorites: $e');
@@ -306,10 +308,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
+          EllipsisButton.elevated(
             onPressed: () => context.push('/trips/create'),
             icon: const Icon(Icons.add),
-            label: const Text('Créer un voyage'),
+            text: 'Créer un voyage',
           ),
         ],
       ),
@@ -342,10 +344,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
+          EllipsisButton.elevated(
             onPressed: _loadTrips,
             icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
+            text: 'Réessayer',
           ),
         ],
       ),
@@ -355,6 +357,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   void _applyFilters() {
     List<Trip> filteredPublished = List.from(_myTrips);
     List<Trip> filteredDrafts = List.from(_drafts);
+    List<Trip> filteredFavorites = List.from(_favorites);
 
     // Apply status filter
     if (_statusFilter != 'all') {
@@ -395,24 +398,23 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         (trip.airline?.toLowerCase().contains(query) ?? false)
       ).toList();
       
-      List<Trip> filteredFavs = List.from(_favorites);
-      filteredFavs = filteredFavs.where((trip) => 
+      filteredFavorites = filteredFavorites.where((trip) => 
         trip.departureCity.toLowerCase().contains(query) ||
         trip.arrivalCity.toLowerCase().contains(query) ||
         (trip.flightNumber?.toLowerCase().contains(query) ?? false) ||
         (trip.airline?.toLowerCase().contains(query) ?? false)
       ).toList();
-      _filteredFavorites = filteredFavs;
     }
 
     // Apply sorting
     _applySorting(filteredPublished);
     _applySorting(filteredDrafts);
-    _applySorting(_filteredFavorites);
+    _applySorting(filteredFavorites);
 
     setState(() {
       _filteredTrips = filteredPublished;
       _filteredDrafts = filteredDrafts;
+      _filteredFavorites = filteredFavorites;
     });
   }
 

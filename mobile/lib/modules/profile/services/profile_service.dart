@@ -77,6 +77,14 @@ class ProfileService {
 
       return null;
     } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        // Profil non trouvé - c'est normal pour un nouvel utilisateur
+        if (kDebugMode) {
+          print('[ProfileService] Profil non trouvé - utilisateur sans profil');
+        }
+        return null;
+      }
+      
       if (kDebugMode) {
         print('[ProfileService] Erreur lors de la récupération du profil: $e');
       }
@@ -134,11 +142,11 @@ class ProfileService {
     }
   }
 
-  // Avatar Upload
+  // Avatar Upload avec Cloudinary
   Future<String> uploadAvatar(File imageFile) async {
     try {
       if (kDebugMode) {
-        print('[ProfileService] Upload avatar: ${imageFile.path}');
+        print('[ProfileService] Upload avatar vers Cloudinary: ${imageFile.path}');
       }
 
       FormData formData = FormData.fromMap({
@@ -148,24 +156,26 @@ class ProfileService {
         ),
       });
 
-      final response = await _dio.post('/profile/avatar', data: formData, options: Options(
+      final response = await _dio.post('/images/avatar', data: formData, options: Options(
         headers: {
           if (await _getAccessToken() != null) 'Authorization': 'Bearer ${await _getAccessToken()}',
         },
       ));
 
       if (kDebugMode) {
-        print('[ProfileService] Réponse upload avatar: ${response.data}');
+        print('[ProfileService] Réponse upload avatar Cloudinary: ${response.data}');
       }
 
       if (response.data['success'] == true && response.data['data'] != null) {
-        return response.data['data']['avatar_url'];
+        return response.data['data']['avatar_url'] ?? 
+               response.data['data']['cloudinary_url'] ?? 
+               response.data['data']['secure_url'] ?? '';
       }
 
-      throw Exception(response.data['message'] ?? 'Erreur lors de l\'upload de l\'avatar');
+      throw Exception(response.data['message'] ?? 'Erreur lors de l\'upload de l\'avatar vers Cloudinary');
     } catch (e) {
       if (kDebugMode) {
-        print('[ProfileService] Erreur upload avatar: $e');
+        print('[ProfileService] Erreur upload avatar Cloudinary: $e');
       }
       rethrow;
     }

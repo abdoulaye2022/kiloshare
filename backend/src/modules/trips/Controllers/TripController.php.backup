@@ -1,0 +1,1012 @@
+<?php
+
+namespace App\Modules\Trips\Controllers;
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Modules\Trips\Services\TripService;
+use Psr\Log\LoggerInterface;
+use Exception;
+
+class TripController
+{
+    private TripService $tripService;
+    private LoggerInterface $logger;
+
+    public function __construct(TripService $tripService, LoggerInterface $logger)
+    {
+        $this->tripService = $tripService;
+        $this->logger = $logger;
+    }
+
+    private function jsonResponse(Response $response, array $data, int $status = 200): Response
+    {
+        $response->getBody()->write(json_encode($data));
+        return $response->withStatus($status)->withHeader('Content-Type', 'application/json');
+    }
+
+    private function success(Response $response, array $data = []): Response
+    {
+        return $this->jsonResponse($response, array_merge(['success' => true], $data));
+    }
+
+    private function error(Response $response, string $message, int $status = 500): Response
+    {
+        return $this->jsonResponse($response, [
+            'success' => false,
+            'message' => $message
+        ], $status);
+    }
+
+    /**
+     * Create a new trip
+     * POST /api/trips/create
+     */
+    public function create(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            if (!$user) {
+                return $this->error($response, 'Authentication required', 401);
+            }
+            
+            $data = json_decode($request->getBody()->getContents(), true);
+            if (!$data) {
+                return $this->error($response, 'Invalid JSON data');
+            }
+            
+            // Validate required fields
+            $requiredFields = [
+                'departure_city', 'departure_country', 'departure_date',
+                'arrival_city', 'arrival_country', 'arrival_date',
+                'available_weight_kg', 'price_per_kg'
+            ];
+            
+            foreach ($requiredFields as $field) {
+                if (empty($data[$field])) {
+                    return $this->error($response, "Field '$field' is required");
+                }
+            }
+            
+            $trip = $this->tripService->createTrip($data, $user['id']);
+            
+            return $this->success($response, [
+                'trip' => $trip->toJson(),
+                'message' => 'Trip created successfully'
+            ], 201);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get user's trips
+     * GET /api/trips/list
+     */
+    public function list(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            if (!$user) {
+                return $this->error($response, 'Authentication required', 401);
+            }
+            
+            $queryParams = $request->getQueryParams();
+            $page = max(1, (int) ($queryParams['page'] ?? 1));
+            $limit = min(50, max(10, (int) ($queryParams['limit'] ?? 20)));
+            
+            $trips = $this->tripService->getUserTrips($user['id'], $page, $limit);
+            
+            $tripsData = [];
+            foreach ($trips as $trip) {
+                $tripsData[] = $trip->toJson();
+            }
+            
+            return $this->success($response, [
+                'trips' => $tripsData,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'has_more' => count($trips) === $limit
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get trip details
+     * GET /api/trips/{id}
+     */
+    public function get(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            
+            // Try to get by UUID first, then by numeric ID
+            $trip = $this->tripService->getTripByUuid($tripId);
+            if (!$trip && is_numeric($tripId)) {
+                $trip = $this->tripService->getTripById((int) $tripId);
+            }
+            
+            if (!$trip) {
+                return $this->error($response, 'Trip not found');
+            }
+            
+            // Record view for analytics (if not the owner)
+            $user = $request->getAttribute('user');
+            if (!$user || $user['id'] !== $trip->getUserId()) {
+                $viewerId = $user['id'] ?? null;
+                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+                $this->tripService->recordView($trip->getId(), $viewerId, $ip);
+            }
+            
+            return $this->success($response, [
+                'trip' => $trip->toJson()
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Update a trip
+     * PUT /api/trips/{id}/update
+     */
+    public function update(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            if (!$user) {
+                return $this->error($response, 'Authentication required', 401);
+            }
+            
+            $tripId = (int) $args['id'];
+            $data = json_decode($request->getBody()->getContents(), true);
+            if (!$data) {
+                return $this->error($response, 'Invalid JSON data');
+            }
+            
+            $trip = $this->tripService->updateTrip($tripId, $data, $user['id']);
+            
+            return $this->success($response, [
+                'trip' => $trip->toJson(),
+                'message' => 'Trip updated successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            if (strpos($e->getMessage(), 'Not authorized') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete a trip
+     * DELETE /api/trips/{id}/delete
+     */
+    public function delete(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            if (!$user) {
+                return $this->error($response, 'Authentication required', 401);
+            }
+            
+            $tripId = (int) $args['id'];
+            $this->tripService->deleteTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip deleted successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            if (strpos($e->getMessage(), 'Not authorized') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Search trips
+     * GET /api/trips/search
+     */
+    public function search(Request $request, Response $response): Response
+    {
+        try {
+            $queryParams = $request->getQueryParams();
+            $page = max(1, (int) ($queryParams['page'] ?? 1));
+            $limit = min(50, max(10, (int) ($queryParams['limit'] ?? 20)));
+            
+            // Build filters
+            $filters = [];
+            $allowedFilters = [
+                'departure_city', 'arrival_city', 'departure_country', 'arrival_country',
+                'departure_date_from', 'departure_date_to', 'min_weight', 'max_price_per_kg',
+                'currency', 'verified_only', 'ticket_verified'
+            ];
+            
+            foreach ($allowedFilters as $filter) {
+                if (isset($queryParams[$filter]) && $queryParams[$filter] !== '') {
+                    if (in_array($filter, ['verified_only', 'ticket_verified'])) {
+                        $filters[$filter] = (bool) $queryParams[$filter];
+                    } else {
+                        $filters[$filter] = $queryParams[$filter];
+                    }
+                }
+            }
+            
+            $trips = $this->tripService->searchTrips($filters, $page, $limit);
+            
+            return $this->success($response, [
+                'trips' => $trips,
+                'filters' => $filters,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'has_more' => count($trips) === $limit
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Validate ticket (optional)
+     * POST /api/trips/{id}/validate-ticket
+     */
+    public function validateTicket(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            if (!$user) {
+                return $this->error($response, 'Authentication required', 401);
+            }
+            
+            $tripId = (int) $args['id'];
+            $data = json_decode($request->getBody()->getContents(), true);
+            if (!$data) {
+                return $this->error($response, 'Invalid JSON data');
+            }
+            
+            $trip = $this->tripService->validateTicket($tripId, $data, $user['id']);
+            
+            return $this->success($response, [
+                'trip' => $trip->toJson(),
+                'message' => 'Ticket validated successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            if (strpos($e->getMessage(), 'Not authorized') !== false) {
+                return $this->error($response, $e->getMessage());
+            }
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get suggested price for a route
+     * GET /api/trips/price-suggestion
+     */
+    public function getPriceSuggestion(Request $request, Response $response): Response
+    {
+        try {
+            $queryParams = $request->getQueryParams();
+            
+            $requiredParams = ['departure_city', 'departure_country', 'arrival_city', 'arrival_country'];
+            foreach ($requiredParams as $param) {
+                if (empty($queryParams[$param])) {
+                    return $this->error($response, "Parameter '$param' is required");
+                }
+            }
+            
+            $currency = $queryParams['currency'] ?? 'EUR';
+            
+            $priceData = $this->tripService->getSuggestedPrice(
+                $queryParams['departure_city'],
+                $queryParams['departure_country'],
+                $queryParams['arrival_city'],
+                $queryParams['arrival_country'],
+                $currency
+            );
+            
+            return $this->success($response, [
+                'price_suggestion' => $priceData
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get price breakdown
+     * GET /api/trips/price-breakdown
+     */
+    public function getPriceBreakdown(Request $request, Response $response): Response
+    {
+        try {
+            $queryParams = $request->getQueryParams();
+            
+            $pricePerKg = (float) ($queryParams['price_per_kg'] ?? 0);
+            $weightKg = (float) ($queryParams['weight_kg'] ?? 0);
+            $currency = $queryParams['currency'] ?? 'EUR';
+            
+            if ($pricePerKg <= 0 || $weightKg <= 0) {
+                return $this->error($response, 'Price per kg and weight must be greater than 0');
+            }
+            
+            $breakdown = $this->tripService->getPriceBreakdown($pricePerKg, $weightKg, $currency);
+            
+            return $this->success($response, [
+                'breakdown' => $breakdown
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get pending trips for admin review
+     * GET /api/v1/admin/trips/pending
+     */
+    public function getPendingTrips(Request $request, Response $response): Response
+    {
+        try {
+            $trips = $this->tripService->getPendingTrips();
+            
+            return $this->success($response, [
+                'trips' => $trips
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get pending trips: ' . $e->getMessage());
+            return $this->error($response, 'Failed to get pending trips');
+        }
+    }
+
+    /**
+     * Approve a trip
+     * POST /api/v1/admin/trips/{id}/approve
+     */
+    public function approveTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $adminUser = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $trip = $this->tripService->approveTrip($tripId, $adminUser['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip approved successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to approve trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Reject a trip
+     * POST /api/v1/admin/trips/{id}/reject
+     */
+    public function rejectTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $adminUser = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $reason = $data['reason'] ?? 'No reason provided';
+            $trip = $this->tripService->rejectTrip($tripId, $adminUser['id'], $reason);
+            
+            return $this->success($response, [
+                'message' => 'Trip rejected successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to reject trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Pause a trip
+     * POST /api/v1/trips/{id}/pause
+     */
+    public function pauseTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $reason = $data['reason'] ?? null;
+            $trip = $this->tripService->pauseTrip($tripId, $user['id'], $reason);
+            
+            return $this->success($response, [
+                'message' => 'Trip paused successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to pause trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Resume a trip
+     * POST /api/v1/trips/{id}/resume
+     */
+    public function resumeTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $trip = $this->tripService->resumeTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip resumed successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to resume trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Cancel a trip
+     * POST /api/v1/trips/{id}/cancel
+     */
+    public function cancelTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $reason = $data['reason'] ?? null;
+            $details = $data['details'] ?? null;
+            $trip = $this->tripService->cancelTrip($tripId, $user['id'], $reason, $details);
+            
+            return $this->success($response, [
+                'message' => 'Trip cancelled successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to cancel trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Complete a trip
+     * POST /api/v1/trips/{id}/complete
+     */
+    public function completeTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $trip = $this->tripService->completeTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip completed successfully',
+                'trip' => $trip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to complete trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Add trip to favorites
+     * POST /api/v1/trips/{id}/favorite
+     */
+    public function addToFavorites(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $favorite = $this->tripService->addToFavorites($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip added to favorites',
+                'favorite' => $favorite
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to add trip to favorites: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove trip from favorites
+     * DELETE /api/v1/trips/{id}/favorite
+     */
+    public function removeFromFavorites(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $this->tripService->removeFromFavorites($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip removed from favorites'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to remove trip from favorites: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get user's favorite trips
+     * GET /api/v1/trips/favorites
+     */
+    public function getFavorites(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $queryParams = $request->getQueryParams();
+            
+            $page = (int) ($queryParams['page'] ?? 1);
+            $limit = (int) ($queryParams['limit'] ?? 20);
+            
+            $favorites = $this->tripService->getUserFavorites($user['id'], $page, $limit);
+            
+            return $this->success($response, [
+                'favorites' => $favorites
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get user favorites: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Report a trip
+     * POST /api/v1/trips/{id}/report
+     */
+    public function reportTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $reportType = $data['report_type'] ?? null;
+            $description = $data['description'] ?? null;
+
+            if (!$reportType) {
+                return $this->error($response, 'Report type is required', 400);
+            }
+
+            $report = $this->tripService->reportTrip($tripId, $user['id'], $reportType, $description);
+            
+            return $this->success($response, [
+                'message' => 'Trip reported successfully',
+                'report' => $report
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to report trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get trip action history
+     * GET /api/v1/trips/{id}/history
+     */
+    public function getTripHistory(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $history = $this->tripService->getTripHistory($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'history' => $history
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get trip history: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Duplicate a trip
+     * POST /api/v1/trips/{id}/duplicate
+     */
+    public function duplicateTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $newTrip = $this->tripService->duplicateTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip duplicated successfully',
+                'trip' => $newTrip
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to duplicate trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get trip analytics/statistics
+     * GET /api/v1/trips/{id}/analytics
+     */
+    public function getTripAnalytics(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $analytics = $this->tripService->getTripAnalytics($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'analytics' => $analytics
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get trip analytics: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Save trip draft
+     * POST /api/v1/trips/drafts/save
+     */
+    public function saveDraft(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            $draft = $this->tripService->saveDraft($user['id'], $data);
+            
+            return $this->success($response, [
+                'message' => 'Draft saved successfully',
+                'draft' => $draft
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to save draft: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get user's drafts
+     * GET /api/v1/trips/drafts
+     */
+    public function getDrafts(Request $request, Response $response): Response
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $queryParams = $request->getQueryParams();
+            
+            $page = (int) ($queryParams['page'] ?? 1);
+            $limit = (int) ($queryParams['limit'] ?? 20);
+            
+            $drafts = $this->tripService->getUserDrafts($user['id'], $page, $limit);
+            
+            return $this->success($response, [
+                'drafts' => $drafts
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get user drafts: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Load draft by ID
+     * GET /api/v1/trips/drafts/{id}
+     */
+    public function loadDraft(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $draftId = $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$draftId) {
+                return $this->error($response, 'Draft ID is required', 400);
+            }
+
+            $draft = $this->tripService->loadDraft($draftId, $user['id']);
+            
+            return $this->success($response, [
+                'draft' => $draft
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to load draft: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete draft
+     * DELETE /api/v1/trips/drafts/{id}
+     */
+    public function deleteDraft(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $draftId = $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$draftId) {
+                return $this->error($response, 'Draft ID is required', 400);
+            }
+
+            $this->tripService->deleteDraft($draftId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Draft deleted successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to delete draft: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Publish trip
+     * POST /api/v1/trips/{id}/publish
+     */
+    public function publishTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $trip = $this->tripService->publishTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip published successfully',
+                'trip' => $trip->toJson()
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to publish trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Add trip to favorites
+     * POST /api/v1/trips/{id}/favorite
+     */
+    public function addToFavorites(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $this->tripService->addToFavorites($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip added to favorites successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to add to favorites: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove trip from favorites
+     * DELETE /api/v1/trips/{id}/favorite
+     */
+    public function removeFromFavorites(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $this->tripService->removeFromFavorites($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip removed from favorites successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to remove from favorites: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Report trip
+     * POST /api/v1/trips/{id}/report
+     */
+    public function reportTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody() ?? [];
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $reportType = $data['report_type'] ?? null;
+            $description = $data['description'] ?? null;
+
+            if (!$reportType) {
+                return $this->error($response, 'Report type is required', 400);
+            }
+
+            $this->tripService->reportTrip($tripId, $user['id'], $reportType, $description);
+            
+            return $this->success($response, [
+                'message' => 'Trip reported successfully'
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to report trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Share trip
+     * POST /api/v1/trips/{id}/share
+     */
+    public function shareTrip(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $result = $this->tripService->shareTrip($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'message' => 'Trip shared successfully',
+                'share_url' => $result['share_url']
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to share trip: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+
+    /**
+     * Get trip analytics
+     * GET /api/v1/trips/{id}/analytics
+     */
+    public function getTripAnalytics(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $tripId = (int) $args['id'];
+            $user = $request->getAttribute('user');
+            
+            if (!$tripId) {
+                return $this->error($response, 'Trip ID is required', 400);
+            }
+
+            $analytics = $this->tripService->getTripAnalytics($tripId, $user['id']);
+            
+            return $this->success($response, [
+                'analytics' => $analytics
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get trip analytics: ' . $e->getMessage());
+            return $this->error($response, $e->getMessage());
+        }
+    }
+}

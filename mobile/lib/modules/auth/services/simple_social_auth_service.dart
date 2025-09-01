@@ -33,9 +33,8 @@ class SimpleSocialAuthService {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        print('❌ Google Sign-In cancelled by user or failed');
-        print('💡 Possible causes: Bundle ID mismatch, client ID incorrect, or network issues');
-        return null;
+        print('ℹ️ Google Sign-In cancelled by user');
+        return null; // User cancelled, return null gracefully
       }
       
       print('✅ Google user selected: ${googleUser.email}');
@@ -91,6 +90,13 @@ class SimpleSocialAuthService {
       }, 'apple');
       
     } catch (e) {
+      // Vérifier si c'est une annulation utilisateur
+      if (e.toString().contains('AuthorizationErrorCode.canceled') || 
+          e.toString().contains('error 1001')) {
+        print('ℹ️ Apple Sign-In cancelled by user');
+        return null; // Retourner null au lieu de throw pour annulation
+      }
+      
       print('❌ Simple Apple Sign-In error: $e');
       rethrow;
     }

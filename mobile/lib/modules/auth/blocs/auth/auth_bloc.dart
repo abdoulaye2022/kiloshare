@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kiloshare/modules/auth/services/auth_service.dart';
 import '../../services/phone_auth_service.dart';
+import '../../../../services/auth_token_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -26,6 +27,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthPasswordResetRequested>(_onAuthPasswordResetRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthTokenRefreshRequested>(_onAuthTokenRefreshRequested);
+    on<AuthUserUpdated>(_onAuthUserUpdated);
     on<AuthErrorCleared>(_onAuthErrorCleared);
     on<SocialSignInRequested>(_onSocialSignInRequested);
     
@@ -34,23 +36,58 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<VerifyPhoneCode>(_onVerifyPhoneCode);
   }
 
+  /// Helper method to extract user-friendly error messages
+  String _extractErrorMessage(Object e) {
+    if (e.toString().contains('AuthException:')) {
+      // Extract message after "AuthException: "
+      String fullError = e.toString();
+      if (fullError.contains('AuthException: ')) {
+        return fullError.split('AuthException: ')[1];
+      }
+    }
+    return e.toString();
+  }
+
   Future<void> _onAuthStarted(
       AuthStarted event, Emitter<AuthState> emit) async {
+    print('AuthBloc: _onAuthStarted called');
     try {
       // Check if user is already authenticated
       final token = await _authService.getStoredToken();
+      print('AuthBloc: Token from storage: ${token != null}');
+      
       if (token != null && !_authService.isTokenExpired(token)) {
-        final user = await _authService.getCurrentUser();
-        if (user != null) {
-          emit(AuthAuthenticated(
-            user: user,
-            accessToken: token,
-          ));
-          return;
+        print('AuthBloc: Token is valid, checking user data...');
+        var user = await _authService.getCurrentUser();
+        print('AuthBloc: Local user data found: ${user != null}');
+        
+        // Si pas d'utilisateur en local, récupérer depuis l'API
+        if (user == null) {
+          try {
+            print('AuthBloc: Fetching user from API...');
+            user = await _authService.getCurrentUserFromApi();
+            // Sauvegarder l'utilisateur récupéré
+            await _authService.saveUser(user);
+            print('AuthBloc: User fetched and saved successfully');
+          } catch (e) {
+            print('AuthBloc: Failed to fetch user from API: $e');
+            // Si échec de récupération, considérer comme non authentifié
+            emit(AuthUnauthenticated());
+            return;
+          }
         }
+        
+        print('AuthBloc: Emitting AuthAuthenticated state');
+        emit(AuthAuthenticated(
+          user: user,
+          accessToken: token,
+        ));
+        return;
       }
+      print('AuthBloc: No valid token found, emitting AuthUnauthenticated');
       emit(AuthUnauthenticated());
     } catch (e) {
+      print('AuthBloc: Error in _onAuthStarted: $e');
       emit(AuthUnauthenticated());
     }
   }
@@ -74,6 +111,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           refreshToken: response.tokens.refreshToken,
         ));
       } else {
+        // Store token in AuthTokenService for API calls
+        await AuthTokenService.instance.setToken(response.tokens.accessToken);
+        
         emit(AuthAuthenticated(
           user: response.user,
           accessToken: response.tokens.accessToken,
@@ -81,7 +121,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ));
       }
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -107,6 +147,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           refreshToken: response.tokens.refreshToken,
         ));
       } else {
+        // Store token in AuthTokenService for API calls
+        await AuthTokenService.instance.setToken(response.tokens.accessToken);
+        
         emit(AuthAuthenticated(
           user: response.user,
           accessToken: response.tokens.accessToken,
@@ -114,7 +157,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ));
       }
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -132,7 +175,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         verificationId: 'temp_verification_id',
       ));
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -150,7 +193,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         verificationId: 'temp_verification_id',
       ));
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -171,7 +214,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         refreshToken: response.tokens.refreshToken,
       ));
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -188,8 +231,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: response.tokens.accessToken,
         refreshToken: response.tokens.refreshToken,
       ));
+    } on AuthCancelledException {
+      // User cancelled Google Sign-In, return to unauthenticated state silently
+      emit(AuthUnauthenticated());
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -207,8 +253,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: response.tokens.accessToken,
         refreshToken: response.tokens.refreshToken,
       ));
+    } on AuthCancelledException {
+      // User cancelled Apple Sign-In, return to unauthenticated state silently
+      emit(AuthUnauthenticated());
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -221,7 +270,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _authService.forgotPassword(event.email);
       emit(AuthPasswordResetSent(email: event.email));
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -232,9 +281,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       await _authService.resetPassword(event.token, event.newPassword);
-      emit(AuthPasswordResetSuccess());
+      emit(const AuthPasswordResetSuccess());
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -298,8 +347,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         default:
           throw Exception('Unsupported provider: ${event.provider}');
       }
+    } on AuthCancelledException {
+      // User cancelled social sign-in, return to unauthenticated state silently
+      emit(AuthUnauthenticated());
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
@@ -347,7 +399,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         refreshToken: response.tokens.refreshToken,
       ));
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onAuthUserUpdated(
+    AuthUserUpdated event,
+    Emitter<AuthState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is AuthAuthenticated) {
+      emit(AuthAuthenticated(
+        user: event.user,
+        accessToken: currentState.accessToken,
+        refreshToken: currentState.refreshToken,
+      ));
     }
   }
 }

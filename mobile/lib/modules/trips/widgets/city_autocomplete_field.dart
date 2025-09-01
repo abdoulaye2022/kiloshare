@@ -140,9 +140,12 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
                     ),
                     subtitle: Row(
                       children: [
-                        Text(
-                          city['country'],
-                          style: const TextStyle(fontSize: 12),
+                        Expanded(
+                          child: Text(
+                            city['country'],
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         if (city['code'] != null) ...[
                           const SizedBox(width: 8),

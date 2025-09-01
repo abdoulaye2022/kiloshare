@@ -12,12 +12,16 @@ class SocialAuthService {
   // Configuration Google Sign-In
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    // Client ID pour Android (trouvé dans google-services.json)
+    serverClientId: '325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com',
   );
   
   /// Authentification avec Google
   Future<AuthResponse?> signInWithGoogle() async {
     try {
       print('🔍 Starting Google Sign-In...');
+      print('📱 Google Sign-In Configuration: ${_googleSignIn.clientId}');
+      print('🌐 Server Client ID: 325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com');
       
       // Vérifier si Google Sign-In est disponible
       final isAvailable = await _googleSignIn.isSignedIn();

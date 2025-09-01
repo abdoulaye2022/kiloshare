@@ -11,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # UI & Navigation essentiels pour l'auth
   cupertino_icons: ^1.0.6
@@ -23,10 +25,15 @@ dependencies:
 
   # HTTP & API
   dio: ^5.3.4
+  http: ^1.2.1
   json_annotation: ^4.8.1
+  
+  # Internationalization
+  intl: ^0.20.2
   
   # Storage sécurisé pour les tokens
   flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.2
   
   # Authentification sociale
   google_sign_in: ^6.2.1
@@ -38,11 +45,20 @@ dependencies:
   file_picker: ^8.1.4
   path: ^1.9.0
   
+  # Gestion optimisée des images avec Cloudinary
+  flutter_image_compress: ^2.3.0
+  cached_network_image: ^3.4.1
+  photo_view: ^0.15.0
+  
+  # Progress indicators et UI
+  percent_indicator: ^4.2.3
+  
   # Launcher pour les liens externes
   url_launcher: ^6.2.5
   
   # Package info pour obtenir les infos de l'app
   package_info_plus: ^8.3.1
+  bloc: ^8.1.4
 
 dev_dependencies:
   flutter_test:

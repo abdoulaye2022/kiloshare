@@ -5,6 +5,7 @@ import '../models/trip_model.dart';
 import '../widgets/trip_card_widget.dart';
 import '../widgets/city_autocomplete_field.dart';
 import '../../../widgets/auth_guard.dart';
+import '../../../widgets/ellipsis_button.dart';
 
 class SearchTripsScreen extends StatefulWidget {
   const SearchTripsScreen({super.key});
@@ -198,33 +199,40 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             // Search button
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _canSearch() ? _searchTrips : null,
-                icon: _isLoading 
-                    ? const SizedBox(
+              child: _isLoading 
+                  ? ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const SizedBox(
                         height: 16,
                         width: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search),
-                label: Text(_isLoading ? 'Recherche...' : 'Rechercher'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
+                      ),
+                      label: const Text('Recherche...'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    )
+                  : EllipsisButton.elevated(
+                      onPressed: _canSearch() ? _searchTrips : null,
+                      icon: const Icon(Icons.search),
+                      text: 'Rechercher',
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
             ),
             
             if (_departureDate != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: TextButton.icon(
+                child: EllipsisButton.text(
                   onPressed: () {
                     setState(() {
                       _departureDate = null;
                     });
                   },
                   icon: const Icon(Icons.clear),
-                  label: const Text('Effacer la date'),
+                  text: 'Effacer la date',
                 ),
               ),
           ],
@@ -359,10 +367,10 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          OutlinedButton.icon(
+          EllipsisButton.outlined(
             onPressed: _clearSearch,
             icon: const Icon(Icons.refresh),
-            label: const Text('Nouvelle recherche'),
+            text: 'Nouvelle recherche',
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.1),
         ],
@@ -401,10 +409,10 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
+          EllipsisButton.elevated(
             onPressed: _searchTrips,
             icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
+            text: 'Réessayer',
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.1),
         ],

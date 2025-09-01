@@ -13,6 +13,7 @@ import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
 import '../services/trip_image_service.dart';
 import '../../auth/services/auth_service.dart';
+import '../../../widgets/ellipsis_button.dart';
 import '../../../widgets/auth_guard.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -225,9 +226,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         title: Text(widget.tripId != null ? 'Modifier voyage' : 'Créer un voyage'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
-          TextButton(
+          EllipsisButton.text(
             onPressed: _currentStep > 0 ? _previousStep : null,
-            child: const Text('Précédent'),
+            text: 'Précédent',
           ),
         ],
       ),
@@ -1021,9 +1022,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         children: [
           if (_currentStep > 0)
             Expanded(
-              child: OutlinedButton(
+              child: EllipsisButton.outlined(
                 onPressed: _isLoading ? null : _previousStep,
-                child: const Text('Précédent'),
+                text: 'Précédent',
               ),
             ),
           
@@ -1031,18 +1032,21 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           
           Expanded(
             flex: _currentStep > 0 ? 1 : 2,
-            child: ElevatedButton(
-              onPressed: _isLoading || !_canContinue() ? null : _nextStep,
-              child: _isLoading
-                  ? const SizedBox(
+            child: _isLoading
+                ? ElevatedButton(
+                    onPressed: null,
+                    child: const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_currentStep < _totalSteps - 1 
-                      ? 'Suivant' 
-                      : (widget.tripId != null ? 'Modifier l\'annonce' : 'Créer l\'annonce')),
-            ),
+                    ),
+                  )
+                : EllipsisButton.elevated(
+                    onPressed: !_canContinue() ? null : _nextStep,
+                    text: _currentStep < _totalSteps - 1 
+                        ? 'Suivant' 
+                        : (widget.tripId != null ? 'Modifier l\'annonce' : 'Créer l\'annonce'),
+                  ),
           ),
         ],
       ),

@@ -50,9 +50,14 @@ class User
     public function findById(int $id): ?array
     {
         try {
-            $sql = "SELECT id, uuid, email, phone, first_name, last_name, is_verified, 
-                           email_verified_at, phone_verified_at, profile_picture, status, role,
-                           last_login_at, social_provider, social_id, created_at, updated_at 
+            $sql = "SELECT id, uuid, email, phone, first_name, last_name, gender, date_of_birth,
+                           nationality, bio, website, profession, company, address_line1, address_line2,
+                           city, state_province, postal_code, country, preferred_language, timezone,
+                           emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+                           login_method, two_factor_enabled, newsletter_subscribed, marketing_emails,
+                           profile_visibility, is_verified, email_verified_at, phone_verified_at,
+                           profile_picture, status, role, last_login_at, social_provider, social_id,
+                           created_at, updated_at 
                     FROM users WHERE id = :id AND status != 'deleted'";
             
             $stmt = $this->db->prepare($sql);
@@ -176,24 +181,22 @@ class User
             $fields = [];
             $params = [':id' => $userId];
 
-            if (isset($data['first_name'])) {
-                $fields[] = 'first_name = :first_name';
-                $params[':first_name'] = $data['first_name'];
-            }
+            // Champs de base
+            $allowedFields = [
+                'first_name', 'last_name', 'phone', 'profile_picture', 'email',
+                'gender', 'date_of_birth', 'nationality', 'bio', 'website',
+                'profession', 'company', 'address_line1', 'address_line2',
+                'city', 'state_province', 'postal_code', 'country',
+                'preferred_language', 'timezone', 'emergency_contact_name',
+                'emergency_contact_phone', 'emergency_contact_relation',
+                'newsletter_subscribed', 'marketing_emails', 'profile_visibility'
+            ];
 
-            if (isset($data['last_name'])) {
-                $fields[] = 'last_name = :last_name';
-                $params[':last_name'] = $data['last_name'];
-            }
-
-            if (isset($data['phone'])) {
-                $fields[] = 'phone = :phone';
-                $params[':phone'] = $data['phone'];
-            }
-
-            if (isset($data['profile_picture'])) {
-                $fields[] = 'profile_picture = :profile_picture';
-                $params[':profile_picture'] = $data['profile_picture'];
+            foreach ($allowedFields as $field) {
+                if (isset($data[$field])) {
+                    $fields[] = "$field = :$field";
+                    $params[":$field"] = $data[$field];
+                }
             }
 
             if (empty($fields)) {
@@ -247,12 +250,97 @@ class User
     }
 
     /**
+     * Valide les données de profil selon la méthode de connexion
+     */
+    public function validateProfileUpdate(int $userId, array $data): array
+    {
+        $user = $this->findById($userId);
+        if (!$user) {
+            return ['valid' => false, 'message' => 'Utilisateur non trouvé'];
+        }
+
+        $loginMethod = $user['login_method'] ?? 'email';
+        
+        // Validation spéciale pour les utilisateurs connectés par téléphone
+        if ($loginMethod === 'phone') {
+            // Le numéro de téléphone est obligatoire pour ces utilisateurs
+            if (isset($data['phone']) && (empty($data['phone']) || $data['phone'] === '')) {
+                return ['valid' => false, 'message' => 'Le numéro de téléphone est obligatoire car vous vous connectez avec votre téléphone'];
+            }
+            
+            // Vérifier que le nouveau numéro n'est pas déjà utilisé par un autre utilisateur
+            if (isset($data['phone']) && $data['phone'] !== $user['phone']) {
+                if ($this->phoneExists($data['phone'])) {
+                    return ['valid' => false, 'message' => 'Ce numéro de téléphone est déjà utilisé par un autre compte'];
+                }
+            }
+        }
+        
+        // Validation spéciale pour les utilisateurs connectés par email
+        if ($loginMethod === 'email') {
+            // L'email est obligatoire pour ces utilisateurs
+            if (isset($data['email']) && (empty($data['email']) || $data['email'] === '')) {
+                return ['valid' => false, 'message' => 'L\'adresse email est obligatoire car vous vous connectez avec votre email'];
+            }
+            
+            // Vérifier que le nouvel email n'est pas déjà utilisé par un autre utilisateur
+            if (isset($data['email']) && $data['email'] !== $user['email']) {
+                if ($this->emailExists($data['email'])) {
+                    return ['valid' => false, 'message' => 'Cette adresse email est déjà utilisée par un autre compte'];
+                }
+            }
+        }
+
+        // Validations générales
+        if (isset($data['email']) && !empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            return ['valid' => false, 'message' => 'Format d\'email invalide'];
+        }
+
+        if (isset($data['phone']) && !empty($data['phone']) && !preg_match('/^\+?[\d\s\-\(\)\.]{8,}$/', $data['phone'])) {
+            return ['valid' => false, 'message' => 'Format de numéro de téléphone invalide'];
+        }
+
+        if (isset($data['date_of_birth']) && !empty($data['date_of_birth'])) {
+            $birthDate = \DateTime::createFromFormat('Y-m-d', $data['date_of_birth']);
+            if (!$birthDate) {
+                return ['valid' => false, 'message' => 'Format de date de naissance invalide (YYYY-MM-DD)'];
+            }
+            
+            $age = $birthDate->diff(new \DateTime())->y;
+            if ($age < 13) {
+                return ['valid' => false, 'message' => 'L\'âge minimum requis est de 13 ans'];
+            }
+            if ($age > 120) {
+                return ['valid' => false, 'message' => 'Veuillez vérifier votre date de naissance'];
+            }
+        }
+
+        if (isset($data['website']) && !empty($data['website']) && !filter_var($data['website'], FILTER_VALIDATE_URL)) {
+            return ['valid' => false, 'message' => 'URL du site web invalide'];
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
      * Normalize user data for API responses
      */
     public static function normalizeForApi(array $user): array
     {
         if (isset($user['is_verified'])) {
             $user['is_verified'] = (bool)$user['is_verified'];
+        }
+        
+        if (isset($user['two_factor_enabled'])) {
+            $user['two_factor_enabled'] = (bool)$user['two_factor_enabled'];
+        }
+        
+        if (isset($user['newsletter_subscribed'])) {
+            $user['newsletter_subscribed'] = (bool)$user['newsletter_subscribed'];
+        }
+        
+        if (isset($user['marketing_emails'])) {
+            $user['marketing_emails'] = (bool)$user['marketing_emails'];
         }
         
         return $user;

@@ -458,7 +458,7 @@ class AuthService {
     print('AuthService: Starting Google Sign-In...');
     final socialResponse = await _socialAuthService.signInWithGoogle();
     if (socialResponse == null) {
-      throw const AuthException('Google Sign-In was cancelled');
+      throw const AuthCancelledException('Google Sign-In was cancelled by user');
     }
     
     print('AuthService: Google Sign-In successful, saving tokens...');
@@ -476,7 +476,7 @@ class AuthService {
     print('AuthService: Starting Apple Sign-In...');
     final socialResponse = await _socialAuthService.signInWithApple();
     if (socialResponse == null) {
-      throw const AuthException('Apple Sign-In was cancelled');
+      throw const AuthCancelledException('Apple Sign-In was cancelled by user');
     }
     
     print('AuthService: Apple Sign-In successful, saving tokens...');
@@ -773,4 +773,12 @@ class AuthException implements Exception {
 
   @override
   String toString() => 'AuthException: $message';
+}
+
+class AuthCancelledException implements Exception {
+  final String message;
+  const AuthCancelledException(this.message);
+
+  @override
+  String toString() => 'AuthCancelledException: $message';
 }

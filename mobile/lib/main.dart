@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'config/app_config.dart';
 import 'config/theme.dart';
@@ -58,9 +59,9 @@ class KiloShareApp extends StatelessWidget {
             ));
             
             return AuthBloc(
-              authService: AuthService(),
+              authService: AuthService.instance,
               phoneAuthService: PhoneAuthService(dio),
-            );
+            )..add(AuthStarted());
           },
         ),
       ],
@@ -83,6 +84,15 @@ class KiloShareApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
           routerConfig: router,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('fr', 'FR'),
+            Locale('en', 'US'),
+          ],
           builder: (context, child) {
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(

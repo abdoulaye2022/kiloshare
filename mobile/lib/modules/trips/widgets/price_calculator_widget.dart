@@ -71,11 +71,20 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   }
 
   Future<void> _loadPriceSuggestion() async {
+    print('=== DEBUG: _loadPriceSuggestion() START ===');
+    print('DEBUG: departureCity: ${widget.departureCity}');
+    print('DEBUG: departureCountry: ${widget.departureCountry}');
+    print('DEBUG: arrivalCity: ${widget.arrivalCity}');
+    print('DEBUG: arrivalCountry: ${widget.arrivalCountry}');
+    print('DEBUG: weightKg: ${widget.weightKg}');
+    print('DEBUG: transportType: ${widget.transportType}');
+    
     // Safety check: ensure all required parameters are not null
     if (widget.departureCity == null || 
         widget.departureCountry == null || 
         widget.arrivalCity == null || 
         widget.arrivalCountry == null) {
+      print('DEBUG: Missing required location data - setting default price');
       // Set default price if required data is missing
       final defaultPrice = 15.0; // CAD per kg
       _priceController.text = defaultPrice.toString();
@@ -91,6 +100,8 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     setState(() {
       _isLoadingSuggestion = true;
     });
+    
+    print('DEBUG: Starting price suggestion calculation...');
 
     try {
       // Use multi-transport service if transport type is specified
@@ -113,18 +124,24 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
           widget.onPriceSelected(multiSuggestion.suggestedPricePerKg, _selectedCurrency);
         } catch (e) {
           // If multi-transport endpoint is not available, fallback to original service
+          print('DEBUG: Multi-transport error: $e');
+          print('DEBUG: Error type: ${e.runtimeType}');
           if (e.toString().contains('ENDPOINT_NOT_AVAILABLE')) {
-            print('Multi-transport endpoint not available, using fallback');
+            print('DEBUG: Multi-transport endpoint not available, using fallback');
             await _useFallbackPriceSuggestion();
           } else {
+            print('DEBUG: Rethrowing error: $e');
             rethrow;
           }
         }
       } else {
+        print('DEBUG: No transport type specified, using fallback');
         await _useFallbackPriceSuggestion();
       }
 
     } catch (e) {
+      print('DEBUG: Final catch block - error: $e');
+      print('DEBUG: Error type: ${e.runtimeType}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -192,6 +209,14 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   }
 
   Future<void> _useFallbackPriceSuggestion() async {
+    print('DEBUG: _useFallbackPriceSuggestion() START');
+    print('DEBUG: Calling _tripService.getPriceSuggestion with:');
+    print('DEBUG: - departureCity: ${widget.departureCity}');
+    print('DEBUG: - departureCountry: ${widget.departureCountry}');
+    print('DEBUG: - arrivalCity: ${widget.arrivalCity}');
+    print('DEBUG: - arrivalCountry: ${widget.arrivalCountry}');
+    print('DEBUG: - currency: $_selectedCurrency');
+    
     final suggestion = await _tripService.getPriceSuggestion(
       departureCity: widget.departureCity!,
       departureCountry: widget.departureCountry!,
@@ -199,6 +224,9 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       arrivalCountry: widget.arrivalCountry!,
       currency: _selectedCurrency,
     );
+
+    print('DEBUG: Received suggestion: $suggestion');
+    print('DEBUG: Suggested price: ${suggestion?.suggestedPricePerKg}');
 
     setState(() {
       _priceSuggestion = suggestion;
@@ -248,7 +276,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
             const SizedBox(height: 16),
             
             // Total earnings preview
-            if (_getCurrentPrice() != null)
+            if (_getCurrentPrice() != null && widget.weightKg > 0)
               _buildEarningsPreview(),
           ],
         ),
@@ -428,7 +456,8 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
 
   Widget _buildEarningsPreview() {
     final price = _getCurrentPriceWithFallback();
-    final totalEarnings = price * widget.weightKg;
+    final weightKg = widget.weightKg <= 0 ? 1.0 : widget.weightKg; // Avoid zero weight
+    final totalEarnings = price * weightKg;
     final commission = totalEarnings * 0.15; // 15% commission
     final netEarnings = totalEarnings - commission;
 

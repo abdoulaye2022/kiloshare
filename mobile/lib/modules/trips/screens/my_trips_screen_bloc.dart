@@ -50,17 +50,8 @@ class _MyTripsViewState extends State<_MyTripsView>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     
-    // Load initial data for the first tab immediately (only if authenticated)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // Check if user is authenticated before loading trips
-        final authState = context.read<AuthBloc>().state;
-        if (authState is AuthAuthenticated) {
-          final bloc = context.read<TripBloc>();
-          bloc.add(const LoadTrips());
-        }
-      }
-    });
+    // No need to load data here - let the build method handle it
+    // This prevents double loading that can cause infinite loading states
   }
 
   @override
@@ -120,48 +111,62 @@ class _MyTripsViewState extends State<_MyTripsView>
           ),
         ],
       ),
-      body: BlocConsumer<TripBloc, TripState>(
-        listener: (context, state) {
-          if (state is TripActionSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else if (state is TripError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          } else if (state is TripDuplicated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Voyage dupliqué avec succès'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else if (state is TripDeleted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Voyage supprimé avec succès'),
-                backgroundColor: Colors.green,
-              ),
-            );
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, authState) {
+          // When user becomes authenticated, reload trips if we're on the first tab
+          if (authState is AuthAuthenticated && _tabController.index == 0) {
+            final tripBloc = context.read<TripBloc>();
+            final currentTripState = tripBloc.state;
+            // Only reload if we're still in initial state or loading failed due to auth
+            if (currentTripState is TripInitial || 
+                (currentTripState is TripError && currentTripState.message.contains('Authentication'))) {
+              tripBloc.add(const LoadTrips());
+            }
           }
         },
-        builder: (context, state) {
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildTripsTab(context, state), // All trips
-              _buildDraftsTab(context, state), // Drafts
-              _buildFavoritesTab(context, state), // Favorites
-            ],
-          );
-        },
+        child: BlocConsumer<TripBloc, TripState>(
+          listener: (context, state) {
+            if (state is TripActionSuccess) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else if (state is TripError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            } else if (state is TripDuplicated) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Voyage dupliqué avec succès'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else if (state is TripDeleted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Voyage supprimé avec succès'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          },
+          builder: (context, state) {
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTripsTab(context, state), // All trips
+                _buildDraftsTab(context, state), // Drafts
+                _buildFavoritesTab(context, state), // Favorites
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -308,10 +313,7 @@ class _MyTripsViewState extends State<_MyTripsView>
       margin: const EdgeInsets.only(bottom: 16.0),
       child: InkWell(
         onTap: () {
-          print('TripCard: Clicked on trip ID: "${trip.id}", Status: ${trip.status.value}, UUID: "${trip.uuid}"');
           if (trip.id.isEmpty) {
-            print('TripCard: ERROR - Trip ID is empty, cannot navigate!');
-            print('TripCard: Using UUID for navigation instead: ${trip.uuid}');
             context.push('/trips/${trip.uuid}'); // fallback to UUID
           } else {
             context.push('/trips/${trip.id}');

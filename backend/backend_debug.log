@@ -1,0 +1,7 @@
+[Sun Aug 31 05:22:22 2025] PHP 8.4.7 Development Server (http://localhost:8080) started
+[Sun Aug 31 05:22:33 2025] [::1]:56092 Accepted
+[Sun Aug 31 05:22:33 2025] [::1]:56092 [404]: GET /v1/trips/9
+[Sun Aug 31 05:22:33 2025] [::1]:56092 Closing
+[Sun Aug 31 05:22:44 2025] [::1]:56130 Accepted
+[Sun Aug 31 05:22:44 2025] [::1]:56130 [404]: GET /v1/trips/9
+[Sun Aug 31 05:22:44 2025] [::1]:56130 Closing

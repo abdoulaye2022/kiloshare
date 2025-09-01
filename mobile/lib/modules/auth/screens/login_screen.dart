@@ -8,6 +8,7 @@ import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_divider.dart';
 import '../widgets/social_login_buttons.dart';
+import '../../../widgets/ellipsis_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -112,10 +113,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(height: 16.h),
                 
                 // Phone authentication button
-                OutlinedButton.icon(
+                EllipsisButton.outlined(
                   onPressed: () => context.push('/phone-auth'),
                   icon: const Icon(Icons.phone),
-                  label: const Text('Se connecter avec le téléphone'),
+                  text: 'Se connecter avec le téléphone',
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.symmetric(
                       horizontal: 24.w,
@@ -264,14 +265,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        TextButton(
+        EllipsisButton.text(
           onPressed: () => context.push('/forgot-password'),
-          child: Text(
-            'Mot de passe oublié ?',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
-          ),
+          text: 'Mot de passe oublié ?',
         ),
       ],
     );

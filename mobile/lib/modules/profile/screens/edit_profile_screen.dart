@@ -1,21 +1,19 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../bloc/profile_bloc.dart';
-import '../bloc/profile_event.dart';
-import '../bloc/profile_state.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:io';
+
+import '../../auth/blocs/auth/auth_bloc.dart';
+import '../../auth/blocs/auth/auth_state.dart';
+import '../../auth/blocs/auth/auth_event.dart';
+import '../../auth/models/user_model.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
+import '../../../themes/modern_theme.dart';
 
 class EditProfileScreen extends StatefulWidget {
-  final UserProfile? existingProfile;
-
-  const EditProfileScreen({
-    super.key,
-    this.existingProfile,
-  });
+  const EditProfileScreen({super.key});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -23,51 +21,34 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _profileService = ProfileService();
+  final ProfileService _profileService = ProfileService();
+  final ImagePicker _imagePicker = ImagePicker();
   
-  // Form controllers
+  // Controllers
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _bioController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _postalCodeController = TextEditingController();
   final _professionController = TextEditingController();
   final _companyController = TextEditingController();
   final _websiteController = TextEditingController();
-
-  DateTime? _selectedBirthDate;
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _postalCodeController = TextEditingController();
+  
+  // State
+  File? _selectedImage;
   String? _selectedGender;
   String? _selectedCountry;
-  File? _selectedAvatar;
-  
+  DateTime? _selectedBirthDate;
+  UserProfile? _currentProfile;
   bool _isLoading = false;
-  final ImagePicker _picker = ImagePicker();
+  bool _isLoadingProfile = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeForm();
-  }
-
-  void _initializeForm() {
-    if (widget.existingProfile != null) {
-      final profile = widget.existingProfile!;
-      _firstNameController.text = profile.firstName ?? '';
-      _lastNameController.text = profile.lastName ?? '';
-      _phoneController.text = profile.phone ?? '';
-      _bioController.text = profile.bio ?? '';
-      _addressController.text = profile.address ?? '';
-      _cityController.text = profile.city ?? '';
-      _postalCodeController.text = profile.postalCode ?? '';
-      _professionController.text = profile.profession ?? '';
-      _companyController.text = profile.company ?? '';
-      _websiteController.text = profile.website ?? '';
-      _selectedBirthDate = profile.dateOfBirth;
-      _selectedGender = profile.gender;
-      _selectedCountry = profile.country;
-    }
+    _loadUserProfile();
   }
 
   @override
@@ -76,25 +57,199 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _lastNameController.dispose();
     _phoneController.dispose();
     _bioController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _postalCodeController.dispose();
     _professionController.dispose();
     _companyController.dispose();
     _websiteController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _postalCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getUserProfile();
+      if (profile != null) {
+        setState(() {
+          _currentProfile = profile;
+          _firstNameController.text = profile.firstName ?? '';
+          _lastNameController.text = profile.lastName ?? '';
+          _phoneController.text = profile.phone ?? '';
+          _bioController.text = profile.bio ?? '';
+          _professionController.text = profile.profession ?? '';
+          _companyController.text = profile.company ?? '';
+          _websiteController.text = profile.website ?? '';
+          _addressController.text = profile.address ?? '';
+          _cityController.text = profile.city ?? '';
+          _postalCodeController.text = profile.postalCode ?? '';
+          _selectedGender = profile.gender;
+          _selectedCountry = profile.country;
+          _selectedBirthDate = profile.dateOfBirth;
+          _isLoadingProfile = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingProfile = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement du profil: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _selectBirthDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthDate ?? DateTime(1990),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)), // Minimum 13 ans
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _selectedBirthDate = picked;
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      String? avatarUrl;
+      
+      // Upload avatar if selected
+      if (_selectedImage != null) {
+        avatarUrl = await _profileService.uploadAvatar(_selectedImage!);
+      }
+
+      // Prepare profile data
+      final profileData = {
+        'first_name': _firstNameController.text.trim(),
+        'last_name': _lastNameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'profession': _professionController.text.trim(),
+        'company': _companyController.text.trim(),
+        'website': _websiteController.text.trim(),
+        'address': _addressController.text.trim(),
+        'city': _cityController.text.trim(),
+        'postal_code': _postalCodeController.text.trim(),
+        'gender': _selectedGender,
+        'country': _selectedCountry,
+        'date_of_birth': _selectedBirthDate?.toIso8601String().split('T')[0],
+        if (avatarUrl != null) 'profile_picture': avatarUrl,
+      };
+
+      // Remove empty values
+      profileData.removeWhere((key, value) => value == null || value.toString().trim().isEmpty);
+
+      // Validate data
+      final validationError = _profileService.validateProfileData(profileData);
+      if (validationError != null) {
+        throw Exception(validationError);
+      }
+
+      // Update or create profile
+      if (_currentProfile != null) {
+        await _profileService.updateUserProfile(profileData);
+      } else {
+        await _profileService.createUserProfile(profileData);
+      }
+
+      if (mounted) {
+        // Refresh current user in AuthBloc to update avatar in all screens
+        final authState = context.read<AuthBloc>().state;
+        if (authState is AuthAuthenticated) {
+          // Get updated user profile
+          final updatedProfile = await _profileService.getUserProfile();
+          if (updatedProfile != null) {
+            // Update AuthBloc with new profile picture and basic info
+            final updatedUser = authState.user.copyWith(
+              profilePicture: updatedProfile.avatarUrl,
+              firstName: updatedProfile.firstName,
+              lastName: updatedProfile.lastName,
+            );
+            if (mounted) {
+              context.read<AuthBloc>().add(AuthUserUpdated(user: updatedUser));
+            }
+          }
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil sauvegardé avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: ModernTheme.gray50,
       appBar: AppBar(
-        title: Text(widget.existingProfile != null ? 'Modifier le profil' : 'Créer le profil'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(
+          'Modifier le profil',
+          style: TextStyle(
+            color: ModernTheme.gray900,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: ModernTheme.white,
+        elevation: 0,
+        iconTheme: IconThemeData(color: ModernTheme.gray700),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveProfile,
-            child: _isLoading 
+            child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -104,67 +259,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ],
       ),
-      body: BlocListener<ProfileBloc, ProfileState>(
-        listener: (context, state) {
-          if (state is ProfileCreated || state is ProfileUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state is ProfileCreated 
-                    ? 'Profil créé avec succès' 
-                    : 'Profil mis à jour avec succès'),
-                backgroundColor: Colors.green,
+      body: _isLoadingProfile
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildAvatarSection(),
+                    const SizedBox(height: 24),
+                    _buildPersonalInfoSection(),
+                    const SizedBox(height: 24),
+                    _buildContactInfoSection(),
+                    const SizedBox(height: 24),
+                    _buildProfessionalInfoSection(),
+                    const SizedBox(height: 24),
+                    _buildAddressSection(),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-            );
-            context.pop();
-          } else if (state is ProfileActionError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          } else if (state is AvatarUploaded) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Avatar mis à jour avec succès'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-          
-          setState(() {
-            _isLoading = state is ProfileActionLoading;
-          });
-        },
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAvatarSection(),
-                const SizedBox(height: 24),
-                _buildPersonalInfoSection(),
-                const SizedBox(height: 24),
-                _buildContactSection(),
-                const SizedBox(height: 24),
-                _buildAddressSection(),
-                const SizedBox(height: 24),
-                _buildProfessionalSection(),
-                const SizedBox(height: 32),
-              ],
             ),
-          ),
-        ),
-      ),
     );
   }
 
   Widget _buildAvatarSection() {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Text(
@@ -174,55 +297,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            GestureDetector(
-              onTap: _selectAvatar,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey[300]!, width: 2),
-                  color: Colors.grey[100],
+            Stack(
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300, width: 2),
+                  ),
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundImage: _selectedImage != null
+                        ? FileImage(_selectedImage!)
+                        : (_currentProfile?.avatarUrl != null
+                            ? NetworkImage(_currentProfile!.avatarUrl!)
+                            : null) as ImageProvider?,
+                    child: _selectedImage == null && _currentProfile?.avatarUrl == null
+                        ? Icon(Icons.person, size: 40, color: Colors.grey.shade600)
+                        : null,
+                  ),
                 ),
-                child: _selectedAvatar != null
-                    ? ClipOval(
-                        child: Image.file(
-                          _selectedAvatar!,
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 120,
-                        ),
-                      )
-                    : widget.existingProfile?.avatarUrl != null
-                        ? ClipOval(
-                            child: Image.network(
-                              widget.existingProfile!.avatarUrl!,
-                              fit: BoxFit.cover,
-                              width: 120,
-                              height: 120,
-                              errorBuilder: (context, error, stackTrace) => _buildAvatarPlaceholder(),
-                            ),
-                          )
-                        : _buildAvatarPlaceholder(),
-              ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                      onPressed: _pickImage,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _selectAvatar,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Changer la photo'),
+            Text(
+              'Touchez l\'icône pour changer',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade600,
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAvatarPlaceholder() {
-    return const Icon(
-      Icons.person,
-      size: 60,
-      color: Colors.grey,
     );
   }
 
@@ -240,7 +364,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
             Row(
               children: [
                 Expanded(
@@ -258,7 +381,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     },
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _lastNameController,
@@ -276,57 +399,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ],
             ),
-            
             const SizedBox(height: 16),
-            
-            InkWell(
-              onTap: _selectBirthDate,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date de naissance',
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-                child: Text(
-                  _selectedBirthDate != null
-                      ? _formatDate(_selectedBirthDate!)
-                      : 'Sélectionner une date',
-                  style: TextStyle(
-                    color: _selectedBirthDate != null ? Colors.black87 : Colors.grey,
-                  ),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
             DropdownButtonFormField<String>(
               value: _selectedGender,
               decoration: const InputDecoration(
                 labelText: 'Genre',
                 border: OutlineInputBorder(),
               ),
-              items: _profileService.getAvailableGenders().map((gender) {
-                return DropdownMenuItem(
-                  value: gender,
-                  child: Text(_profileService.getGenderDisplayName(gender)),
-                );
-              }).toList(),
+              items: _profileService.getAvailableGenders()
+                  .map((gender) => DropdownMenuItem(
+                        value: gender,
+                        child: Text(_profileService.getGenderDisplayName(gender)),
+                      ))
+                  .toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedGender = value;
                 });
               },
             ),
-            
             const SizedBox(height: 16),
-            
+            InkWell(
+              onTap: _selectBirthDate,
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Date de naissance',
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(
+                  _selectedBirthDate != null
+                      ? '${_selectedBirthDate!.day}/${_selectedBirthDate!.month}/${_selectedBirthDate!.year}'
+                      : 'Sélectionner une date',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _bioController,
               decoration: const InputDecoration(
                 labelText: 'Biographie',
-                hintText: 'Décrivez-vous en quelques mots...',
                 border: OutlineInputBorder(),
+                hintText: 'Parlez-nous de vous...',
               ),
               maxLines: 3,
               maxLength: 500,
@@ -337,7 +450,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildContactSection() {
+  Widget _buildContactInfoSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -351,7 +464,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(
@@ -361,30 +473,65 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               keyboardType: TextInputType.phone,
               validator: (value) {
-                if (value != null && value.isNotEmpty && !_profileService.isValidPhone(value)) {
+                if (value != null && value.trim().isNotEmpty && !_profileService.isValidPhone(value)) {
                   return 'Numéro de téléphone invalide';
                 }
                 return null;
               },
             ),
-            
             const SizedBox(height: 16),
-            
             TextFormField(
               controller: _websiteController,
               decoration: const InputDecoration(
                 labelText: 'Site web',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.language),
-                hintText: 'https://...',
+                prefixIcon: Icon(Icons.web),
+                hintText: 'https://www.exemple.com',
               ),
               keyboardType: TextInputType.url,
               validator: (value) {
-                if (value != null && value.isNotEmpty && !_profileService.isValidWebsite(value)) {
+                if (value != null && value.trim().isNotEmpty && !_profileService.isValidWebsite(value)) {
                   return 'URL invalide';
                 }
                 return null;
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalInfoSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Informations professionnelles',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _professionController,
+              decoration: const InputDecoration(
+                labelText: 'Profession',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.work),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _companyController,
+              decoration: const InputDecoration(
+                labelText: 'Entreprise',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.business),
+              ),
             ),
           ],
         ),
@@ -406,19 +553,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
             TextFormField(
               controller: _addressController,
               decoration: const InputDecoration(
-                labelText: 'Adresse',
+                labelText: 'Adresse complète',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.home),
+                prefixIcon: Icon(Icons.location_on),
               ),
               maxLines: 2,
             ),
-            
             const SizedBox(height: 16),
-            
             Row(
               children: [
                 Expanded(
@@ -431,7 +575,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _postalCodeController,
@@ -443,21 +587,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ],
             ),
-            
             const SizedBox(height: 16),
-            
             DropdownButtonFormField<String>(
               value: _selectedCountry,
               decoration: const InputDecoration(
                 labelText: 'Pays',
                 border: OutlineInputBorder(),
               ),
-              items: _profileService.getAvailableCountries().map((country) {
-                return DropdownMenuItem(
-                  value: country,
-                  child: Text(country),
-                );
-              }).toList(),
+              items: _profileService.getAvailableCountries()
+                  .map((country) => DropdownMenuItem(
+                        value: country,
+                        child: Text(country),
+                      ))
+                  .toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedCountry = value;
@@ -468,167 +610,5 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildProfessionalSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Informations professionnelles',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            TextFormField(
-              controller: _professionController,
-              decoration: const InputDecoration(
-                labelText: 'Profession',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.work),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            TextFormField(
-              controller: _companyController,
-              decoration: const InputDecoration(
-                labelText: 'Entreprise',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectAvatar() async {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Prendre une photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choisir dans la galerie'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            if (_selectedAvatar != null || widget.existingProfile?.avatarUrl != null)
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Supprimer la photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _selectedAvatar = null;
-                  });
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _selectedAvatar = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la sélection de l\'image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _selectBirthDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedBirthDate ?? DateTime(1990),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)), // Minimum 13 ans
-      locale: const Locale('fr', 'FR'),
-    );
-
-    if (picked != null && picked != _selectedBirthDate) {
-      setState(() {
-        _selectedBirthDate = picked;
-      });
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final profileData = {
-      'first_name': _firstNameController.text.trim(),
-      'last_name': _lastNameController.text.trim(),
-      'date_of_birth': _selectedBirthDate?.toIso8601String().split('T')[0],
-      'gender': _selectedGender,
-      'phone': _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-      'address': _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
-      'city': _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : null,
-      'country': _selectedCountry,
-      'postal_code': _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
-      'bio': _bioController.text.trim().isNotEmpty ? _bioController.text.trim() : null,
-      'profession': _professionController.text.trim().isNotEmpty ? _professionController.text.trim() : null,
-      'company': _companyController.text.trim().isNotEmpty ? _companyController.text.trim() : null,
-      'website': _websiteController.text.trim().isNotEmpty ? _websiteController.text.trim() : null,
-    };
-
-    // Remove null values
-    profileData.removeWhere((key, value) => value == null);
-
-    // Save profile
-    if (widget.existingProfile != null) {
-      context.read<ProfileBloc>().add(UpdateUserProfile(profileData: profileData));
-    } else {
-      context.read<ProfileBloc>().add(CreateUserProfile(profileData: profileData));
-    }
-
-    // Upload avatar if selected
-    if (_selectedAvatar != null) {
-      context.read<ProfileBloc>().add(UploadAvatar(imageFile: _selectedAvatar!));
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/'
-           '${date.month.toString().padLeft(2, '0')}/'
-           '${date.year}';
   }
 }

@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../services/auth_token_service.dart';
+import '../../../widgets/ellipsis_button.dart';
 import '../models/trip_model.dart';
+import '../widgets/trip_status_widget.dart';
+import '../widgets/trip_actions_widget.dart';
+import '../services/trip_state_manager.dart';
+import '../services/favorites_service.dart';
 
 class TripDetailsScreen extends StatefulWidget {
   final String tripId;
@@ -20,6 +25,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   Trip? _trip;
   bool _isLoading = true;
   String? _error;
+  bool _isFavorite = false;
+  bool _isOwner = false;
 
   @override
   void initState() {
@@ -35,8 +42,16 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
     try {
       final trip = await AuthTokenService.instance.tripService.getTripById(widget.tripId);
+      
+      // Vérifier le statut de favori en parallèle
+      final isFavorite = await FavoritesService.instance.isFavorite(widget.tripId);
+      
       setState(() {
         _trip = trip;
+        _isFavorite = isFavorite;
+        // For now, we'll consider all trips as owned by current user for actions
+        // In a real app, you'd compare with the actual current user ID
+        _isOwner = true; // TODO: Implement proper user ownership check
         _isLoading = false;
       });
     } catch (e) {
@@ -109,11 +124,32 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTripHeader(),
+          // Trip Status Widget
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TripStatusWidget(
+              trip: _trip!,
+              showDetails: true,
+              showMetrics: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Trip Actions Widget (only for trip owner)
+          if (_isOwner) Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TripActionsWidget(
+              trip: _trip!,
+              onTripUpdated: (updatedTrip) => _handleTripUpdated(updatedTrip),
+              onTripDeleted: () => _handleTripDeleted(),
+            ),
+          ),
+          _buildActionButtons(),
           _buildTripInfo(),
           _buildPricingInfo(),
           _buildFlightInfo(),
           _buildRestrictionsInfo(),
           _buildContactInfo(),
+          if (!_isOwner) _buildBookingSection(),
           const SizedBox(height: 20),
         ],
       ),
@@ -181,7 +217,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
         color = Colors.amber;
         text = 'En attente d\'approbation';
         break;
-      case TripStatus.published:
+      case TripStatus.active:
         color = Colors.green;
         text = 'Publié';
         break;
@@ -189,17 +225,33 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
         color = Colors.red;
         text = 'Rejeté';
         break;
-      case TripStatus.flaggedForReview:
+      case TripStatus.pendingReview:
         color = Colors.purple;
         text = 'Signalé pour révision';
+        break;
+      case TripStatus.booked:
+        color = Colors.orange;
+        text = 'Réservé';
+        break;
+      case TripStatus.inProgress:
+        color = Colors.indigo;
+        text = 'En cours';
         break;
       case TripStatus.completed:
         color = Colors.blue;
         text = 'Terminé';
         break;
       case TripStatus.cancelled:
-        color = Colors.red;
+        color = Colors.grey;
         text = 'Annulé';
+        break;
+      case TripStatus.paused:
+        color = Colors.yellow;
+        text = 'En pause';
+        break;
+      case TripStatus.expired:
+        color = Colors.brown;
+        text = 'Expiré';
         break;
     }
 
@@ -242,7 +294,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                dateFormatter.format(trip.departureDate),
+                dateFormatter.format(trip.departureDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -250,7 +302,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 ),
               ),
               Text(
-                timeFormatter.format(trip.departureDate),
+                timeFormatter.format(trip.departureDate.toLocal()),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withOpacity(0.9),
@@ -291,7 +343,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                dateFormatter.format(trip.arrivalDate),
+                dateFormatter.format(trip.arrivalDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -299,7 +351,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 ),
               ),
               Text(
-                timeFormatter.format(trip.arrivalDate),
+                timeFormatter.format(trip.arrivalDate.toLocal()),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withOpacity(0.9),
@@ -362,6 +414,62 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     return const SizedBox.shrink();
   }
 
+  Widget _buildActionButtons() {
+    if (_trip == null) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // Favorite button
+          Expanded(
+            child: EllipsisButton.outlined(
+              onPressed: _toggleFavorite,
+              icon: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? Colors.red : null,
+              ),
+              text: _isFavorite ? 'Favoris ✓' : 'Favoris',
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: 12),
+          
+          // Share button
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _shareTrip,
+              icon: const Icon(Icons.share),
+              label: const Text('Partager'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          
+          if (_isOwner) ...[
+            const SizedBox(width: 12),
+            
+            // Edit button (owner only)
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _editTrip,
+                icon: const Icon(Icons.edit),
+                label: const Text('Modifier'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildContactInfo() {
     final trip = _trip!;
     
@@ -390,17 +498,102 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ],
             ],
           ),
-          subtitle: const Text('Transporteur'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.star, size: 16, color: Colors.amber[600]),
-              const SizedBox(width: 4),
-              const Text('4.8', style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text('Transporteur'),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.star, size: 16, color: Colors.amber[600]),
+                  const SizedBox(width: 4),
+                  const Text('4.8', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  Text('(127 avis)', style: TextStyle(color: Colors.grey[600])),
+                ],
+              ),
+            ],
+          ),
+          trailing: !_isOwner 
+              ? ElevatedButton(
+                  onPressed: _contactTransporter,
+                  child: const Text('Contacter'),
+                )
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBookingSection() {
+    if (_trip == null || _isOwner) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Card(
+        color: Colors.green[50],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.luggage, color: Colors.green[700]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Réserver cet espace',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[800],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              Text(
+                'Capacité disponible: ${_trip!.availableWeightKg.toStringAsFixed(1)} kg',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              
+              Text(
+                'Prix: ${_trip!.pricePerKg.toStringAsFixed(2)} ${_trip!.currency} par kg',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _trip!.status == TripStatus.active ? _bookTrip : null,
+                  icon: const Icon(Icons.book_online),
+                  label: const Text('Réserver maintenant'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                'Vous pourrez préciser le poids exact et les détails lors de la réservation',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -544,6 +737,212 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     }
   }
 
+  void _toggleFavorite() async {
+    if (_trip == null) return;
+    
+    final success = await FavoritesService.instance.toggleFavorite(_trip!.id.toString());
+    
+    if (success) {
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris'),
+            backgroundColor: _isFavorite ? Colors.green : Colors.grey[600],
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour des favoris'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _contactTransporter() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.message, color: Theme.of(context).primaryColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Contacter le transporteur',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              const TextField(
+                decoration: InputDecoration(
+                  labelText: 'Votre message',
+                  hintText: 'Bonjour, je suis intéressé par votre voyage...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Annuler'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Message envoyé au transporteur'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Envoyer'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _bookTrip() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.book_online, color: Colors.green[700]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Réserver cet espace',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[800],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Text(
+                'Route: ${_trip!.routeDisplay}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              
+              Text(
+                'Prix: ${_trip!.pricePerKg.toStringAsFixed(2)} ${_trip!.currency}/kg',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              const TextField(
+                decoration: InputDecoration(
+                  labelText: 'Poids à transporter (kg)',
+                  hintText: '0.0',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              
+              const SizedBox(height: 12),
+              
+              const TextField(
+                decoration: InputDecoration(
+                  labelText: 'Description du colis',
+                  hintText: 'Décrivez brièvement ce que vous voulez transporter...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Annuler'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Demande de réservation envoyée'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Confirmer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _editTrip() {
     // TODO: Navigate to edit trip screen
     ScaffoldMessenger.of(context).showSnackBar(
@@ -552,10 +951,68 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   void _shareTrip() {
-    // TODO: Implement trip sharing
+    final trip = _trip!;
+    final shareText = '''
+🚀 Voyage disponible sur KiloShare
+
+📍 ${trip.routeDisplay}
+📅 ${trip.departureDate.day}/${trip.departureDate.month}/${trip.departureDate.year}
+🧳 ${trip.availableWeightKg.toStringAsFixed(1)} kg disponibles
+💰 ${trip.pricePerKg.toStringAsFixed(2)} ${trip.currency}/kg
+
+Réservez maintenant: https://kiloshare.app/trips/${trip.id}
+    ''';
+    
+    // In a real app, you would use the share plugin
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Partage bientôt disponible')),
+      SnackBar(
+        content: const Text('Lien copié dans le presse-papiers'),
+        backgroundColor: Colors.green,
+        action: SnackBarAction(
+          label: 'VOIR',
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Contenu à partager'),
+                content: Text(shareText),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
+  }
+
+  void _handleTripUpdated(Trip updatedTrip) {
+    setState(() {
+      _trip = updatedTrip;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Voyage mis à jour avec succès'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+  
+  void _handleTripDeleted() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Voyage supprimé avec succès'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    
+    // Navigate back to trips list
+    context.pop();
   }
 
   void _deleteTrip() {

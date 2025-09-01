@@ -8,6 +8,7 @@ import '../../trips/screens/my_trips_screen_bloc.dart';
 import '../../trips/bloc/trip_bloc.dart';
 import '../../trips/models/trip_model.dart';
 import '../../trips/widgets/trip_card_widget.dart';
+import '../../booking/screens/bookings_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -399,13 +400,7 @@ class _HomePage extends StatelessWidget {
             const SizedBox(height: ModernTheme.spacing16),
             BlocConsumer<TripBloc, TripState>(
               listener: (context, state) {
-                print('=== DEBUG: HomeScreen BlocConsumer listener triggered ===');
-                print('DEBUG: State type: ${state.runtimeType}');
                 if (state is TripError) {
-                  print('DEBUG: TripError detected in HomeScreen');
-                  print('DEBUG: Error message: ${state.message}');
-                  print('DEBUG: Error details: ${state.error}');
-                  print('DEBUG: Showing SnackBar with error message');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(state.message),
@@ -415,8 +410,6 @@ class _HomePage extends StatelessWidget {
                 }
               },
               builder: (context, state) {
-                print('=== DEBUG: HomeScreen BlocConsumer builder triggered ===');
-                print('DEBUG: State type: ${state.runtimeType}');
                 if (state is TripLoading) {
                   return const ModernCard(
                     padding: EdgeInsets.all(ModernTheme.spacing24),
@@ -616,8 +609,7 @@ class _BookingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use our advanced MyTripsScreenBloc directly
-    return const MyTripsScreenBloc();
+    return const BookingsListScreen();
   }
 }
 

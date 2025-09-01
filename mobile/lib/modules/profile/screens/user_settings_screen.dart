@@ -7,6 +7,8 @@ import '../../auth/blocs/auth/auth_bloc.dart';
 import '../../auth/blocs/auth/auth_event.dart';
 import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/models/user_model.dart';
+import '../../../themes/modern_theme.dart';
+import '../../../utils/debug_storage_cleaner.dart';
 
 class UserSettingsScreen extends StatefulWidget {
   const UserSettingsScreen({super.key});
@@ -34,10 +36,18 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: ModernTheme.gray50,
       appBar: AppBar(
-        title: const Text('Paramètres'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(
+          'Paramètres',
+          style: TextStyle(
+            color: ModernTheme.gray900,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: ModernTheme.white,
         elevation: 0,
+        iconTheme: IconThemeData(color: ModernTheme.gray700),
       ),
       body: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
@@ -50,20 +60,51 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                _buildUserHeader(context, user),
-                const SizedBox(height: 16),
-                _buildAccountSection(context, user),
-                const SizedBox(height: 16),
-                _buildSecuritySection(context),
-                const SizedBox(height: 16),
-                _buildPreferencesSection(context),
-                const SizedBox(height: 16),
-                _buildSupportSection(context),
-                const SizedBox(height: 16),
-                _buildDangerSection(context),
-                const SizedBox(height: 24),
-                _buildAppInfo(context),
-                const SizedBox(height: 32),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 100),
+                  child: _buildUserHeader(context, user),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 150),
+                  child: _buildQuickActions(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 200),
+                  child: _buildAccountSection(context, user),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 300),
+                  child: _buildSecuritySection(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 400),
+                  child: _buildPreferencesSection(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 500),
+                  child: _buildSupportSection(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 600),
+                  child: _buildDangerSection(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing16),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 650),
+                  child: _buildDebugSection(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing24),
+                FadeInSlideUp(
+                  delay: const Duration(milliseconds: 700),
+                  child: _buildAppInfo(context),
+                ),
+                const SizedBox(height: ModernTheme.spacing32),
               ],
             ),
           );
@@ -73,6 +114,10 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
   }
 
   Widget _buildUserHeader(BuildContext context, User? user) {
+    // Vérifier l'état d'authentification
+    final authState = context.read<AuthBloc>().state;
+    final isAuthenticated = authState is AuthAuthenticated;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -97,10 +142,10 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
             ),
             child: CircleAvatar(
               radius: 37,
-              backgroundImage: user?.profilePicture != null
+              backgroundImage: (isAuthenticated && user?.profilePicture != null)
                   ? NetworkImage(user!.profilePicture!)
                   : null,
-              child: user?.profilePicture == null
+              child: (isAuthenticated && user?.profilePicture == null)
                   ? Text(
                       _getInitials(user),
                       style: const TextStyle(
@@ -109,19 +154,25 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : null,
+                  : !isAuthenticated
+                      ? const Icon(
+                          Icons.person_outline,
+                          size: 40,
+                          color: Colors.white,
+                        )
+                      : null,
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            _getDisplayName(user),
+            isAuthenticated ? _getDisplayName(user) : 'Visiteur',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          if (user?.email != null) ...[
+          if (isAuthenticated && user?.email != null) ...[
             const SizedBox(height: 4),
             Text(
               user!.email,
@@ -130,8 +181,18 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
                 color: Colors.white70,
               ),
             ),
+          ] else if (!isAuthenticated) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Connectez-vous pour accéder à vos paramètres',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white70,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
-          if (user?.isVerified == true) ...[
+          if (isAuthenticated && user?.isVerified == true) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -157,7 +218,125 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _navigateToProfile(context, user),
+            icon: Icon(
+              isAuthenticated ? Icons.edit : Icons.login,
+              size: 18,
+            ),
+            label: Text(isAuthenticated ? 'Modifier le profil' : 'Se connecter'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Actions rapides',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickActionButton(
+                    context: context,
+                    icon: Icons.add_circle_outline,
+                    label: 'Créer un voyage',
+                    color: Theme.of(context).primaryColor,
+                    onTap: () => context.push('/trips/create'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickActionButton(
+                    context: context,
+                    icon: Icons.search,
+                    label: 'Rechercher',
+                    color: Colors.blue,
+                    onTap: () => context.push('/trips/search'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickActionButton(
+                    context: context,
+                    icon: Icons.history,
+                    label: 'Mes voyages',
+                    color: Colors.purple,
+                    onTap: () => context.push('/profile/trip-history'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickActionButton(
+                    context: context,
+                    icon: Icons.person_outline,
+                    label: 'Mon profil',
+                    color: Colors.green,
+                    onTap: () => _navigateToProfile(context, null),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -197,22 +376,14 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
             icon: Icons.account_balance_wallet,
             title: 'Portefeuille',
             subtitle: 'Gérer vos paiements et revenus',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Fonctionnalité bientôt disponible')),
-              );
-            },
+            onTap: () => _navigateToWallet(context),
           ),
           const Divider(height: 1),
           _buildSettingsItem(
             icon: Icons.history,
             title: 'Historique des voyages',
             subtitle: 'Vos trajets passés et futurs',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Fonctionnalité bientôt disponible')),
-              );
-            },
+            onTap: () => context.push('/profile/trip-history'),
           ),
           const Divider(height: 1),
           _buildSettingsItem(
@@ -388,6 +559,54 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     );
   }
 
+  Widget _buildDebugSection(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: Colors.blue.withValues(alpha: 0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '🛠️ Debug Tools',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[700],
+              ),
+            ),
+          ),
+          _buildSettingsItem(
+            icon: Icons.storage,
+            title: 'Inspecter le stockage',
+            subtitle: 'Voir le contenu du stockage local',
+            titleColor: Colors.blue[700],
+            onTap: () async {
+              await DebugStorageCleaner.debugSecureStorage();
+              await DebugStorageCleaner.debugSharedPreferences();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Debug info affichée dans la console'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              }
+            },
+          ),
+          const Divider(height: 1),
+          _buildSettingsItem(
+            icon: Icons.cleaning_services,
+            title: 'Nettoyer le stockage',
+            subtitle: 'Supprimer toutes les sessions persistantes',
+            titleColor: Colors.blue[700],
+            onTap: () => _showClearStorageDialog(context),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDangerSection(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -513,6 +732,84 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
       }
     }
   }
+
+  void _navigateToProfile(BuildContext context, User? user) {
+    // Vérifier si l'utilisateur est connecté
+    final authState = context.read<AuthBloc>().state;
+    
+    if (authState is AuthAuthenticated) {
+      // Utilisateur connecté, permettre la navigation
+      context.push('/profile/edit');
+    } else {
+      // Utilisateur non connecté, rediriger vers la page de login
+      context.push('/login');
+    }
+  }
+
+  void _navigateToWallet(BuildContext context) {
+    // Vérifier si l'utilisateur est connecté
+    final authState = context.read<AuthBloc>().state;
+    
+    if (authState is AuthAuthenticated) {
+      // Utilisateur connecté, permettre la navigation
+      context.push('/profile/wallet');
+    } else {
+      // Utilisateur non connecté, rediriger vers la page de login
+      context.push('/login');
+    }
+  }
+
+  void _showClearStorageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('🧹 Nettoyer le stockage'),
+        content: const Text(
+          'Cela va supprimer toutes les données stockées localement, y compris les sessions persistantes. Vous devrez vous reconnecter.\n\nÊtes-vous sûr de vouloir continuer ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              
+              try {
+                // Nettoyer le stockage
+                await DebugStorageCleaner.clearAllStorage();
+                
+                // Forcer une déconnexion du Bloc
+                if (context.mounted) {
+                  context.read<AuthBloc>().add(AuthLogoutRequested());
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Stockage nettoyé avec succès'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Erreur lors du nettoyage: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Nettoyer'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(

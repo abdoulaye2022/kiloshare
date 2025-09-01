@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+// Suppress PHP deprecation warnings to prevent JSON response pollution
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', '0');
+
 use DI\ContainerBuilder;
 use Slim\Factory\AppFactory;
 use Slim\Factory\ServerRequestCreatorFactory;
@@ -239,6 +243,59 @@ $containerBuilder->addDefinitions([
     \KiloShare\Middleware\AdminAuthMiddleware::class => function ($container) {
         return new \KiloShare\Middleware\AdminAuthMiddleware(
             $container->get(PDO::class)
+        );
+    },
+    
+    // Booking module services
+    \KiloShare\Modules\Booking\Services\CommissionService::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Services\CommissionService(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \KiloShare\Modules\Booking\Services\StripeService::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Services\StripeService(
+            $container->get(PDO::class),
+            Config::get('app.debug', true) // Development mode by default
+        );
+    },
+    
+    \KiloShare\Modules\Booking\Services\NotificationService::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Services\NotificationService(
+            $container->get(PDO::class)
+        );
+    },
+    
+    // Booking module models
+    \KiloShare\Modules\Booking\Models\Booking::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Models\Booking(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \KiloShare\Modules\Booking\Models\Transaction::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Models\Transaction(
+            $container->get(PDO::class)
+        );
+    },
+    
+    // Booking module controllers
+    \KiloShare\Modules\Booking\Controllers\BookingController::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Controllers\BookingController(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \KiloShare\Modules\Booking\Controllers\PaymentController::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Controllers\PaymentController(
+            $container->get(PDO::class)
+        );
+    },
+    
+    \KiloShare\Modules\Booking\Controllers\StripeController::class => function ($container) {
+        return new \KiloShare\Modules\Booking\Controllers\StripeController(
+            $container->get(PDO::class),
+            $container->get(\KiloShare\Modules\Booking\Services\StripeService::class)
         );
     }
 ]);

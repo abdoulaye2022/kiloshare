@@ -1,5 +1,17 @@
 // Modèles simplifiés pour le test de l'interface moderne
 
+enum TrustLevel {
+  newUser,      // < 30 points
+  verified,     // 30-70 points  
+  established   // > 70 points
+}
+
+enum UserRole {
+  user,         // Utilisateur normal
+  admin,        // Administrateur
+  moderator     // Modérateur (si besoin plus tard)
+}
+
 class User {
   final int id;
   final String uuid;
@@ -13,6 +25,10 @@ class User {
   final String? profilePicture;
   final String status;
   final DateTime? lastLoginAt;
+  final UserRole role;
+  final int trustScore;
+  final int completedTrips;
+  final int totalTrips;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,9 +45,24 @@ class User {
     this.profilePicture,
     required this.status,
     this.lastLoginAt,
+    this.role = UserRole.user,
+    this.trustScore = 0,
+    this.completedTrips = 0,
+    this.totalTrips = 0,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  static UserRole _parseUserRole(String? role) {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return UserRole.admin;
+      case 'moderator':
+        return UserRole.moderator;
+      default:
+        return UserRole.user;
+    }
+  }
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: json['id'] as int,
@@ -56,6 +87,10 @@ class User {
     lastLoginAt: json['last_login_at'] != null 
         ? DateTime.parse(json['last_login_at'] as String) 
         : null,
+    role: _parseUserRole(json['role'] as String?),
+    trustScore: json['trust_score'] as int? ?? 0,
+    completedTrips: json['completed_trips'] as int? ?? 0,
+    totalTrips: json['total_trips'] as int? ?? 0,
     createdAt: DateTime.parse(json['created_at'] as String),
     updatedAt: json['updated_at'] != null 
         ? DateTime.parse(json['updated_at'] as String)
@@ -75,6 +110,10 @@ class User {
     'profile_picture': profilePicture,
     'status': status,
     'last_login_at': lastLoginAt?.toIso8601String(),
+    'role': role.name,
+    'trust_score': trustScore,
+    'completed_trips': completedTrips,
+    'total_trips': totalTrips,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -91,6 +130,47 @@ class User {
   bool get isEmailVerified => emailVerifiedAt != null;
   bool get isFullyVerified => isVerified && isPhoneVerified;
 
+  // Role checks
+  bool get isAdmin => role == UserRole.admin;
+  bool get isModerator => role == UserRole.moderator;
+  bool get isUser => role == UserRole.user;
+  bool get canModerate => role == UserRole.admin || role == UserRole.moderator;
+
+  // Trust score analysis
+  TrustLevel get trustLevel {
+    if (trustScore < 30) return TrustLevel.newUser;
+    if (trustScore <= 70) return TrustLevel.verified;
+    return TrustLevel.established;
+  }
+
+  // Trip approval rules
+  bool needsManualApproval(String transportType) {
+    switch (trustLevel) {
+      case TrustLevel.newUser:
+        // Premier voyage avion = révision manuelle
+        if (transportType.toLowerCase() == 'plane' && totalTrips == 0) {
+          return true;
+        }
+        // Autres transports = publication immédiate avec flag review
+        return false;
+      case TrustLevel.verified:
+      case TrustLevel.established:
+        return false;
+    }
+  }
+
+  bool needsReviewFlag(String transportType) {
+    if (trustLevel == TrustLevel.newUser) {
+      // Tous les premiers voyages (sauf avion qui va en révision manuelle)
+      return transportType.toLowerCase() != 'plane';
+    }
+    return false;
+  }
+
+  bool canAutoPublish(String transportType) {
+    return !needsManualApproval(transportType);
+  }
+
   User copyWith({
     int? id,
     String? uuid,
@@ -104,6 +184,10 @@ class User {
     String? profilePicture,
     String? status,
     DateTime? lastLoginAt,
+    UserRole? role,
+    int? trustScore,
+    int? completedTrips,
+    int? totalTrips,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -120,6 +204,10 @@ class User {
       profilePicture: profilePicture ?? this.profilePicture,
       status: status ?? this.status,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      role: role ?? this.role,
+      trustScore: trustScore ?? this.trustScore,
+      completedTrips: completedTrips ?? this.completedTrips,
+      totalTrips: totalTrips ?? this.totalTrips,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

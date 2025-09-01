@@ -140,14 +140,14 @@ class TripCardWidget extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                dateFormatter.format(trip.departureDate),
+                dateFormatter.format(trip.departureDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                timeFormatter.format(trip.departureDate),
+                timeFormatter.format(trip.departureDate.toLocal()),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -190,14 +190,14 @@ class TripCardWidget extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                dateFormatter.format(trip.arrivalDate),
+                dateFormatter.format(trip.arrivalDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                timeFormatter.format(trip.arrivalDate),
+                timeFormatter.format(trip.arrivalDate.toLocal()),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -476,7 +476,7 @@ class TripCardWidget extends StatelessWidget {
         color = Colors.amber;
         text = 'En attente';
         break;
-      case TripStatus.published:
+      case TripStatus.active:
         color = Colors.green;
         text = 'Publié';
         break;
@@ -484,17 +484,33 @@ class TripCardWidget extends StatelessWidget {
         color = Colors.red;
         text = 'Rejeté';
         break;
-      case TripStatus.flaggedForReview:
+      case TripStatus.pendingReview:
         color = Colors.purple;
         text = 'En révision';
+        break;
+      case TripStatus.booked:
+        color = Colors.orange;
+        text = 'Réservé';
+        break;
+      case TripStatus.inProgress:
+        color = Colors.indigo;
+        text = 'En cours';
         break;
       case TripStatus.completed:
         color = Colors.blue;
         text = 'Terminé';
         break;
       case TripStatus.cancelled:
-        color = Colors.red;
+        color = Colors.grey;
         text = 'Annulé';
+        break;
+      case TripStatus.paused:
+        color = Colors.yellow;
+        text = 'En pause';
+        break;
+      case TripStatus.expired:
+        color = Colors.brown;
+        text = 'Expiré';
         break;
     }
 

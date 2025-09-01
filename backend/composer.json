@@ -4,6 +4,7 @@
     "type": "project",
     "require": {
         "php": "^8.1",
+        "cloudinary/cloudinary_php": "^3.1",
         "firebase/php-jwt": "^6.8",
         "getbrevo/brevo-php": "1.x.x",
         "league/flysystem": "^3.0",
@@ -14,6 +15,7 @@
         "respect/validation": "^2.2",
         "slim/psr7": "^1.6",
         "slim/slim": "4.*",
+        "stripe/stripe-php": "^17.6",
         "twilio/sdk": "^8.7",
         "vlucas/phpdotenv": "^5.5"
     },

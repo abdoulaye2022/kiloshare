@@ -28,7 +28,17 @@ class ProfileController
     public function getProfile(Request $request, Response $response, array $args): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
+            
             $profile = $this->profileService->getUserProfile($userId);
 
             if (!$profile) {
@@ -59,7 +69,16 @@ class ProfileController
     public function createProfile(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $data = $request->getParsedBody() ?? [];
             
             if (empty($data)) {
@@ -90,7 +109,16 @@ class ProfileController
     public function updateProfile(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $data = $request->getParsedBody() ?? [];
             
             if (empty($data)) {
@@ -121,7 +149,16 @@ class ProfileController
     public function uploadAvatar(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $uploadedFiles = $request->getUploadedFiles();
             
             if (!isset($uploadedFiles['avatar'])) {
@@ -142,7 +179,7 @@ class ProfileController
                 return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
             }
 
-            $result = $this->ftpUploadService->uploadFile($uploadedFile, 'avatars');
+            $result = $this->ftpUploadService->uploadFile($uploadedFile, 'avatars', $userId);
             
             if ($result['success']) {
                 $this->profileService->updateAvatarUrl($userId, $result['file_url']);
@@ -177,7 +214,16 @@ class ProfileController
     public function uploadDocument(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $uploadedFiles = $request->getUploadedFiles();
             $parsedBody = $request->getParsedBody();
             
@@ -211,7 +257,7 @@ class ProfileController
                 return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
             }
 
-            $result = $this->ftpUploadService->uploadFile($uploadedFile, 'documents');
+            $result = $this->ftpUploadService->uploadFile($uploadedFile, 'documents', $userId);
             
             if ($result['success']) {
                 $document = $this->profileService->uploadVerificationDocument(
@@ -253,7 +299,16 @@ class ProfileController
     public function getUserDocuments(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $documents = $this->profileService->getUserDocuments($userId);
 
             $response->getBody()->write(json_encode([
@@ -276,7 +331,16 @@ class ProfileController
     public function getUserBadges(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $badges = $this->profileService->getUserBadges($userId);
 
             $response->getBody()->write(json_encode([
@@ -299,7 +363,16 @@ class ProfileController
     public function getVerificationStatus(Request $request, Response $response): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $status = $this->profileService->getVerificationStatus($userId);
 
             $response->getBody()->write(json_encode([
@@ -322,7 +395,16 @@ class ProfileController
     public function deleteDocument(Request $request, Response $response, array $args): Response
     {
         try {
-            $userId = $request->getAttribute('user_id');
+            $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
+            
+            if (!$userId) {
+                $response->getBody()->write(json_encode([
+                    'success' => false,
+                    'message' => 'User ID not found'
+                ]));
+                return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            }
             $documentId = (int) $args['documentId'];
             
             $result = $this->profileService->deleteUserDocument($userId, $documentId);
