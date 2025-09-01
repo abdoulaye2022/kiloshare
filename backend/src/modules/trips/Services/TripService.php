@@ -98,7 +98,14 @@ class TripService
     public function getTripById(int $id): ?Trip
     {
         $stmt = $this->db->prepare("
-            SELECT t.*, 
+            SELECT t.id, t.uuid, t.user_id, 
+                   t.departure_city, t.departure_country, t.departure_airport_code, t.departure_date,
+                   t.arrival_city, t.arrival_country, t.arrival_airport_code, t.arrival_date,
+                   t.available_weight_kg, t.price_per_kg, t.currency,
+                   t.flight_number, t.airline, t.ticket_verified, t.ticket_verification_date,
+                   t.status, t.is_approved, t.view_count, t.booking_count,
+                   t.description, t.special_notes,
+                   t.created_at, t.updated_at, t.published_at,
                    tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
@@ -137,7 +144,14 @@ class TripService
     public function getTripByUuid(string $uuid): ?Trip
     {
         $stmt = $this->db->prepare("
-            SELECT t.*, 
+            SELECT t.id, t.uuid, t.user_id, 
+                   t.departure_city, t.departure_country, t.departure_airport_code, t.departure_date,
+                   t.arrival_city, t.arrival_country, t.arrival_airport_code, t.arrival_date,
+                   t.available_weight_kg, t.price_per_kg, t.currency,
+                   t.flight_number, t.airline, t.ticket_verified, t.ticket_verification_date,
+                   t.status, t.is_approved, t.view_count, t.booking_count,
+                   t.description, t.special_notes,
+                   t.created_at, t.updated_at, t.published_at,
                    tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
@@ -172,17 +186,30 @@ class TripService
      */
     public function getUserTrips(int $userId, int $page = 1, int $limit = 20): array
     {
+        error_log("[TripService] getUserTrips called for user $userId");
         $offset = ($page - 1) * $limit;
         
         $stmt = $this->db->prepare("
-            SELECT t.*, 
+            SELECT t.id, t.uuid, t.user_id, 
+                   t.departure_city, t.departure_country, t.departure_airport_code, t.departure_date,
+                   t.arrival_city, t.arrival_country, t.arrival_airport_code, t.arrival_date,
+                   t.available_weight_kg, t.price_per_kg, t.currency,
+                   t.flight_number, t.airline, t.ticket_verified, t.ticket_verification_date,
+                   t.status, t.is_approved, t.view_count, t.booking_count,
+                   t.description, t.special_notes,
+                   t.created_at, t.updated_at, t.published_at,
                    tr.restricted_categories, tr.restricted_items, tr.restriction_notes,
                    COUNT(tv.id) as view_count_calculated
             FROM trips t
             LEFT JOIN trip_restrictions tr ON t.id = tr.trip_id
             LEFT JOIN trip_views tv ON t.id = tv.trip_id
             WHERE t.user_id = ? AND t.status != 'draft' AND t.deleted_at IS NULL
-            GROUP BY t.id, tr.restricted_categories, tr.restricted_items, tr.restriction_notes
+            GROUP BY t.id, t.uuid, t.user_id, t.departure_city, t.departure_country, t.departure_airport_code, 
+                     t.departure_date, t.arrival_city, t.arrival_country, t.arrival_airport_code, t.arrival_date,
+                     t.available_weight_kg, t.price_per_kg, t.currency, t.flight_number, t.airline, 
+                     t.ticket_verified, t.ticket_verification_date, t.status, t.is_approved, t.view_count, 
+                     t.booking_count, t.description, t.special_notes, t.created_at, t.updated_at, t.published_at,
+                     tr.restricted_categories, tr.restricted_items, tr.restriction_notes
             ORDER BY t.created_at DESC
             LIMIT ? OFFSET ?
         ");

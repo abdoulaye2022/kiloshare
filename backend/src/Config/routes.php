@@ -8,6 +8,10 @@ use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\PhoneAuthController;
 use KiloShare\Controllers\TestController;
+use KiloShare\Controllers\UserProfileController;
+use KiloShare\Controllers\ImageController;
+use KiloShare\Controllers\CloudinaryMonitoringController;
+use KiloShare\Controllers\FavoriteController;
 use App\Modules\Profile\Controllers\ProfileController;
 use App\Modules\Trips\Controllers\TripController;
 use App\Modules\Search\Controllers\SearchController;
@@ -386,20 +390,21 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
             });
             
-            // Profile routes
+            // Profile routes (using new UserProfileController for user table direct access)
             $v1Group->group('/profile', function (RouteCollectorProxy $profileGroup) {
-                // Profile management
-                $profileGroup->get('', [ProfileController::class, 'getProfile'])
+                // Profile management (direct users table access)
+                $profileGroup->get('', [UserProfileController::class, 'getProfile'])
                     ->add(AuthMiddleware::class);
-                $profileGroup->post('', [ProfileController::class, 'createProfile'])
-                    ->add(AuthMiddleware::class);
-                $profileGroup->put('', [ProfileController::class, 'updateProfile'])
+                $profileGroup->put('', [UserProfileController::class, 'updateProfile'])
                     ->add(AuthMiddleware::class);
                 
-                // Avatar upload
-                $profileGroup->post('/avatar', [ProfileController::class, 'uploadAvatar'])
+                // Avatar upload/management
+                $profileGroup->post('/avatar', [UserProfileController::class, 'uploadAvatar'])
+                    ->add(AuthMiddleware::class);
+                $profileGroup->delete('/avatar', [UserProfileController::class, 'deleteAvatar'])
                     ->add(AuthMiddleware::class);
                 
+                // Legacy routes (using old ProfileController for document/badge features)
                 // Document verification
                 $profileGroup->post('/documents', [ProfileController::class, 'uploadDocument'])
                     ->add(AuthMiddleware::class);
@@ -414,6 +419,41 @@ return function (App $app) {
                 
                 // Verification status
                 $profileGroup->get('/verification-status', [ProfileController::class, 'getVerificationStatus'])
+                    ->add(AuthMiddleware::class);
+            });
+            
+            // Image management routes avec Cloudinary
+            $v1Group->group('/images', function (RouteCollectorProxy $imageGroup) {
+                // Upload d'avatar utilisateur (remplace l'ancien système local)
+                $imageGroup->post('/avatar', [ImageController::class, 'uploadAvatar'])
+                    ->add(AuthMiddleware::class);
+                
+                // Upload de documents KYC sécurisés
+                $imageGroup->post('/kyc', [ImageController::class, 'uploadKYCDocument'])
+                    ->add(AuthMiddleware::class);
+                
+                // Upload multiple de photos d'annonces de voyage
+                $imageGroup->post('/trip', [ImageController::class, 'uploadTripPhotos'])
+                    ->add(AuthMiddleware::class);
+                
+                // Upload de photos de colis avec expiration automatique
+                $imageGroup->post('/package', [ImageController::class, 'uploadPackagePhotos'])
+                    ->add(AuthMiddleware::class);
+                
+                // Upload de preuve de livraison (conservation légale permanente)
+                $imageGroup->post('/delivery-proof', [ImageController::class, 'uploadDeliveryProof'])
+                    ->add(AuthMiddleware::class);
+                
+                // Suppression d'image (avec vérification de propriété)
+                $imageGroup->delete('/{public_id:.+}', [ImageController::class, 'deleteImage'])
+                    ->add(AuthMiddleware::class);
+                
+                // Statistiques d'usage Cloudinary (admin uniquement)
+                $imageGroup->get('/stats', [ImageController::class, 'getUsageStats'])
+                    ->add(AuthMiddleware::class);
+                
+                // Nettoyage manuel des images (admin uniquement)  
+                $imageGroup->post('/cleanup', [ImageController::class, 'triggerCleanup'])
                     ->add(AuthMiddleware::class);
             });
             
@@ -432,7 +472,7 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
                 
                 // Favorites routes
-                $tripGroup->get('/favorites', [TripController::class, 'getUserFavorites'])
+                $tripGroup->get('/favorites', [FavoriteController::class, 'getUserFavorites'])
                     ->add(AuthMiddleware::class);
                 
                 // Draft routes
@@ -462,9 +502,11 @@ return function (App $app) {
                     ->add(AuthMiddleware::class);
                     
                 // Favorites and reporting routes
-                $tripGroup->post('/{id}/favorite', [TripController::class, 'addToFavorites'])
+                $tripGroup->post('/{id}/favorite', [FavoriteController::class, 'addToFavorites'])
                     ->add(AuthMiddleware::class);
-                $tripGroup->delete('/{id}/favorite', [TripController::class, 'removeFromFavorites'])
+                $tripGroup->delete('/{id}/favorite', [FavoriteController::class, 'removeFromFavorites'])
+                    ->add(AuthMiddleware::class);
+                $tripGroup->get('/{id}/favorite/status', [FavoriteController::class, 'getFavoriteStatus'])
                     ->add(AuthMiddleware::class);
                 $tripGroup->post('/{id}/report', [TripController::class, 'reportTrip'])
                     ->add(AuthMiddleware::class);
@@ -532,6 +574,16 @@ return function (App $app) {
                     ->add(AdminAuthMiddleware::class);
                 $adminGroup->put('/users/{id}/role', [AuthController::class, 'updateUserRole'])
                     ->add(AdminAuthMiddleware::class);
+                
+                // Cloudinary monitoring (admin only)
+                $adminGroup->group('/cloudinary', function (RouteCollectorProxy $cloudinaryGroup) {
+                    $cloudinaryGroup->get('/usage', [CloudinaryMonitoringController::class, 'getUsageStats']);
+                    $cloudinaryGroup->get('/quota', [CloudinaryMonitoringController::class, 'getQuotaStatus']);
+                    $cloudinaryGroup->get('/images', [CloudinaryMonitoringController::class, 'getImagesByType']);
+                    $cloudinaryGroup->post('/cleanup', [CloudinaryMonitoringController::class, 'triggerCleanup']);
+                    $cloudinaryGroup->get('/cleanup/history', [CloudinaryMonitoringController::class, 'getCleanupHistory']);
+                    $cloudinaryGroup->get('/report/export', [CloudinaryMonitoringController::class, 'exportUsageReport']);
+                })->add(AdminAuthMiddleware::class);
             });
             
             // Test routes (development only)

@@ -6,6 +6,7 @@ import 'package:equatable/equatable.dart';
 
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
+import '../services/favorites_service.dart';
 import '../../../services/auth_token_service.dart';
 
 part 'trip_event.dart';
@@ -15,12 +16,9 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   late final TripService _tripService;
 
   TripBloc() : super(const TripInitial()) {
-    print('=== DEBUG: TripBloc constructor called ===');
     _tripService = AuthTokenService.instance.tripService;
-    print('DEBUG: TripService instance from AuthTokenService: $_tripService');
     
     on<LoadTrips>((event, emit) async {
-      print('=== DEBUG: LoadTrips event received ===');
       await _onLoadTrips(event, emit);
     });
     on<LoadTripById>(_onLoadTripById);
@@ -271,18 +269,23 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   Future<void> _onAddToFavorites(AddToFavorites event, Emitter<TripState> emit) async {
     try {
-      await _tripService.addToFavorites(event.tripId);
-      emit(const TripActionSuccess(
-        message: 'Trip added to favorites',
-        action: TripAction.addToFavorites,
-      ));
+      final success = await FavoritesService.instance.addToFavorites(event.tripId);
       
-      // Update current trip details if viewing this trip
-      if (state is TripDetailsLoaded) {
-        final currentState = state as TripDetailsLoaded;
-        if (currentState.trip.id == event.tripId) {
-          emit(currentState.copyWith(isFavorite: true));
+      if (success) {
+        emit(const TripActionSuccess(
+          message: 'Trip added to favorites',
+          action: TripAction.addToFavorites,
+        ));
+        
+        // Update current trip details if viewing this trip
+        if (state is TripDetailsLoaded) {
+          final currentState = state as TripDetailsLoaded;
+          if (currentState.trip.id == event.tripId) {
+            emit(currentState.copyWith(isFavorite: true));
+          }
         }
+      } else {
+        emit(const TripError('Failed to add trip to favorites'));
       }
     } catch (error) {
       emit(TripError('Failed to add trip to favorites: ${error.toString()}', error: error));
@@ -291,18 +294,28 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   Future<void> _onRemoveFromFavorites(RemoveFromFavorites event, Emitter<TripState> emit) async {
     try {
-      await _tripService.removeFromFavorites(event.tripId);
-      emit(const TripActionSuccess(
-        message: 'Trip removed from favorites',
-        action: TripAction.removeFromFavorites,
-      ));
+      final success = await FavoritesService.instance.removeFromFavorites(event.tripId);
       
-      // Update current trip details if viewing this trip
-      if (state is TripDetailsLoaded) {
-        final currentState = state as TripDetailsLoaded;
-        if (currentState.trip.id == event.tripId) {
-          emit(currentState.copyWith(isFavorite: false));
+      if (success) {
+        emit(const TripActionSuccess(
+          message: 'Trip removed from favorites',
+          action: TripAction.removeFromFavorites,
+        ));
+        
+        // Update current trip details if viewing this trip
+        if (state is TripDetailsLoaded) {
+          final currentState = state as TripDetailsLoaded;
+          if (currentState.trip.id == event.tripId) {
+            emit(currentState.copyWith(isFavorite: false));
+          }
         }
+        
+        // If currently showing favorites, refresh the list
+        if (state is FavoritesLoaded) {
+          add(const LoadFavorites());
+        }
+      } else {
+        emit(const TripError('Failed to remove trip from favorites'));
       }
     } catch (error) {
       emit(TripError('Failed to remove trip from favorites: ${error.toString()}', error: error));
@@ -346,7 +359,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onLoadFavorites(LoadFavorites event, Emitter<TripState> emit) async {
     emit(const TripLoading());
     try {
-      final favorites = await _tripService.getFavorites();
+      final favorites = await FavoritesService.instance.getFavoriteTrips();
       emit(FavoritesLoaded(favorites));
     } catch (error) {
       emit(TripError('Failed to load favorites: ${error.toString()}', error: error));
@@ -378,26 +391,15 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   }
 
   Future<void> _onLoadPublicTrips(LoadPublicTrips event, Emitter<TripState> emit) async {
-    print('=== DEBUG: _onLoadPublicTrips START ===');
-    print('DEBUG: Loading public trips with limit: ${event.limit}');
     emit(const TripLoading());
     try {
       // Create a separate TripService instance for public operations (no auth required)
-      print('DEBUG: Creating TripService instance for public operations');
       final publicTripService = TripService();
-      print('DEBUG: Calling getPublicTrips...');
       final trips = await publicTripService.getPublicTrips(limit: event.limit);
-      print('DEBUG: getPublicTrips completed successfully - ${trips.length} trips loaded');
       emit(PublicTripsLoaded(trips: trips));
-      print('DEBUG: PublicTripsLoaded state emitted');
     } catch (error) {
-      print('=== DEBUG: Error in _onLoadPublicTrips ===');
-      print('DEBUG: Error type: ${error.runtimeType}');
-      print('DEBUG: Error message: $error');
-      print('DEBUG: Error string: ${error.toString()}');
       emit(TripError('Failed to load public trips: ${error.toString()}', error: error));
     }
-    print('=== DEBUG: _onLoadPublicTrips END ===');
   }
 
   // Filter handlers for user trips
@@ -505,6 +507,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       return true;
     }).toList();
   }
+
 
   void _updateCurrentTripState(Emitter<TripState> emit, Trip updatedTrip) {
     if (state is TripDetailsLoaded) {

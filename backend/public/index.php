@@ -208,6 +208,13 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    \KiloShare\Controllers\FavoriteController::class => function ($container) {
+        return new \KiloShare\Controllers\FavoriteController(
+            $container->get(PDO::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
     \App\Modules\Search\Controllers\SearchController::class => function ($container) {
         return new \App\Modules\Search\Controllers\SearchController(
             $container->get(\App\Modules\Search\Services\SearchService::class),

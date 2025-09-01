@@ -1,0 +1,134 @@
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import '../../../config/app_config.dart';
+import '../../auth/services/auth_service.dart';
+import '../models/trip_model.dart';
+
+class FavoritesService {
+  static FavoritesService? _instance;
+  static FavoritesService get instance => _instance ??= FavoritesService._();
+  
+  FavoritesService._();
+
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: '${AppConfig.baseUrl}/v1',
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  ));
+
+  Future<Options> _getAuthHeaders() async {
+    final token = await AuthService.instance.getValidAccessToken();
+    return Options(
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    );
+  }
+
+  /// Ajouter un voyage aux favoris
+  Future<bool> addToFavorites(String tripId) async {
+    try {
+      final response = await _dio.post(
+        '/trips/$tripId/favorite',
+        options: await _getAuthHeaders(),
+      );
+
+      return response.data['success'] == true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FavoritesService] Erreur ajout favoris: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Retirer un voyage des favoris
+  Future<bool> removeFromFavorites(String tripId) async {
+    try {
+      if (kDebugMode) {
+        print('[FavoritesService] Suppression des favoris: $tripId');
+      }
+
+      final response = await _dio.delete(
+        '/trips/$tripId/favorite',
+        options: await _getAuthHeaders(),
+      );
+
+      if (kDebugMode) {
+        print('[FavoritesService] Réponse suppression favoris: ${response.data}');
+      }
+
+      return response.data['success'] == true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FavoritesService] Erreur suppression favoris: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Vérifier si un voyage est en favoris
+  Future<bool> isFavorite(String tripId) async {
+    try {
+      final response = await _dio.get(
+        '/trips/$tripId/favorite/status',
+        options: await _getAuthHeaders(),
+      );
+
+      return response.data['success'] == true && 
+             response.data['is_favorite'] == true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FavoritesService] Erreur vérification favoris: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Récupérer la liste des voyages favoris
+  Future<List<Trip>> getFavoriteTrips() async {
+    try {
+      final response = await _dio.get(
+        '/trips/favorites',
+        options: await _getAuthHeaders(),
+      );
+
+      if (response.data['success'] == true) {
+        final tripsData = response.data['data'] as List;
+        return tripsData.map((tripJson) => Trip.fromJson(tripJson)).toList();
+      }
+
+      return [];
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FavoritesService] Erreur récupération favoris: $e');
+      }
+      return [];
+    }
+  }
+
+  /// Basculer l'état favoris d'un voyage
+  Future<bool> toggleFavorite(String tripId) async {
+    try {
+      final isFav = await isFavorite(tripId);
+      
+      if (isFav) {
+        return await removeFromFavorites(tripId);
+      } else {
+        return await addToFavorites(tripId);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FavoritesService] Erreur toggle favoris: $e');
+      }
+      return false;
+    }
+  }
+}

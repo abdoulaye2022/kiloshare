@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
+import '../services/favorites_service.dart';
+import '../../../widgets/ellipsis_button.dart';
 import '../../auth/services/auth_service.dart';
 
 class TripDetailsFinal extends StatefulWidget {
@@ -25,6 +27,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   String? _currentUserId;
   bool _isOwner = false;
   bool _hasLoaded = false;
+  bool _isFavorite = false;
 
   @override
   void initState() {
@@ -75,12 +78,24 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       print('TripDetailsFinal: - Departure: ${trip.departureCity} → ${trip.arrivalCity}');
       print('=== TRIP DETAILS DEBUG SUCCESS ===');
       
+      // Check favorite status if authenticated and not owner
+      bool isFavorite = false;
+      if (isAuth && userId != null && trip.userId != userId) {
+        try {
+          isFavorite = await FavoritesService.instance.isFavorite(widget.tripId);
+          print('TripDetailsFinal: Trip is favorite: $isFavorite');
+        } catch (e) {
+          print('TripDetailsFinal: Error checking favorite status: $e');
+        }
+      }
+      
       if (mounted) {
         setState(() {
           _isAuthenticated = isAuth;
           _currentUserId = userId;
           _trip = trip;
           _isOwner = trip.userId == userId;
+          _isFavorite = isFavorite;
           _isLoading = false;
           _error = null;
         });
@@ -719,10 +734,10 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _saveTrip(),
-            icon: const Icon(Icons.bookmark_border),
-            label: const Text('Sauvegarder'),
+          child: EllipsisButton.outlined(
+            onPressed: () => _toggleFavorite(),
+            icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
+            text: _isFavorite ? 'Favoris ✓' : 'Favoris',
           ),
         ),
       ],
@@ -889,8 +904,33 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     _showMessage('Fonctionnalité de contact bientôt disponible', Colors.blue);
   }
 
-  void _saveTrip() {
-    _showMessage('Voyage sauvegardé', Colors.green);
+  void _toggleFavorite() async {
+    if (!_isAuthenticated) {
+      _showMessage('Veuillez vous connecter pour ajouter aux favoris', Colors.orange);
+      return;
+    }
+    
+    if (_isOwner) {
+      _showMessage('Vous ne pouvez pas ajouter votre propre voyage aux favoris', Colors.orange);
+      return;
+    }
+    
+    try {
+      final success = await FavoritesService.instance.toggleFavorite(widget.tripId);
+      if (success) {
+        setState(() {
+          _isFavorite = !_isFavorite;
+        });
+        _showMessage(
+          _isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris', 
+          Colors.green
+        );
+      } else {
+        _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
+      }
+    } catch (e) {
+      _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
+    }
   }
 
   void _showMessage(String message, Color color) {
