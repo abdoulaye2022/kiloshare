@@ -6,20 +6,26 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Modules\Trips\Services\TripService;
 use App\Modules\Trips\Services\TripImageService;
+use KiloShare\Services\CloudinaryService;
 use Psr\Log\LoggerInterface;
+use PDO;
 use Exception;
 
 class TripController
 {
     private TripService $tripService;
     private TripImageService $tripImageService;
+    private CloudinaryService $cloudinaryService;
     private LoggerInterface $logger;
+    private PDO $db;
 
-    public function __construct(TripService $tripService, TripImageService $tripImageService, LoggerInterface $logger)
+    public function __construct(TripService $tripService, TripImageService $tripImageService, CloudinaryService $cloudinaryService, LoggerInterface $logger, PDO $db)
     {
         $this->tripService = $tripService;
         $this->tripImageService = $tripImageService;
+        $this->cloudinaryService = $cloudinaryService;
         $this->logger = $logger;
+        $this->db = $db;
     }
 
     private function jsonResponse(Response $response, array $data, int $status = 200): Response
@@ -156,6 +162,7 @@ class TripController
             // If not owner (authenticated or not), only allow access to approved and active/published trips
             else {
                 $allowedStatuses = ['active', 'published'];
+                // Trip must be approved AND have an allowed status to be publicly visible
                 if (!$trip->getIsApproved() || !in_array($trip->getStatus(), $allowedStatuses)) {
                     return $this->error($response, 'Trip not found', 404);
                 }
@@ -878,7 +885,7 @@ class TripController
     }
 
     /**
-     * Upload images for a trip
+     * Upload images for a trip using Cloudinary
      * POST /api/v1/trips/{id}/images
      */
     public function uploadTripImages(Request $request, Response $response, array $args): Response
@@ -886,14 +893,19 @@ class TripController
         try {
             $tripId = (int) $args['id'];
             $user = $request->getAttribute('user');
+            $userId = is_array($user) && isset($user['id']) ? (int)$user['id'] : null;
             
             if (!$tripId) {
                 return $this->error($response, 'Trip ID is required', 400);
             }
 
+            if (!$userId) {
+                return $this->error($response, 'User authentication required', 401);
+            }
+
             // Verify trip ownership
             $trip = $this->tripService->getTripById($tripId);
-            if (!$trip || $trip->getUserId() != $user['id']) {
+            if (!$trip || $trip->getUserId() != $userId) {
                 return $this->error($response, 'Trip not found or access denied', 404);
             }
 
@@ -908,49 +920,76 @@ class TripController
                 $images = [$images];
             }
 
-            // Convert PSR-7 UploadedFiles to array format for processing
-            $filesArray = [];
+            // Filter valid uploads
+            $validImages = [];
             foreach ($images as $uploadedFile) {
                 if ($uploadedFile->getError() === UPLOAD_ERR_OK) {
-                    $tempFile = tempnam(sys_get_temp_dir(), 'trip_image');
-                    $uploadedFile->moveTo($tempFile);
-                    
-                    $filesArray[] = [
-                        'name' => $uploadedFile->getClientFilename(),
-                        'tmp_name' => $tempFile,
-                        'size' => $uploadedFile->getSize(),
-                        'error' => $uploadedFile->getError(),
-                        'type' => $uploadedFile->getClientMediaType()
-                    ];
+                    $validImages[] = $uploadedFile;
                 }
             }
 
-            if (empty($filesArray)) {
+            if (empty($validImages)) {
                 return $this->error($response, 'No valid images to upload', 400);
             }
 
-            $uploadedImages = $this->tripImageService->uploadTripImages($tripId, $filesArray);
-            
-            // Clean up temp files
-            foreach ($filesArray as $file) {
-                if (file_exists($file['tmp_name'])) {
-                    unlink($file['tmp_name']);
-                }
+            // Limit to 5 photos per trip
+            if (count($validImages) > 5) {
+                return $this->error($response, 'Maximum 5 photos per trip', 400);
             }
+
+            $this->logger->info('[TripController] Upload trip photos via Cloudinary', [
+                'user_id' => $userId,
+                'trip_id' => $tripId,
+                'photo_count' => count($validImages)
+            ]);
+
+            // Upload to Cloudinary using the new service
+            $result = $this->cloudinaryService->uploadMultipleImages(
+                $validImages,
+                'trip_photo',
+                $userId,
+                [
+                    'related_entity_type' => 'trip',
+                    'related_entity_id' => $tripId,
+                    'additional_tags' => ['trip_' . $tripId, 'travel', 'user_' . $userId]
+                ]
+            );
+
+            $successfulUploads = array_filter($result['results'], function($r) {
+                return $r['success'] === true;
+            });
+
+            // Format response to match mobile expectations
+            $uploadedImages = array_map(function($upload, $index) use ($tripId) {
+                return [
+                    'id' => $upload['local_data']['id'],
+                    'trip_id' => $tripId,
+                    'image_path' => '', // Not used with Cloudinary
+                    'image_name' => basename($upload['cloudinary_data']['public_id']),
+                    'image_url' => $upload['cloudinary_data']['secure_url'],
+                    'file_size' => $upload['cloudinary_data']['bytes'],
+                    'formatted_file_size' => $this->formatBytes($upload['cloudinary_data']['bytes']),
+                    'mime_type' => 'image/' . $upload['cloudinary_data']['format'],
+                    'upload_order' => $index + 1,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ];
+            }, $successfulUploads, array_keys($successfulUploads));
             
             return $this->success($response, [
-                'message' => 'Images uploaded successfully',
-                'images' => $uploadedImages
+                'message' => 'Images uploaded successfully to Cloudinary',
+                'images' => $uploadedImages,
+                'summary' => $result['summary']
             ]);
             
         } catch (Exception $e) {
-            $this->logger->error('Failed to upload trip images: ' . $e->getMessage());
+            $this->logger->error('[TripController] Failed to upload trip images to Cloudinary: ' . $e->getMessage());
             return $this->error($response, $e->getMessage());
         }
     }
 
     /**
-     * Get images for a trip
+     * Get images for a trip (from Cloudinary)
      * GET /api/v1/trips/{id}/images
      */
     public function getTripImages(Request $request, Response $response, array $args): Response
@@ -962,15 +1001,41 @@ class TripController
                 return $this->error($response, 'Trip ID is required', 400);
             }
 
-            $images = $this->tripImageService->getTripImages($tripId);
-            $imagesArray = array_map(fn($img) => $img->toArray(), $images);
+            // Get images from Cloudinary image_uploads table
+            $stmt = $this->db->prepare("
+                SELECT * FROM image_uploads 
+                WHERE image_type = 'trip_photo' 
+                AND related_entity_type = 'trip' 
+                AND related_entity_id = ? 
+                AND deleted_at IS NULL
+                ORDER BY created_at ASC
+            ");
+            $stmt->execute([$tripId]);
+            $cloudinaryImages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Format images to match mobile expectations
+            $imagesArray = array_map(function($img, $index) {
+                return [
+                    'id' => $img['id'],
+                    'trip_id' => $img['related_entity_id'],
+                    'image_path' => '', // Not used with Cloudinary
+                    'image_name' => basename($img['cloudinary_public_id']),
+                    'image_url' => $img['cloudinary_secure_url'],
+                    'file_size' => $img['file_size'],
+                    'formatted_file_size' => $this->formatBytes($img['file_size']),
+                    'mime_type' => 'image/' . $img['format'],
+                    'upload_order' => $index + 1,
+                    'created_at' => $img['created_at'],
+                    'updated_at' => $img['updated_at'],
+                ];
+            }, $cloudinaryImages, array_keys($cloudinaryImages));
             
             return $this->success($response, [
                 'images' => $imagesArray
             ]);
             
         } catch (Exception $e) {
-            $this->logger->error('Failed to get trip images: ' . $e->getMessage());
+            $this->logger->error('[TripController] Failed to get trip images from Cloudinary: ' . $e->getMessage());
             return $this->error($response, $e->getMessage());
         }
     }
@@ -1006,5 +1071,15 @@ class TripController
             $this->logger->error('Failed to delete trip image: ' . $e->getMessage());
             return $this->error($response, $e->getMessage());
         }
+    }
+
+    /**
+     * Format bytes to human readable format
+     */
+    private function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $power = $bytes > 0 ? floor(log($bytes, 1024)) : 0;
+        return number_format($bytes / pow(1024, $power), 2, '.', '') . ' ' . $units[$power];
     }
 }

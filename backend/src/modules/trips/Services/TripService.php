@@ -718,13 +718,13 @@ class TripService
         try {
             $this->db->beginTransaction();
 
-            // Update trip status
+            // Update trip status and approval
             $stmt = $this->db->prepare("
                 UPDATE trips 
-                SET status = 'published', updated_at = NOW()
+                SET status = 'active', is_approved = 1, moderated_by = ?, updated_at = NOW()
                 WHERE id = ? OR uuid = ?
             ");
-            $stmt->execute([$tripId, $tripId]);
+            $stmt->execute([$adminId, $tripId, $tripId]);
 
             if ($stmt->rowCount() === 0) {
                 throw new Exception('Trip not found');
@@ -899,15 +899,24 @@ class TripService
             $this->db->beginTransaction();
 
             // Determine target status based on auto-approval logic
-            $status = $trip->getAutoApproved() ? 'active' : 'pending_review';
+            if ($trip->getAutoApproved()) {
+                $status = 'active';
+                $isApproved = true;
+                $moderatedBy = null; // Auto-approved, no moderator
+            } else {
+                $status = 'pending_review';
+                $isApproved = false;
+                $moderatedBy = null;
+            }
+            
             $publishedAt = date('Y-m-d H:i:s');
 
             $stmt = $this->db->prepare("
                 UPDATE trips 
-                SET status = ?, published_at = ?, updated_at = NOW()
+                SET status = ?, published_at = ?, is_approved = ?, moderated_by = ?, updated_at = NOW()
                 WHERE id = ?
             ");
-            $stmt->execute([$status, $publishedAt, $tripId]);
+            $stmt->execute([$status, $publishedAt, $isApproved ? 1 : 0, $moderatedBy, $tripId]);
 
             $this->db->commit();
             return $this->getTripById($tripId);

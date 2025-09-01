@@ -8,6 +8,7 @@ import '../bloc/profile_state.dart';
 import '../widgets/profile_info_tab.dart';
 import '../widgets/verification_tab.dart';
 import '../widgets/trust_badge_widget.dart';
+import '../../auth/services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,14 +19,24 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
   late TabController _tabController;
+  bool _isAuthenticated = false;
   
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _checkAuthentication();
     
     // Load profile data when screen initializes
     context.read<ProfileBloc>().add(const GetUserProfile());
+  }
+  
+  void _checkAuthentication() async {
+    final authService = AuthService.instance;
+    final isAuth = await authService.isAuthenticated();
+    setState(() {
+      _isAuthenticated = isAuth;
+    });
   }
 
   @override
@@ -210,11 +221,17 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/edit-profile'),
-              icon: const Icon(Icons.add),
-              label: const Text('Créer mon profil'),
-            ),
+            _isAuthenticated
+                ? ElevatedButton.icon(
+                    onPressed: () => context.go('/edit-profile'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Créer mon profil'),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: () => context.go('/auth/login'),
+                    icon: const Icon(Icons.login),
+                    label: const Text('Se connecter'),
+                  ),
           ],
         ),
       ),
@@ -346,10 +363,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 background: _buildProfileHeader(context, profile, state.verificationStatus),
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => context.go('/edit-profile'),
-                ),
+                if (_isAuthenticated)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () => context.go('/edit-profile'),
+                  ),
+                if (!_isAuthenticated)
+                  IconButton(
+                    icon: const Icon(Icons.login),
+                    onPressed: () => context.go('/auth/login'),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
@@ -383,7 +406,10 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           children: [
             ProfileInfoTab(
               profile: profile,
-              onEdit: () => context.go('/edit-profile'),
+              isAuthenticated: _isAuthenticated,
+              onEdit: _isAuthenticated 
+                  ? () => context.go('/edit-profile')
+                  : () => context.go('/auth/login'),
             ),
             VerificationTab(
               profile: profile,

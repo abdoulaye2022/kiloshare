@@ -84,6 +84,13 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    \KiloShare\Services\CloudinaryService::class => function ($container) {
+        return new \KiloShare\Services\CloudinaryService(
+            $container->get(PDO::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
     \KiloShare\Services\SocialAuthService::class => function ($container) {
         return new \KiloShare\Services\SocialAuthService(
             $container->get(\KiloShare\Models\User::class),
@@ -121,6 +128,20 @@ $containerBuilder->addDefinitions([
         );
     },
     
+    \KiloShare\Controllers\ImageController::class => function ($container) {
+        return new \KiloShare\Controllers\ImageController(
+            $container->get(\KiloShare\Services\CloudinaryService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
+    \KiloShare\Controllers\CloudinaryMonitoringController::class => function ($container) {
+        return new \KiloShare\Controllers\CloudinaryMonitoringController(
+            $container->get(\KiloShare\Services\CloudinaryService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
     // Profile services
     \App\Services\FtpUploadService::class => function ($container) {
         return new \App\Services\FtpUploadService();
@@ -135,6 +156,15 @@ $containerBuilder->addDefinitions([
     \App\Modules\Profile\Controllers\ProfileController::class => function ($container) {
         return new \App\Modules\Profile\Controllers\ProfileController(
             $container->get(\App\Modules\Profile\Services\ProfileService::class),
+            $container->get(\App\Services\FtpUploadService::class),
+            $container->get(Psr\Log\LoggerInterface::class)
+        );
+    },
+    
+    // New UserProfileController (direct users table access)
+    \KiloShare\Controllers\UserProfileController::class => function ($container) {
+        return new \KiloShare\Controllers\UserProfileController(
+            $container->get(\KiloShare\Models\User::class),
             $container->get(\App\Services\FtpUploadService::class),
             $container->get(Psr\Log\LoggerInterface::class)
         );
@@ -164,7 +194,9 @@ $containerBuilder->addDefinitions([
         return new \App\Modules\Trips\Controllers\TripController(
             $container->get(\App\Modules\Trips\Services\TripService::class),
             $container->get(\App\Modules\Trips\Services\TripImageService::class),
-            $container->get(Psr\Log\LoggerInterface::class)
+            $container->get(\KiloShare\Services\CloudinaryService::class),
+            $container->get(Psr\Log\LoggerInterface::class),
+            $container->get(PDO::class)
         );
     },
     

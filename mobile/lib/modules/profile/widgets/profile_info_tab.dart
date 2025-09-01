@@ -6,11 +6,13 @@ import 'trust_badge_widget.dart';
 class ProfileInfoTab extends StatelessWidget {
   final UserProfile profile;
   final VoidCallback onEdit;
+  final bool isAuthenticated;
 
   const ProfileInfoTab({
     super.key,
     required this.profile,
     required this.onEdit,
+    this.isAuthenticated = true,
   });
 
   @override
@@ -321,8 +323,8 @@ class ProfileInfoTab extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onEdit,
-        icon: const Icon(Icons.edit),
-        label: const Text('Modifier le profil'),
+        icon: Icon(isAuthenticated ? Icons.edit : Icons.login),
+        label: Text(isAuthenticated ? 'Modifier le profil' : 'Se connecter'),
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 12),
         ),
