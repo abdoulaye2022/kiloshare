@@ -3,6 +3,19 @@
 
 # Local Configuration
 /api/v1/.env
+.env
+.env.*
+!.env.example
+
+# Fichiers avec clés secrètes
+*secret*.md
+*key*.md
+*token*.md
+*api*.md
+*auth*.md
+STRIPE_*.md
+FIREBASE_*.md
+DATABASE_*.md
 
 # Claude Code
 .claude_session/
@@ -12,11 +25,27 @@
 # Backend
 backend/vendor/
 backend/.env
+backend/.env.*
+backend/*secret*.md
+backend/*key*.md
+
+# Web (Next.js)
+web/.env
+web/.env.*
+web/*secret*.md
+web/*key*.md
+web/node_modules/
+web/.next/
+web/out/
 
 # Mobile
 mobile/build/
 mobile/.dart_tool/
 mobile/.flutter-plugins*
+mobile/.env
+mobile/.env.*
+mobile/*secret*.md
+mobile/*key*.md
 
 # Database
 *.sql.backup
