@@ -37,11 +37,7 @@ interface ConnectedAccount {
   };
 }
 
-interface ConnectedAccountsManagementProps {
-  adminInfo: any;
-}
-
-export default function ConnectedAccountsManagement({ adminInfo }: ConnectedAccountsManagementProps) {
+export default function ConnectedAccountsManagement() {
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'pending' | 'restricted' | 'rejected'>('all');
@@ -63,7 +59,8 @@ export default function ConnectedAccountsManagement({ adminInfo }: ConnectedAcco
       
       if (response.ok) {
         const data = await response.json();
-        setAccounts(data.accounts || []);
+        console.log('Connected accounts API response:', data);
+        setAccounts(data.data?.accounts || []);
       } else {
         console.error('Failed to fetch connected accounts');
       }
@@ -80,7 +77,8 @@ export default function ConnectedAccountsManagement({ adminInfo }: ConnectedAcco
       
       if (response.ok) {
         const data = await response.json();
-        setStats(data.stats);
+        console.log('Connected accounts stats API response:', data);
+        setStats(data.data?.stats);
       }
     } catch (error) {
       console.error('Error fetching connected accounts stats:', error);
@@ -89,8 +87,9 @@ export default function ConnectedAccountsManagement({ adminInfo }: ConnectedAcco
 
   const handleAccountAction = async (accountId: string, action: 'enable' | 'disable' | 'review') => {
     try {
-      const response = await adminAuth.apiRequest(`/api/v1/admin/stripe/connected-accounts/${accountId}/${action}`, {
+      const response = await adminAuth.apiRequest(`/api/v1/admin/stripe/connected-accounts/${accountId}/action`, {
         method: 'POST',
+        body: JSON.stringify({ action: action })
       });
 
       if (response.ok) {

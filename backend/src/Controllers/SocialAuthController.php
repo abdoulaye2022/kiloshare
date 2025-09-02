@@ -4,384 +4,282 @@ declare(strict_types=1);
 
 namespace KiloShare\Controllers;
 
-use KiloShare\Services\SocialAuthService;
-use Psr\Http\Message\ResponseInterface as Response;
-use Psr\Http\Message\ServerRequestInterface as Request;
+use KiloShare\Models\User;
+use KiloShare\Utils\Response;
+use KiloShare\Utils\Validator;
+use KiloShare\Utils\JWTHelper;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Carbon\Carbon;
 
 class SocialAuthController
 {
-    private SocialAuthService $socialAuthService;
-
-    public function __construct(SocialAuthService $socialAuthService)
+    public function googleAuth(ServerRequestInterface $request): ResponseInterface
     {
-        $this->socialAuthService = $socialAuthService;
-    }
+        $data = json_decode($request->getBody()->getContents(), true);
 
-    /**
-     * Authenticate with Google
-     * POST /api/v1/auth/google
-     */
-    public function googleAuth(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-
-            if (empty($data['access_token'])) {
-                throw new \RuntimeException('Google access token is required', 400);
-            }
-
-            $result = $this->socialAuthService->authenticateWithGoogle($data['access_token']);
-
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => $result['is_new_user'] ? 'Account created with Google' : 'Logged in with Google',
-                'data' => [
-                    'user' => $result['user'],
-                    'tokens' => $result['tokens'],
-                    'is_new_user' => $result['is_new_user']
-                ]
-            ]));
-
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'GOOGLE_AUTH_FAILED'
-            ]));
-
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Google authentication failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-
-    /**
-     * Authenticate with Firebase (Google, Apple, etc.)
-     * POST /api/v1/auth/firebase
-     */
-    public function firebaseAuth(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-
-            if (empty($data['firebase_token'])) {
-                throw new \RuntimeException('Firebase token is required', 400);
-            }
-
-            // For now, simulate Firebase token verification
-            // In production, use Firebase Admin SDK to verify the token
-            $firebaseToken = $data['firebase_token'];
-            
-            // Mock user data from Firebase token
-            $mockUser = [
-                'id' => 'firebase_user_123',
-                'email' => 'user@example.com',
-                'first_name' => 'Firebase',
-                'last_name' => 'User',
-                'profile_picture' => null,
-                'verified_email' => true
-            ];
-
-            // Simplified Firebase auth - just return mock success for now
-            $result = [
-                'user' => [
-                    'id' => 'firebase_123',
-                    'email' => 'firebase.user@example.com',
-                    'first_name' => 'Firebase',
-                    'last_name' => 'User',
-                    'is_verified' => true
-                ],
-                'tokens' => [
-                    'access_token' => 'mock_access_token_firebase',
-                    'refresh_token' => 'mock_refresh_token_firebase',
-                    'token_type' => 'bearer',
-                    'expires_in' => 3600
-                ],
-                'is_new_user' => false
-            ];
-
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => $result['is_new_user'] ? 'Account created with Firebase' : 'Logged in with Firebase',
-                'data' => [
-                    'user' => $result['user'],
-                    'tokens' => $result['tokens'],
-                    'is_new_user' => $result['is_new_user']
-                ]
-            ]));
-
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'FIREBASE_AUTH_FAILED'
-            ]));
-
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Firebase authentication failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    /**
-     * Authenticate with Apple
-     * POST /api/v1/auth/apple
-     */
-    public function appleAuth(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-
-            if (empty($data['id_token'])) {
-                throw new \RuntimeException('Apple ID token is required', 400);
-            }
-
-            $result = $this->socialAuthService->authenticateWithApple($data['id_token']);
-
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => $result['is_new_user'] ? 'Account created with Apple' : 'Logged in with Apple',
-                'data' => [
-                    'user' => $result['user'],
-                    'tokens' => $result['tokens'],
-                    'is_new_user' => $result['is_new_user']
-                ]
-            ]));
-
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'APPLE_AUTH_FAILED'
-            ]));
-
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Apple authentication failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    /**
-     * Get available social providers
-     * GET /api/v1/auth/social/providers
-     */
-    public function getProviders(Request $request, Response $response): Response
-    {
-        $providers = [
-            'google' => [
-                'name' => 'Google',
-                'enabled' => !empty($_ENV['GOOGLE_CLIENT_ID']),
-                'icon' => 'google',
-                'color' => '#4285f4'
-            ],
-            'apple' => [
-                'name' => 'Apple',
-                'enabled' => !empty($_ENV['APPLE_CLIENT_ID']),
-                'icon' => 'apple',
-                'color' => '#000000'
-            ]
+        $validator = new Validator();
+        $rules = [
+            'id_token' => Validator::required()->stringType(),
+            'email' => Validator::required()->email(),
+            'name' => Validator::required()->stringType(),
+            'picture' => Validator::optional(Validator::stringType()),
         ];
 
-        $response->getBody()->write(json_encode([
-            'success' => true,
-            'data' => [
-                'providers' => array_filter($providers, fn($provider) => $provider['enabled'])
-            ]
-        ]));
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
 
-        return $response
-            ->withStatus(200)
-            ->withHeader('Content-Type', 'application/json');
-    }
-
-    /**
-     * Link social account to existing user
-     * POST /api/v1/auth/social/link
-     */
-    public function linkSocialAccount(Request $request, Response $response): Response
-    {
         try {
-            $user = $request->getAttribute('user');
-            $data = $request->getParsedBody() ?? [];
+            // TODO: Vérifier le token Google avec l'API Google
+            // Pour l'instant, on fait confiance au token fourni par Flutter
 
-            if (empty($data['provider']) || empty($data['access_token'])) {
-                throw new \RuntimeException('Provider and access token are required', 400);
+            $email = $data['email'];
+            $name = $data['name'];
+            $picture = $data['picture'] ?? null;
+            
+            // Diviser le nom complet
+            $nameParts = explode(' ', trim($name), 2);
+            $firstName = $nameParts[0];
+            $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
+
+            // Chercher l'utilisateur existant
+            $user = User::where('email', $email)->first();
+
+            if ($user) {
+                // Utilisateur existant - mise à jour des infos sociales
+                $user->social_provider = 'google';
+                $user->social_id = $data['id_token']; // Utiliser une partie du token comme ID
+                if (!$user->profile_picture && $picture) {
+                    $user->profile_picture = $picture;
+                }
+                $user->last_login_at = Carbon::now();
+                $user->save();
+            } else {
+                // Nouvel utilisateur - création
+                $user = User::create([
+                    'email' => $email,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'profile_picture' => $picture,
+                    'social_provider' => 'google',
+                    'social_id' => $data['id_token'],
+                    'email_verified_at' => Carbon::now(), // Les comptes Google sont déjà vérifiés
+                    'last_login_at' => Carbon::now(),
+                    'status' => 'active',
+                    'role' => 'user',
+                    'is_verified' => true,
+                ]);
             }
 
-            // This would link a social account to existing user
-            // Implementation depends on your database schema
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Social account linked successfully'
-            ]));
+            // Générer les tokens JWT
+            $accessToken = JWTHelper::generateAccessToken($user);
+            $refreshToken = JWTHelper::generateRefreshToken($user);
 
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'SOCIAL_LINK_FAILED'
-            ]));
-
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::success([
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+                'token_type' => 'Bearer',
+                'expires_in' => 3600,
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'full_name' => $user->full_name,
+                    'profile_picture' => $user->profile_picture,
+                    'is_verified' => $user->is_verified,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                ]
+            ], 'Google authentication successful');
 
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to link social account',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Google authentication failed: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Unlink social account
-     * DELETE /api/v1/auth/social/unlink/{provider}
-     */
-    public function unlinkSocialAccount(Request $request, Response $response, array $args): Response
+    public function appleAuth(ServerRequestInterface $request): ResponseInterface
     {
-        try {
-            $user = $request->getAttribute('user');
-            $provider = $args['provider'] ?? '';
+        $data = json_decode($request->getBody()->getContents(), true);
 
-            if (empty($provider)) {
-                throw new \RuntimeException('Provider is required', 400);
+        $validator = new Validator();
+        $rules = [
+            'identity_token' => Validator::required()->stringType(),
+            'email' => Validator::optional(Validator::email()),
+            'name' => Validator::optional(Validator::stringType()),
+            'user_identifier' => Validator::required()->stringType(),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
+
+        try {
+            // TODO: Vérifier le token Apple avec l'API Apple
+            // Pour l'instant, on fait confiance au token fourni par Flutter
+
+            $userIdentifier = $data['user_identifier'];
+            $email = $data['email'] ?? null;
+            $name = $data['name'] ?? null;
+
+            // Chercher l'utilisateur existant par social_id (Apple ID)
+            $user = User::where('social_provider', 'apple')
+                       ->where('social_id', $userIdentifier)
+                       ->first();
+
+            // Si pas trouvé par social_id et email fourni, chercher par email
+            if (!$user && $email) {
+                $user = User::where('email', $email)->first();
             }
 
-            // This would unlink a social account from user
-            // Implementation depends on your database schema
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Social account unlinked successfully'
-            ]));
+            if ($user) {
+                // Utilisateur existant
+                $user->social_provider = 'apple';
+                $user->social_id = $userIdentifier;
+                $user->last_login_at = Carbon::now();
+                $user->save();
+            } else {
+                // Nouvel utilisateur
+                if (!$email) {
+                    return Response::error('Email is required for new Apple Sign In users');
+                }
 
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
+                $nameParts = $name ? explode(' ', trim($name), 2) : ['Apple', 'User'];
+                $firstName = $nameParts[0];
+                $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
 
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
+                $user = User::create([
+                    'email' => $email,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'social_provider' => 'apple',
+                    'social_id' => $userIdentifier,
+                    'email_verified_at' => Carbon::now(), // Les comptes Apple sont déjà vérifiés
+                    'last_login_at' => Carbon::now(),
+                    'status' => 'active',
+                    'role' => 'user',
+                    'is_verified' => true,
+                ]);
+            }
 
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'SOCIAL_UNLINK_FAILED'
-            ]));
+            // Générer les tokens JWT
+            $accessToken = JWTHelper::generateAccessToken($user);
+            $refreshToken = JWTHelper::generateRefreshToken($user);
 
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::success([
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+                'token_type' => 'Bearer',
+                'expires_in' => 3600,
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'full_name' => $user->full_name,
+                    'profile_picture' => $user->profile_picture,
+                    'is_verified' => $user->is_verified,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                ]
+            ], 'Apple authentication successful');
 
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to unlink social account',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Apple authentication failed: ' . $e->getMessage());
         }
     }
 
-    private function getStatusCodeFromMessage(string $message): int
+    public function facebookAuth(ServerRequestInterface $request): ResponseInterface
     {
-        if (str_contains($message, 'required') || str_contains($message, 'Invalid')) {
-            return 400; // Bad Request
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        $validator = new Validator();
+        $rules = [
+            'access_token' => Validator::required()->stringType(),
+            'email' => Validator::required()->email(),
+            'name' => Validator::required()->stringType(),
+            'id' => Validator::required()->stringType(),
+            'picture' => Validator::optional(Validator::stringType()),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
         }
 
-        if (str_contains($message, 'unauthorized') || str_contains($message, 'token')) {
-            return 401; // Unauthorized
-        }
+        try {
+            // TODO: Vérifier le token Facebook avec l'API Facebook
 
-        if (str_contains($message, 'not found')) {
-            return 404; // Not Found
-        }
+            $email = $data['email'];
+            $name = $data['name'];
+            $facebookId = $data['id'];
+            $picture = $data['picture'] ?? null;
+            
+            $nameParts = explode(' ', trim($name), 2);
+            $firstName = $nameParts[0];
+            $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
 
-        return 500; // Internal Server Error
+            // Chercher l'utilisateur existant
+            $user = User::where('email', $email)
+                       ->orWhere(function($query) use ($facebookId) {
+                           $query->where('social_provider', 'facebook')
+                                 ->where('social_id', $facebookId);
+                       })
+                       ->first();
+
+            if ($user) {
+                // Utilisateur existant
+                $user->social_provider = 'facebook';
+                $user->social_id = $facebookId;
+                if (!$user->profile_picture && $picture) {
+                    $user->profile_picture = $picture;
+                }
+                $user->last_login_at = Carbon::now();
+                $user->save();
+            } else {
+                // Nouvel utilisateur
+                $user = User::create([
+                    'email' => $email,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'profile_picture' => $picture,
+                    'social_provider' => 'facebook',
+                    'social_id' => $facebookId,
+                    'email_verified_at' => Carbon::now(),
+                    'last_login_at' => Carbon::now(),
+                    'status' => 'active',
+                    'role' => 'user',
+                    'is_verified' => true,
+                ]);
+            }
+
+            // Générer les tokens JWT
+            $accessToken = JWTHelper::generateAccessToken($user);
+            $refreshToken = JWTHelper::generateRefreshToken($user);
+
+            return Response::success([
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+                'token_type' => 'Bearer',
+                'expires_in' => 3600,
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'full_name' => $user->full_name,
+                    'profile_picture' => $user->profile_picture,
+                    'is_verified' => $user->is_verified,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                ]
+            ], 'Facebook authentication successful');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Facebook authentication failed: ' . $e->getMessage());
+        }
     }
 }

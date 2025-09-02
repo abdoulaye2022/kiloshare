@@ -27,6 +27,7 @@ export const AUTH_ENDPOINTS = {
   
   // Authentification admin
   ADMIN_LOGIN: `${API_URL}/admin/auth/login`,
+  ADMIN_ME: `${API_URL}/admin/auth/me`,
 } as const;
 
 /**

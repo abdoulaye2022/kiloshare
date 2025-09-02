@@ -1,4 +1,4 @@
-import { AUTH_ENDPOINTS, getDefaultHeaders } from './api-config';
+import { AUTH_ENDPOINTS, getDefaultHeaders, API_BASE_URL } from './api-config';
 
 class AdminAuthService {
   private static instance: AdminAuthService;
@@ -112,13 +112,16 @@ class AdminAuthService {
       throw new Error('No valid token available');
     }
 
+    // Construire l'URL complète si c'est un chemin relatif
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+
     const headers = {
       ...options.headers,
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, {
+    const response = await fetch(fullUrl, {
       ...options,
       headers,
     });

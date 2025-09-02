@@ -151,7 +151,7 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
           console.log('✅ Token found, verifying with backend...');
           
           // Validate token with backend API
-          const response = await fetch(AUTH_ENDPOINTS.ME, {
+          const response = await fetch(AUTH_ENDPOINTS.ADMIN_ME, {
             method: 'GET',
             headers: getDefaultHeaders(token)
           });

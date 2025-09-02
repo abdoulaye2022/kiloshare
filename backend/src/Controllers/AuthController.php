@@ -4,931 +4,345 @@ declare(strict_types=1);
 
 namespace KiloShare\Controllers;
 
-use KiloShare\Services\AuthService;
-use Psr\Http\Message\ResponseInterface as Response;
-use Psr\Http\Message\ServerRequestInterface as Request;
-use Respect\Validation\Validator as v;
-use Respect\Validation\Exceptions\ValidationException;
+use Firebase\JWT\JWT;
+use KiloShare\Models\User;
+use KiloShare\Models\UserToken;
+use KiloShare\Utils\Response;
+use KiloShare\Utils\Validator;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Ramsey\Uuid\Uuid;
+use Carbon\Carbon;
 
 class AuthController
 {
-    private AuthService $authService;
+    private array $jwtConfig;
 
-    public function __construct(AuthService $authService)
+    public function __construct()
     {
-        $this->authService = $authService;
+        $settings = require __DIR__ . '/../../config/settings.php';
+        $this->jwtConfig = $settings['jwt'];
     }
 
-    public function register(Request $request, Response $response): Response
+    public function register(ServerRequestInterface $request): ResponseInterface
     {
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        // Validation des données
+        $validator = new Validator();
+        $rules = [
+            'email' => Validator::required()->email(),
+            'password' => Validator::password(),
+            'first_name' => Validator::required()->stringType()->length(2, 50),
+            'last_name' => Validator::required()->stringType()->length(2, 50),
+            'phone' => Validator::optional(Validator::phone()),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
+
         try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-                error_log('Raw body: ' . $rawBody);
-                error_log('Decoded data: ' . json_encode($data));
+            // Vérifier si l'email existe déjà
+            if (User::withEmail($data['email'])->exists()) {
+                return Response::error('Email already registered', [], 409);
             }
-            
-            // Validate input
-            $this->validateRegistrationInput($data);
-            
-            // Register user
-            $result = $this->authService->register($data);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'User registered successfully',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(201)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'REGISTRATION_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
+
+            // Vérifier si le téléphone existe déjà
+            if (!empty($data['phone']) && User::withPhone($data['phone'])->exists()) {
+                return Response::error('Phone number already registered', [], 409);
+            }
+
+            // Créer l'utilisateur
+            $user = User::create([
+                'uuid' => Uuid::uuid4()->toString(),
+                'email' => $data['email'],
+                'password_hash' => password_hash($data['password'], PASSWORD_ARGON2ID),
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'phone' => $data['phone'] ?? null,
+                'status' => 'active',
+                'role' => 'user',
+            ]);
+
+            // Générer les tokens
+            $tokens = $this->generateTokens($user);
+
+            // Stocker le refresh token
+            UserToken::create([
+                'user_id' => $user->id,
+                'token' => $tokens['refresh_token'],
+                'type' => 'refresh',
+                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+            ]);
+
+            return Response::created([
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'is_verified' => $user->is_verified,
+                ],
+                'tokens' => $tokens
+            ], 'User registered successfully');
+
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Registration failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Registration failed: ' . $e->getMessage());
         }
     }
 
-    public function login(Request $request, Response $response): Response
+    public function login(ServerRequestInterface $request): ResponseInterface
     {
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        // Validation
+        $validator = new Validator();
+        $rules = [
+            'email' => Validator::required()->email(),
+            'password' => Validator::required()->stringType(),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
+
         try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
+            // Trouver l'utilisateur
+            $user = User::withEmail($data['email'])->first();
+
+            if (!$user || !password_verify($data['password'], $user->password_hash)) {
+                return Response::unauthorized('Invalid credentials');
             }
-            
-            // Validate input
-            if (empty($data['email']) || empty($data['password'])) {
-                throw new \RuntimeException('Email and password are required', 400);
+
+            // Vérifier le statut
+            if (!$user->isActive()) {
+                return Response::unauthorized('Account is not active');
             }
-            
-            // Login user
-            $result = $this->authService->login($data['email'], $data['password']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'LOGIN_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
+
+            // Mettre à jour la dernière connexion
+            $user->updateLastLogin();
+
+            // Générer les tokens
+            $tokens = $this->generateTokens($user);
+
+            // Stocker le refresh token
+            UserToken::create([
+                'user_id' => $user->id,
+                'token' => $tokens['refresh_token'],
+                'type' => 'refresh',
+                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+            ]);
+
+            return Response::success([
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'is_verified' => $user->is_verified,
+                ],
+                'tokens' => $tokens
+            ], 'Login successful');
+
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Login failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Login failed: ' . $e->getMessage());
         }
     }
 
-    public function refresh(Request $request, Response $response): Response
+    public function adminLogin(ServerRequestInterface $request): ResponseInterface
     {
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        // Validation
+        $validator = new Validator();
+        $rules = [
+            'email' => Validator::required()->email(),
+            'password' => Validator::required()->stringType(),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
+
         try {
-            $data = $request->getParsedBody();
-            
-            if (empty($data['refresh_token'])) {
-                throw new \RuntimeException('Refresh token is required', 400);
+            // Trouver l'utilisateur admin
+            $user = User::withEmail($data['email'])
+                        ->where('role', 'admin')
+                        ->first();
+
+            if (!$user || !password_verify($data['password'], $user->password_hash)) {
+                return Response::unauthorized('Invalid admin credentials');
             }
-            
-            // Refresh token
-            $result = $this->authService->refreshToken($data['refresh_token']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Token refreshed successfully',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'TOKEN_REFRESH_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus(401)
-                ->withHeader('Content-Type', 'application/json');
-                
+
+            if (!$user->isActive()) {
+                return Response::unauthorized('Admin account is not active');
+            }
+
+            // Mettre à jour la dernière connexion
+            $user->updateLastLogin();
+
+            // Générer les tokens
+            $tokens = $this->generateTokens($user);
+
+            // Stocker le refresh token
+            UserToken::create([
+                'user_id' => $user->id,
+                'token' => $tokens['refresh_token'],
+                'type' => 'refresh',
+                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+            ]);
+
+            return Response::success([
+                'user' => [
+                    'id' => $user->id,
+                    'uuid' => $user->uuid,
+                    'email' => $user->email,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'is_verified' => $user->is_verified,
+                ],
+                'tokens' => $tokens
+            ], 'Admin login successful');
+
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Token refresh failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Admin login failed: ' . $e->getMessage());
         }
     }
 
-    public function verifyPhone(Request $request, Response $response): Response
+    public function me(ServerRequestInterface $request): ResponseInterface
     {
+        $user = $request->getAttribute('user');
+
+        return Response::success([
+            'id' => $user->id,
+            'uuid' => $user->uuid,
+            'email' => $user->email,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'phone' => $user->phone,
+            'role' => $user->role,
+            'is_verified' => $user->is_verified,
+            'email_verified_at' => $user->email_verified_at,
+            'phone_verified_at' => $user->phone_verified_at,
+            'created_at' => $user->created_at,
+        ]);
+    }
+
+    public function refreshToken(ServerRequestInterface $request): ResponseInterface
+    {
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        if (empty($data['refresh_token'])) {
+            return Response::error('Refresh token is required');
+        }
+
         try {
-            $user = $request->getAttribute('user');
-            $data = $request->getParsedBody();
-            
-            if (empty($data['code'])) {
-                throw new \RuntimeException('Verification code is required', 400);
+            // Vérifier le refresh token
+            $tokenRecord = UserToken::where('token', $data['refresh_token'])
+                                   ->where('type', 'refresh')
+                                   ->where('expires_at', '>', Carbon::now())
+                                   ->first();
+
+            if (!$tokenRecord) {
+                return Response::unauthorized('Invalid refresh token');
             }
-            
-            if (strlen($data['code']) !== 6 || !is_numeric($data['code'])) {
-                throw new \RuntimeException('Invalid verification code format', 400);
+
+            $user = User::find($tokenRecord->user_id);
+            if (!$user || !$user->isActive()) {
+                return Response::unauthorized('User not found or inactive');
             }
-            
-            // Verify phone
-            $success = $this->authService->verifyPhone($user['id'], $data['code']);
-            
-            if (!$success) {
-                throw new \RuntimeException('Invalid or expired verification code', 400);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Phone verified successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'PHONE_VERIFICATION_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
+
+            // Supprimer l'ancien refresh token
+            $tokenRecord->delete();
+
+            // Générer de nouveaux tokens
+            $tokens = $this->generateTokens($user);
+
+            // Stocker le nouveau refresh token
+            UserToken::create([
+                'user_id' => $user->id,
+                'token' => $tokens['refresh_token'],
+                'type' => 'refresh',
+                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+            ]);
+
+            return Response::success([
+                'tokens' => $tokens
+            ], 'Token refreshed successfully');
+
         } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Phone verification failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Token refresh failed: ' . $e->getMessage());
         }
     }
 
-    public function forgotPassword(Request $request, Response $response): Response
+    public function logout(ServerRequestInterface $request): ResponseInterface
     {
+        $user = $request->getAttribute('user');
+
         try {
-            error_log("AuthController: forgotPassword called");
-            
-            // Get request data with fallback
-            $data = $request->getParsedBody();
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            error_log("AuthController: Request data: " . json_encode($data));
-            
-            if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-                error_log("AuthController: Invalid email provided");
-                throw new \RuntimeException('Valid email is required', 400);
-            }
-            
-            error_log("AuthController: Email valid, proceeding...");
-            
-            // Ensure we have authService
-            if (!$this->authService) {
-                error_log("AuthController: AuthService not injected!");
-                throw new \RuntimeException('Service not available', 500);
-            }
-            
-            error_log("AuthController: Calling authService->forgotPassword");
-            
-            // Request password reset with error handling
-            $result = $this->authService->forgotPassword($data['email']);
-            
-            error_log("AuthController: forgotPassword completed successfully");
-            
-            // Always return success to prevent email enumeration
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'If the email exists, a password reset link has been sent'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
+            // Supprimer tous les refresh tokens de l'utilisateur
+            UserToken::where('user_id', $user->id)
+                     ->where('type', 'refresh')
+                     ->delete();
+
+            return Response::success([], 'Logout successful');
+
         } catch (\Exception $e) {
-            error_log("AuthController: Exception in forgotPassword: " . $e->getMessage());
-            error_log("AuthController: Exception trace: " . $e->getTraceAsString());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Password reset request failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            return Response::serverError('Logout failed: ' . $e->getMessage());
         }
     }
 
-    public function resetPassword(Request $request, Response $response): Response
+    private function generateTokens(User $user): array
     {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Fallback: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['token']) || empty($data['password'])) {
-                throw new \RuntimeException('Token and new password are required', 400);
-            }
-            
-            if (strlen($data['password']) < 6) {
-                throw new \RuntimeException('Password must be at least 6 characters', 400);
-            }
-            
-            // Reset password
-            $success = $this->authService->resetPassword($data['token'], $data['password']);
-            
-            if (!$success) {
-                throw new \RuntimeException('Password reset failed', 500);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Password reset successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'PASSWORD_RESET_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Password reset failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
+        $now = time();
+        $accessTokenExpiry = $now + $this->jwtConfig['access_token_expiry'];
+        $refreshTokenExpiry = $now + $this->jwtConfig['refresh_token_expiry'];
 
-    public function logout(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody();
-            
-            if (empty($data['refresh_token'])) {
-                throw new \RuntimeException('Refresh token is required', 400);
-            }
-            
-            // Logout user
-            $this->authService->logout($data['refresh_token']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Logged out successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Logged out successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
+        // Access token payload
+        $accessPayload = [
+            'iss' => $this->jwtConfig['issuer'],
+            'aud' => $this->jwtConfig['audience'],
+            'iat' => $now,
+            'exp' => $accessTokenExpiry,
+            'sub' => $user->uuid,
+            'user' => [
+                'id' => $user->id,
+                'uuid' => $user->uuid,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'is_verified' => $user->is_verified,
+                'role' => $user->role,
+            ],
+            'type' => 'access'
+        ];
 
-    public function me(Request $request, Response $response): Response
-    {
-        try {
-            $user = $request->getAttribute('user');
-            
-            // Normalize user data for API
-            $user = \KiloShare\Models\User::normalizeForApi($user);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'data' => ['user' => $user]
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to get user data',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
+        // Refresh token payload
+        $refreshPayload = [
+            'iss' => $this->jwtConfig['issuer'],
+            'aud' => $this->jwtConfig['audience'],
+            'iat' => $now,
+            'exp' => $refreshTokenExpiry,
+            'sub' => $user->uuid,
+            'user_id' => $user->id,
+            'type' => 'refresh'
+        ];
 
-    public function updateProfile(Request $request, Response $response): Response
-    {
-        try {
-            $user = $request->getAttribute('user');
-            $data = $request->getParsedBody();
-            
-            // TODO: Implement profile update logic
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Profile update not implemented yet'
-            ]));
-            
-            return $response
-                ->withStatus(501)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Profile update failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function changePassword(Request $request, Response $response): Response
-    {
-        try {
-            $user = $request->getAttribute('user');
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            // Validate input
-            if (empty($data['currentPassword'])) {
-                throw new \RuntimeException('Current password is required', 400);
-            }
-            
-            if (empty($data['newPassword'])) {
-                throw new \RuntimeException('New password is required', 400);
-            }
-            
-            if (strlen($data['newPassword']) < 6) {
-                throw new \RuntimeException('New password must be at least 6 characters', 400);
-            }
-            
-            // Change password
-            $success = $this->authService->changePassword(
-                $user['id'],
-                $data['currentPassword'],
-                $data['newPassword']
-            );
-            
-            if (!$success) {
-                throw new \RuntimeException('Failed to change password', 500);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Password changed successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'PASSWORD_CHANGE_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Change password failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function deleteAccount(Request $request, Response $response): Response
-    {
-        try {
-            $user = $request->getAttribute('user');
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            // Validate input
-            if (empty($data['password'])) {
-                throw new \RuntimeException('Password is required for account deletion', 400);
-            }
-            
-            if (empty($data['confirmation']) || $data['confirmation'] !== 'SUPPRIMER MON COMPTE') {
-                throw new \RuntimeException('Account deletion confirmation is required', 400);
-            }
-            
-            // Delete account
-            $success = $this->authService->deleteAccount($user['id'], $data['password']);
-            
-            if (!$success) {
-                throw new \RuntimeException('Failed to delete account', 500);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Account deleted successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'ACCOUNT_DELETION_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Account deletion failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    private function validateRegistrationInput(array $data): void
-    {
-        // Debug: Log received data
-        error_log('=== Registration Debug ===');
-        error_log('Received data: ' . json_encode($data));
-        error_log('Email value: ' . ($data['email'] ?? 'NULL'));
-        error_log('Email empty check: ' . (empty($data['email']) ? 'TRUE' : 'FALSE'));
-        error_log('Email filter_var result: ' . (filter_var($data['email'] ?? '', FILTER_VALIDATE_EMAIL) ? 'VALID' : 'INVALID'));
-        error_log('==========================');
-        
-        if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new \RuntimeException('Valid email is required', 400);
-        }
-
-        if (empty($data['password']) || strlen($data['password']) < 6) {
-            throw new \RuntimeException('Password must be at least 6 characters', 400);
-        }
-
-        if (!empty($data['first_name']) && (strlen($data['first_name']) < 1 || strlen($data['first_name']) > 100)) {
-            throw new \RuntimeException('First name must be 1-100 characters', 400);
-        }
-
-        if (!empty($data['last_name']) && (strlen($data['last_name']) < 1 || strlen($data['last_name']) > 100)) {
-            throw new \RuntimeException('Last name must be 1-100 characters', 400);
-        }
-
-        if (!empty($data['phone'])) {
-            // Basic phone validation - you might want to use a more sophisticated library
-            if (!preg_match('/^\+?[1-9]\d{1,14}$/', $data['phone'])) {
-                throw new \RuntimeException('Invalid phone number format', 400);
-            }
-        }
-    }
-
-    private function getStatusCodeFromMessage(string $message): int
-    {
-        if (str_contains($message, 'already exists') || str_contains($message, 'déjà utilisée') || str_contains($message, 'déjà utilisé')) {
-            return 409; // Conflict
-        }
-
-        if (str_contains($message, 'Invalid credentials') || str_contains($message, 'Identifiants invalides') || str_contains($message, 'expired')) {
-            return 401; // Unauthorized
-        }
-
-        if (str_contains($message, 'not active') || str_contains($message, 'pas actif')) {
-            return 403; // Forbidden
-        }
-
-        if (str_contains($message, 'required') || str_contains($message, 'Invalid')) {
-            return 400; // Bad Request
-        }
-
-        return 500; // Internal Server Error
-    }
-
-    public function verifyEmail(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['token'])) {
-                throw new \RuntimeException('Verification token is required', 400);
-            }
-            
-            // Verify email
-            $success = $this->authService->verifyEmail($data['token']);
-            
-            if (!$success) {
-                throw new \RuntimeException('Email verification failed', 500);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Email verified successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'EMAIL_VERIFICATION_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Email verification failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function resendEmailVerification(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            // Debug: Also try raw body if parsed body is empty
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-                throw new \RuntimeException('Valid email is required', 400);
-            }
-            
-            // Resend verification email
-            $success = $this->authService->resendEmailVerification($data['email']);
-            
-            if (!$success) {
-                throw new \RuntimeException('Failed to resend verification email', 500);
-            }
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Verification email sent successfully'
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'EMAIL_RESEND_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to resend verification email',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function adminLogin(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['email']) || empty($data['password'])) {
-                throw new \RuntimeException('Email and password are required', 400);
-            }
-            
-            // Login with admin role verification
-            $result = $this->authService->adminLogin($data['email'], $data['password']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Admin login successful',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'ADMIN_LOGIN_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Admin login failed',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function getAllUsers(Request $request, Response $response): Response
-    {
-        try {
-            $result = $this->authService->getAllUsers();
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to fetch users',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function updateUserRole(Request $request, Response $response, array $args): Response
-    {
-        try {
-            $userId = $args['id'];
-            $data = $request->getParsedBody() ?? [];
-            
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['role']) || !in_array($data['role'], ['user', 'admin', 'moderator'])) {
-                throw new \RuntimeException('Valid role is required (user, admin, moderator)', 400);
-            }
-            
-            $result = $this->authService->updateUserRole((int)$userId, $data['role']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'User role updated successfully',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'UPDATE_ROLE_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to update user role',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
-    }
-
-    public function refreshToken(Request $request, Response $response): Response
-    {
-        try {
-            $data = $request->getParsedBody() ?? [];
-            
-            if (empty($data)) {
-                $rawBody = $request->getBody()->getContents();
-                $data = json_decode($rawBody, true) ?? [];
-            }
-            
-            if (empty($data['refresh_token'])) {
-                throw new \RuntimeException('Refresh token is required', 400);
-            }
-            
-            $result = $this->authService->refreshToken($data['refresh_token']);
-            
-            $response->getBody()->write(json_encode([
-                'success' => true,
-                'message' => 'Token refreshed successfully',
-                'data' => $result
-            ]));
-            
-            return $response
-                ->withStatus(200)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\RuntimeException $e) {
-            $statusCode = $this->getStatusCodeFromMessage($e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => 'REFRESH_TOKEN_FAILED'
-            ]));
-            
-            return $response
-                ->withStatus($statusCode)
-                ->withHeader('Content-Type', 'application/json');
-                
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode([
-                'success' => false,
-                'message' => 'Failed to refresh token',
-                'error_code' => 'INTERNAL_ERROR'
-            ]));
-            
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
-        }
+        return [
+            'access_token' => JWT::encode($accessPayload, $this->jwtConfig['secret'], $this->jwtConfig['algorithm']),
+            'refresh_token' => JWT::encode($refreshPayload, $this->jwtConfig['secret'], $this->jwtConfig['algorithm']),
+            'token_type' => 'bearer',
+            'expires_in' => $this->jwtConfig['access_token_expiry'],
+        ];
     }
 }

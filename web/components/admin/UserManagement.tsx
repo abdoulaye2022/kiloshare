@@ -24,11 +24,7 @@ interface User {
   trust_score?: number;
 }
 
-interface UserManagementProps {
-  adminInfo: any;
-}
-
-export default function UserManagement({ adminInfo }: UserManagementProps) {
+export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'blocked' | 'pending'>('all');
@@ -47,7 +43,8 @@ export default function UserManagement({ adminInfo }: UserManagementProps) {
       
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users || []);
+        console.log('Users API response:', data);
+        setUsers(data.data?.users || []);
       } else {
         console.error('Failed to fetch users');
       }
