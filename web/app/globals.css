@@ -76,3 +76,36 @@ a {
 .hover\:bg-primary:hover {
   background-color: #4096FF;
 }
+
+/* Styles pour améliorer la lisibilité des options select dans l'admin */
+select option {
+  background-color: white;
+  color: #1f2937; /* gray-800 */
+  padding: 8px 12px;
+}
+
+select option:checked,
+select option:hover,
+select option:focus,
+select option:active {
+  background-color: #dbeafe; /* blue-100 */
+  color: #1e40af; /* blue-800 */
+}
+
+/* Styles spécifiques pour les éléments select de l'admin */
+.admin-select {
+  background-color: white;
+  color: #1f2937;
+}
+
+.admin-select option {
+  background-color: white;
+  color: #1f2937;
+  padding: 8px 12px;
+}
+
+.admin-select option:checked,
+.admin-select option:hover {
+  background-color: #dbeafe;
+  color: #1e40af;
+}

@@ -110,7 +110,7 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-100 min-h-screen">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Gestion des utilisateurs</h2>
         
@@ -120,7 +120,7 @@ export default function UserManagement() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
             >
               <option value="all">Tous les utilisateurs</option>
               <option value="active">Actifs</option>
@@ -151,19 +151,19 @@ export default function UserManagement() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-2xl font-bold text-gray-900">{users.length}</div>
-            <div className="text-sm text-gray-500">Total utilisateurs</div>
+            <div className="text-sm text-gray-600">Total utilisateurs</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-2xl font-bold text-green-600">{users.filter(u => u.status === 'active').length}</div>
-            <div className="text-sm text-gray-500">Actifs</div>
+            <div className="text-sm text-gray-600">Actifs</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-2xl font-bold text-red-600">{users.filter(u => u.status === 'blocked').length}</div>
-            <div className="text-sm text-gray-500">Bloqués</div>
+            <div className="text-sm text-gray-600">Bloqués</div>
           </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-2xl font-bold text-blue-600">{users.filter(u => u.stripe_account_id).length}</div>
-            <div className="text-sm text-gray-500">Comptes Stripe</div>
+            <div className="text-sm text-gray-600">Comptes Stripe</div>
           </div>
         </div>
       </div>
@@ -174,19 +174,19 @@ export default function UserManagement() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Utilisateur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Vérifications
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Activité
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -207,7 +207,7 @@ export default function UserManagement() {
                         <div className="text-sm font-medium text-gray-900">
                           {user.first_name} {user.last_name}
                         </div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
+                        <div className="text-sm text-gray-600">{user.email}</div>
                       </div>
                     </div>
                   </td>
@@ -307,23 +307,23 @@ export default function UserManagement() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Nom complet</label>
+                        <label className="text-sm font-medium text-gray-600">Nom complet</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedUser.first_name} {selectedUser.last_name}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Email</label>
+                        <label className="text-sm font-medium text-gray-600">Email</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedUser.email}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Téléphone</label>
+                        <label className="text-sm font-medium text-gray-600">Téléphone</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedUser.phone || 'Non renseigné'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Statut</label>
+                        <label className="text-sm font-medium text-gray-600">Statut</label>
                         <div className="mt-1">{getUserStatusBadge(selectedUser.status)}</div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Compte Stripe</label>
+                        <label className="text-sm font-medium text-gray-600">Compte Stripe</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {selectedUser.stripe_account_id ? (
                             <span className="text-green-600">Configuré</span>
@@ -333,17 +333,17 @@ export default function UserManagement() {
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Score de confiance</label>
+                        <label className="text-sm font-medium text-gray-600">Score de confiance</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedUser.trust_score || 0}/100</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Date d'inscription</label>
+                        <label className="text-sm font-medium text-gray-600">Date d'inscription</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {new Date(selectedUser.created_at).toLocaleDateString('fr-FR')}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Dernière connexion</label>
+                        <label className="text-sm font-medium text-gray-600">Dernière connexion</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {selectedUser.last_login_at ? new Date(selectedUser.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
                         </p>

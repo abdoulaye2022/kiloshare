@@ -733,49 +733,103 @@ class AdminController
             $limit = (int) ($queryParams['limit'] ?? 25);
             $status = $queryParams['status'] ?? '';
 
-            // Pour l'instant, retourner des données simulées
-            // À implémenter avec les vraies données Stripe
-            $accounts = [];
-            $total = 0;
+            $offset = ($page - 1) * $limit;
 
-            // Simuler quelques comptes connectés si nécessaire pour les tests
-            if ($status === 'all' || empty($status)) {
-                for ($i = 1; $i <= 5; $i++) {
-                    $accounts[] = [
-                        'id' => "acc_test_$i",
-                        'user_id' => $i + 1,
-                        'stripe_account_id' => "acct_1A2B3C4D5E6F$i",
-                        'account_status' => ['active', 'pending', 'restricted'][rand(0, 2)],
-                        'onboarding_complete' => rand(0, 1) === 1,
-                        'country' => ['FR', 'GB', 'US', 'DE', 'ES'][rand(0, 4)],
-                        'default_currency' => ['EUR', 'GBP', 'USD'][rand(0, 2)],
-                        'email' => "user$i@example.com",
-                        'business_type' => ['individual', 'company'][rand(0, 1)],
-                        'created_at' => Carbon::now()->subDays(rand(1, 30))->format('Y-m-d H:i:s'),
-                        'updated_at' => Carbon::now()->subDays(rand(0, 5))->format('Y-m-d H:i:s'),
-                        'user' => [
-                            'id' => $i + 1,
-                            'first_name' => 'User',
-                            'last_name' => (string)($i + 1),
-                            'email' => "user$i@example.com"
-                        ],
-                        'balance' => [
-                            'available' => rand(0, 50000) / 100,
-                            'pending' => rand(0, 10000) / 100
-                        ],
-                        'requirements' => [
-                            'currently_due' => [],
-                            'eventually_due' => ['individual.id_number'],
-                            'past_due' => [],
-                            'pending_verification' => ['document']
-                        ]
-                    ];
-                }
-                $total = 5;
+            // Utiliser PDO directement pour accéder aux données
+            $host = '127.0.0.1';
+            $port = '3306';
+            $db = 'kiloshare';
+            $user = 'root';
+            $pass = '';
+            $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
+            $pdo = new \PDO($dsn, $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]);
+
+            // Construire la requête SQL avec jointure sur la table users
+            $sql = "SELECT 
+                        usa.id,
+                        usa.user_id,
+                        usa.stripe_account_id,
+                        usa.status as account_status,
+                        usa.details_submitted as onboarding_complete,
+                        usa.charges_enabled,
+                        usa.payouts_enabled,
+                        usa.onboarding_url,
+                        usa.requirements,
+                        usa.created_at,
+                        usa.updated_at,
+                        u.first_name,
+                        u.last_name,
+                        u.email
+                    FROM user_stripe_accounts usa
+                    LEFT JOIN users u ON usa.user_id = u.id";
+            
+            $params = [];
+            
+            if ($status && $status !== 'all') {
+                $sql .= " WHERE usa.status = ?";
+                $params[] = $status;
+            }
+            
+            $sql .= " ORDER BY usa.created_at DESC LIMIT $limit OFFSET $offset";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Compter le total
+            $countSql = "SELECT COUNT(*) as total FROM user_stripe_accounts usa";
+            if ($status && $status !== 'all') {
+                $countSql .= " WHERE usa.status = ?";
+                $countStmt = $pdo->prepare($countSql);
+                $countStmt->execute([$status]);
+            } else {
+                $countStmt = $pdo->query($countSql);
+            }
+            $total = $countStmt->fetch(\PDO::FETCH_ASSOC)['total'];
+
+            // Formater les données
+            $accounts = [];
+            foreach ($results as $row) {
+                $requirements = json_decode($row['requirements'] ?? '{}', true);
+                
+                $accounts[] = [
+                    'id' => $row['stripe_account_id'], // Utiliser stripe_account_id comme ID externe
+                    'user_id' => (int) $row['user_id'],
+                    'stripe_account_id' => $row['stripe_account_id'],
+                    'account_status' => $row['account_status'],
+                    'onboarding_complete' => (bool) $row['onboarding_complete'],
+                    'capabilities' => [
+                        'card_payments' => $row['charges_enabled'] ? 'active' : 'inactive',
+                        'transfers' => $row['payouts_enabled'] ? 'active' : 'inactive'
+                    ],
+                    'country' => 'CA', // Tous les comptes sont au Canada
+                    'default_currency' => 'CAD', // Devise canadienne par défaut
+                    'email' => $row['email'],
+                    'business_type' => 'individual', // Type par défaut
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'user' => [
+                        'id' => (int) $row['user_id'],
+                        'first_name' => $row['first_name'],
+                        'last_name' => $row['last_name'],
+                        'email' => $row['email']
+                    ],
+                    'balance' => [
+                        'available' => rand(0, 5000) / 100, // Montants fictifs en CAD pour les tests
+                        'pending' => rand(0, 1000) / 100
+                    ],
+                    'requirements' => $requirements,
+                    'onboarding_url' => $row['onboarding_url']
+                ];
             }
 
             return Response::success([
-                'accounts' => array_slice($accounts, ($page - 1) * $limit, $limit),
+                'data' => [
+                    'accounts' => $accounts
+                ],
                 'pagination' => [
                     'current_page' => $page,
                     'per_page' => $limit,
@@ -801,25 +855,72 @@ class AdminController
         }
 
         try {
-            // Pour l'instant, retourner des statistiques simulées
-            // À implémenter avec les vraies données Stripe
+            // Utiliser PDO directement pour accéder aux données
+            $host = '127.0.0.1';
+            $port = '3306';
+            $db = 'kiloshare';
+            $user = 'root';
+            $pass = '';
+            $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
+            $pdo = new \PDO($dsn, $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]);
+            
+            // Récupérer les statistiques réelles depuis la base de données
+            $totalAccountsStmt = $pdo->query("SELECT COUNT(*) as total FROM user_stripe_accounts");
+            $totalAccounts = $totalAccountsStmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+            $statusStatsStmt = $pdo->query("
+                SELECT 
+                    status,
+                    COUNT(*) as count
+                FROM user_stripe_accounts 
+                GROUP BY status
+            ");
+            $statusStats = [];
+            while ($row = $statusStatsStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $statusStats[$row['status']] = $row['count'];
+            }
+            
+            // Calculer les statistiques
+            $activeCount = $statusStats['active'] ?? 0;
+            $pendingCount = $statusStats['pending'] ?? 0;
+            $restrictedCount = $statusStats['restricted'] ?? 0;
+            $rejectedCount = $statusStats['rejected'] ?? 0;
+            $onboardingCount = $statusStats['onboarding'] ?? 0;
+            
+            $completionRate = $totalAccounts > 0 ? 
+                round((($activeCount + $restrictedCount) / $totalAccounts) * 100, 1) : 0;
+            
+            // Compter les comptes avec des requirements
+            $requirementsStmt = $pdo->query("
+                SELECT COUNT(*) as count 
+                FROM user_stripe_accounts 
+                WHERE requirements IS NOT NULL 
+                AND JSON_LENGTH(JSON_EXTRACT(requirements, '$.currently_due')) > 0
+            ");
+            $accountsWithRequirements = $requirementsStmt->fetch(\PDO::FETCH_ASSOC)['count'];
+            
             $stats = [
-                'total_accounts' => 5,
-                'active_accounts' => 3,
-                'pending_accounts' => 1,
-                'restricted_accounts' => 1,
-                'rejected_accounts' => 0,
-                'onboarding_completion_rate' => 80.0,
-                'total_balance_available' => 12500.75,
-                'total_balance_pending' => 2300.50,
-                'monthly_growth' => 12.5,
-                'average_balance_per_account' => 2500.15,
-                'accounts_with_requirements' => 2,
-                'countries_represented' => 4
+                'active_count' => (int) $activeCount,
+                'pending_count' => (int) ($pendingCount + $onboardingCount),
+                'restricted_count' => (int) $restrictedCount,
+                'rejected_count' => (int) $rejectedCount,
+                'total_count' => (int) $totalAccounts,
+                'total_balance' => rand(10000, 50000) / 100, // Montant fictif en CAD pour les tests
+                'onboarding_completion_rate' => $completionRate,
+                'accounts_with_requirements' => (int) $accountsWithRequirements,
+                'countries_represented' => 1, // Tous au Canada pour l'instant
+                'total_revenue_this_month' => rand(5000, 15000) / 100, // Fictif en CAD
+                'average_balance_per_account' => $totalAccounts > 0 ? 
+                    rand(1000, 8000) / 100 : 0 // Fictif en CAD
             ];
 
             return Response::success([
-                'stats' => $stats
+                'data' => [
+                    'stats' => $stats
+                ]
             ], 'Connected accounts stats retrieved successfully');
 
         } catch (\Exception $e) {

@@ -160,8 +160,8 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
     }
   };
 
-  const formatCurrency = (amount: number, currency: string = 'EUR') => {
-    return new Intl.NumberFormat('fr-FR', {
+  const formatCurrency = (amount: number, currency: string = 'CAD') => {
+    return new Intl.NumberFormat('fr-CA', {
       style: 'currency',
       currency: currency
     }).format(amount);
@@ -320,7 +320,7 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as any)}
-                  className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
                 >
                   <option value="all">Tous</option>
                   <option value="pending">En attente</option>
@@ -334,7 +334,7 @@ export default function PaymentManagement({ adminInfo, onLogout }: PaymentManage
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value as any)}
-                  className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
                 >
                   <option value="all">Tous</option>
                   <option value="payment">Paiements</option>

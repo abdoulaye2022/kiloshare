@@ -160,7 +160,7 @@ export default function ConnectedAccountsManagement() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-100 min-h-screen">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Comptes connectés Stripe</h2>
         
@@ -169,19 +169,19 @@ export default function ConnectedAccountsManagement() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-green-600">{stats.active_count || 0}</div>
-              <div className="text-sm text-gray-500">Comptes actifs</div>
+              <div className="text-sm text-gray-600">Comptes actifs</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-yellow-600">{stats.pending_count || 0}</div>
-              <div className="text-sm text-gray-500">En attente</div>
+              <div className="text-sm text-gray-600">En attente</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-orange-600">{stats.restricted_count || 0}</div>
-              <div className="text-sm text-gray-500">Restreints</div>
+              <div className="text-sm text-gray-600">Restreints</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-blue-600">{stats.total_balance?.toFixed(2) || '0.00'} €</div>
-              <div className="text-sm text-gray-500">Solde total</div>
+              <div className="text-sm text-gray-600">Solde total</div>
             </div>
           </div>
         )}
@@ -192,7 +192,7 @@ export default function ConnectedAccountsManagement() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
             >
               <option value="all">Tous les comptes</option>
               <option value="active">Actifs</option>
@@ -210,22 +210,22 @@ export default function ConnectedAccountsManagement() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Utilisateur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Compte Stripe
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Capacités
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Solde
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -246,13 +246,13 @@ export default function ConnectedAccountsManagement() {
                         <div className="text-sm font-medium text-gray-900">
                           {account.user?.first_name} {account.user?.last_name}
                         </div>
-                        <div className="text-sm text-gray-500">{account.user?.email}</div>
+                        <div className="text-sm text-gray-600">{account.user?.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 font-mono">{account.stripe_account_id}</div>
-                    <div className="text-sm text-gray-500">{account.country} • {account.default_currency}</div>
+                    <div className="text-sm text-gray-600">{account.country} • {account.default_currency}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col space-y-1">
@@ -289,7 +289,7 @@ export default function ConnectedAccountsManagement() {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-500">N/A</div>
+                      <div className="text-sm text-gray-600">N/A</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -354,27 +354,27 @@ export default function ConnectedAccountsManagement() {
 
                     <div className="grid grid-cols-2 gap-6 mb-6">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">ID Compte Stripe</label>
+                        <label className="text-sm font-medium text-gray-700">ID Compte Stripe</label>
                         <p className="mt-1 text-sm text-gray-900 font-mono">{selectedAccount.stripe_account_id}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Statut</label>
+                        <label className="text-sm font-medium text-gray-700">Statut</label>
                         <div className="mt-1">{getStatusBadge(selectedAccount.account_status)}</div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Pays</label>
+                        <label className="text-sm font-medium text-gray-700">Pays</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedAccount.country}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Devise par défaut</label>
+                        <label className="text-sm font-medium text-gray-700">Devise par défaut</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedAccount.default_currency}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Type d'entreprise</label>
+                        <label className="text-sm font-medium text-gray-700">Type d'entreprise</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedAccount.business_type || 'Non spécifié'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Email</label>
+                        <label className="text-sm font-medium text-gray-700">Email</label>
                         <p className="mt-1 text-sm text-gray-900">{selectedAccount.email || 'Non spécifié'}</p>
                       </div>
                     </div>
@@ -417,13 +417,13 @@ export default function ConnectedAccountsManagement() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Date de création</label>
+                        <label className="text-sm font-medium text-gray-700">Date de création</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {new Date(selectedAccount.created_at).toLocaleDateString('fr-FR')}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Dernière mise à jour</label>
+                        <label className="text-sm font-medium text-gray-700">Dernière mise à jour</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {new Date(selectedAccount.updated_at).toLocaleDateString('fr-FR')}
                         </p>

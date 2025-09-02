@@ -235,7 +235,7 @@ export default function TripModerationPanel({ adminInfo, onLogout }: TripModerat
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as any)}
-                  className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
                 >
                   <option value="all">Toutes ({trips.length})</option>
                   <option value="urgent">Urgentes ({trips.filter(t => getPriorityLevel(t) === 'urgent').length})</option>
@@ -249,7 +249,7 @@ export default function TripModerationPanel({ adminInfo, onLogout }: TripModerat
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
                 >
                   <option value="date">Date de départ</option>
                   <option value="price">Montant total</option>

@@ -2,91 +2,82 @@
 
 import { useState, useEffect } from 'react';
 import { useAdminAuthStore } from '../../stores/adminAuthStore';
-import { ADMIN_ENDPOINTS, getDefaultHeaders } from '../../lib/api-config';
+import adminAuth from '../../lib/admin-auth';
 
 interface DashboardStats {
-  // KPIs Financiers
+  // KPIs principaux
+  total_users: number;
+  active_users: number;
+  verified_users: number;
+  new_registrations_today: number;
+  new_registrations_this_week: number;
+  
+  // Voyages
+  total_trips: number;
+  published_trips: number;
+  pending_trips_count: number;
+  published_trips_today: number;
+  published_trips_this_week: number;
+  
+  // Réservations
+  total_bookings: number;
+  active_bookings: number;
+  bookings_today: number;
+  bookings_this_week: number;
+  
+  // Financier
   revenue_today: number;
   revenue_this_week: number;
   revenue_this_month: number;
   commissions_collected: number;
   transactions_pending: number;
   
-  // Activité Plateforme
-  active_users: number;
-  new_registrations_today: number;
-  new_registrations_this_week: number;
-  published_trips_today: number;
-  published_trips_this_week: number;
-  active_bookings: number;
-  
-  // Santé du Système
+  // Indicateurs
   trip_completion_rate: number;
   dispute_rate: number;
-  average_resolution_time_hours: number;
-  
-  // Alertes Critiques
   suspected_fraud_count: number;
   urgent_disputes_count: number;
   reported_trips_count: number;
   failed_payments_count: number;
-  
-  // Données pour graphiques
-  revenue_growth: Array<{date: string, amount: number}>;
+}
+
+interface ChartData {
   user_growth: Array<{date: string, count: number}>;
-  popular_routes: Array<{route: string, count: number, revenue: number}>;
-  transport_distribution: Array<{type: string, count: number, percentage: number}>;
+  trip_growth: Array<{date: string, count: number}>;
+  booking_growth: Array<{date: string, count: number}>;
+  revenue_growth: Array<{date: string, amount: number}>;
 }
 
-interface AdminDashboardProps {
-  adminInfo: any;
-  onLogout: () => void;
-}
-
-export default function Dashboard({ adminInfo, onLogout }: AdminDashboardProps) {
+export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [charts, setCharts] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const { token, isAuthenticated, logout } = useAdminAuthStore();
+  const { isAuthenticated } = useAdminAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated && token) {
+    if (isAuthenticated) {
       fetchDashboardStats();
-      // Rafraîchir les stats toutes les 5 minutes
+      // Rafraîchir toutes les 5 minutes
       const interval = setInterval(fetchDashboardStats, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated]);
 
   const fetchDashboardStats = async () => {
     try {
-      if (!token) {
-        setError('Aucun token d\'authentification disponible');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(ADMIN_ENDPOINTS.DASHBOARD_STATS, {
-        method: 'GET',
-        headers: getDefaultHeaders(token)
-      });
+      const response = await adminAuth.apiRequest('/api/v1/admin/dashboard/stats');
       
       if (response.ok) {
         const data = await response.json();
-        setStats(data.stats);
+        console.log('Dashboard stats:', data);
+        setStats(data.data?.stats || data.stats);
+        setCharts(data.data?.charts || data.charts);
         setError(null);
       } else {
-        // Si on reçoit une 401, c'est que le token n'est plus valide
-        if (response.status === 401) {
-          console.log('❌ Token expired, logging out');
-          logout();
-          onLogout();
-          return;
-        }
-        
-        const errorData = await response.json();
-        setError(errorData.message || 'Erreur lors du chargement des statistiques');
+        console.error('Failed to fetch dashboard stats:', response.status);
+        setError('Erreur lors du chargement des statistiques');
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -97,61 +88,158 @@ export default function Dashboard({ adminInfo, onLogout }: AdminDashboardProps) 
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat('fr-CA', {
       style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
+      currency: 'CAD'
+    }).format(amount || 0);
   };
 
-  const getAlertLevel = (type: 'fraud' | 'disputes' | 'reports' | 'payments') => {
-    if (!stats) return 'low';
-    
-    const thresholds = {
-      fraud: { high: 10, medium: 5 },
-      disputes: { high: 20, medium: 10 },
-      reports: { high: 15, medium: 8 },
-      payments: { high: 25, medium: 10 }
-    };
-    
-    const counts = {
-      fraud: stats.suspected_fraud_count,
-      disputes: stats.urgent_disputes_count,
-      reports: stats.reported_trips_count,
-      payments: stats.failed_payments_count
-    };
-    
-    const count = counts[type];
-    const threshold = thresholds[type];
-    
-    if (count >= threshold.high) return 'high';
-    if (count >= threshold.medium) return 'medium';
-    return 'low';
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('fr-FR').format(num || 0);
   };
 
-  const getAlertColor = (level: string) => {
-    switch (level) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-green-100 text-green-800 border-green-200';
-    }
+  const StatCard = ({ 
+    title, 
+    value, 
+    change, 
+    icon, 
+    color = 'blue',
+    format = 'number'
+  }: {
+    title: string;
+    value: number | string;
+    change?: { value: number; label: string };
+    icon: string;
+    color?: 'blue' | 'green' | 'orange' | 'red' | 'purple';
+    format?: 'number' | 'currency' | 'percentage';
+  }) => {
+    const colorClasses = {
+      blue: 'bg-blue-50 text-blue-700 border-blue-200',
+      green: 'bg-green-50 text-green-700 border-green-200',
+      orange: 'bg-orange-50 text-orange-700 border-orange-200',
+      red: 'bg-red-50 text-red-700 border-red-200',
+      purple: 'bg-purple-50 text-purple-700 border-purple-200',
+    };
+
+    const formatValue = (val: number | string) => {
+      if (typeof val === 'string') return val;
+      switch (format) {
+        case 'currency':
+          return formatCurrency(val);
+        case 'percentage':
+          return `${val.toFixed(1)}%`;
+        default:
+          return formatNumber(val);
+      }
+    };
+
+    return (
+      <div className={`p-6 rounded-lg border-2 ${colorClasses[color]}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium opacity-70">{title}</p>
+            <p className="text-2xl font-bold mt-2">
+              {formatValue(value)}
+            </p>
+            {change && (
+              <p className="text-sm mt-2 opacity-60">
+                {change.value > 0 ? '+' : ''}{change.value} {change.label}
+              </p>
+            )}
+          </div>
+          <div className="text-3xl opacity-30">
+            {icon}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const SimpleChart = ({ 
+    data, 
+    title, 
+    color = '#3B82F6',
+    dataKey = 'count'
+  }: {
+    data: Array<{date: string, count?: number, amount?: number}>;
+    title: string;
+    color?: string;
+    dataKey?: 'count' | 'amount';
+  }) => {
+    if (!data || data.length === 0) return null;
+    
+    const maxValue = Math.max(...data.map(d => d[dataKey] || 0));
+    const lastWeekData = data.slice(-7);
+
+    return (
+      <div className="p-6 bg-white rounded-lg border border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+        <div className="flex items-end space-x-2 h-32">
+          {lastWeekData.map((item, index) => {
+            const height = maxValue > 0 ? (item[dataKey] || 0) / maxValue * 100 : 0;
+            return (
+              <div key={index} className="flex flex-col items-center flex-1">
+                <div className="w-full flex items-end justify-center">
+                  <div
+                    className="w-8 rounded-t"
+                    style={{
+                      height: `${Math.max(height, 2)}%`,
+                      backgroundColor: color,
+                      minHeight: '4px'
+                    }}
+                    title={`${item.date}: ${item[dataKey] || 0}`}
+                  />
+                </div>
+                <div className="text-xs text-gray-500 mt-2 text-center">
+                  {new Date(item.date).toLocaleDateString('fr-FR', { 
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
+          <span>7 derniers jours</span>
+          <span className="font-medium">
+            Max: {dataKey === 'amount' ? formatCurrency(maxValue) : formatNumber(maxValue)}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="p-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-8"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-          <div className="text-red-600 text-lg mb-4">{error}</div>
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <div className="text-red-400 text-4xl mb-4">⚠️</div>
+          <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur</h3>
+          <p className="text-red-600">{error}</p>
           <button
             onClick={fetchDashboardStats}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
           >
             Réessayer
           </button>
@@ -160,210 +248,157 @@ export default function Dashboard({ adminInfo, onLogout }: AdminDashboardProps) 
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="p-6">
-        <div className="text-center text-gray-500">Aucune donnée disponible</div>
-      </div>
-    );
-  }
+  if (!stats) return null;
 
   return (
-    <div className="p-6">
-      {/* Dashboard Content */}
-      <div className="space-y-6">
-        {/* Quick Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Revenue Today */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Revenus aujourd'hui</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.revenue_today)}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Users */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Utilisateurs actifs</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.active_users.toLocaleString()}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Bookings */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Réservations actives</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.active_bookings}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m0 0h2m-2 0v4a1 1 0 001 1h4a1 1 0 001-1v-4m-2 0V9a1 1 0 00-1-1H9a1 1 0 00-1 1v6z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Commission Rate */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Taux de completion</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.trip_completion_rate}%</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Alerts Section */}
-        {(stats.suspected_fraud_count > 0 || stats.urgent_disputes_count > 0 || stats.reported_trips_count > 0 || stats.failed_payments_count > 0) && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Alertes critiques</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.suspected_fraud_count > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-800">{stats.suspected_fraud_count} Fraudes suspectées</h3>
-                        <p className="text-xs text-red-700">Nécessite une vérification</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {stats.urgent_disputes_count > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-yellow-800">{stats.urgent_disputes_count} Litiges urgents</h3>
-                        <p className="text-xs text-yellow-700">À traiter prioritairement</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {stats.reported_trips_count > 0 && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="w-5 h-5 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zM10 13a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-orange-800">{stats.reported_trips_count} Annonces signalées</h3>
-                        <p className="text-xs text-orange-700">Modération requise</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {stats.failed_payments_count > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.236 4.53L8.53 10.5a.75.75 0 00-1.06 1.061l1.5 1.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-800">{stats.failed_payments_count} Paiements échoués</h3>
-                        <p className="text-xs text-red-700">Vérification nécessaire</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Activité récente</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Nouvelles inscriptions aujourd'hui</p>
-                    <p className="text-xs text-gray-500">Croissance des utilisateurs</p>
-                  </div>
-                  <span className="text-lg font-semibold text-blue-600">+{stats.new_registrations_today}</span>
-                </div>
-                <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Annonces publiées aujourd'hui</p>
-                    <p className="text-xs text-gray-500">Nouvelle offre de transport</p>
-                  </div>
-                  <span className="text-lg font-semibold text-green-600">+{stats.published_trips_today}</span>
-                </div>
-                <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Revenus cette semaine</p>
-                    <p className="text-xs text-gray-500">Performance commerciale</p>
-                  </div>
-                  <span className="text-lg font-semibold text-gray-900">{formatCurrency(stats.revenue_this_week)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Routes populaires</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {stats.popular_routes.slice(0, 5).map((route, index) => (
-                  <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{route.route}</p>
-                      <p className="text-xs text-gray-500">{route.count} annonces</p>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-600">{formatCurrency(route.revenue)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Tableau de bord
+        </h1>
+        <p className="text-gray-600">
+          Vue d'ensemble de la plateforme KiloShare
+        </p>
       </div>
+
+      {/* KPIs Principaux */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          title="Utilisateurs totaux"
+          value={stats.total_users}
+          change={{ value: stats.new_registrations_this_week, label: 'cette semaine' }}
+          icon="👥"
+          color="blue"
+        />
+        
+        <StatCard
+          title="Voyages publiés"
+          value={stats.published_trips}
+          change={{ value: stats.published_trips_this_week, label: 'cette semaine' }}
+          icon="✈️"
+          color="green"
+        />
+        
+        <StatCard
+          title="Réservations actives"
+          value={stats.active_bookings}
+          change={{ value: stats.bookings_this_week, label: 'cette semaine' }}
+          icon="📦"
+          color="orange"
+        />
+        
+        <StatCard
+          title="Revenus ce mois"
+          value={stats.revenue_this_month}
+          change={{ value: stats.revenue_this_week, label: 'cette semaine' }}
+          icon="💰"
+          color="purple"
+          format="currency"
+        />
+      </div>
+
+      {/* Indicateurs secondaires */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          title="Utilisateurs vérifiés"
+          value={stats.verified_users}
+          icon="✅"
+          color="green"
+        />
+        
+        <StatCard
+          title="Voyages en attente"
+          value={stats.pending_trips_count}
+          icon="⏳"
+          color="orange"
+        />
+        
+        <StatCard
+          title="Taux de finalisation"
+          value={stats.trip_completion_rate}
+          icon="🎯"
+          color="blue"
+          format="percentage"
+        />
+        
+        <StatCard
+          title="Commissions collectées"
+          value={stats.commissions_collected}
+          icon="🏦"
+          color="purple"
+          format="currency"
+        />
+      </div>
+
+      {/* Alertes */}
+      {(stats.suspected_fraud_count > 0 || stats.urgent_disputes_count > 0 || stats.reported_trips_count > 0 || stats.failed_payments_count > 0) && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
+          <h2 className="text-lg font-semibold text-red-800 mb-4 flex items-center">
+            <span className="text-2xl mr-2">🚨</span>
+            Alertes importantes
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.suspected_fraud_count > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-700">{stats.suspected_fraud_count}</div>
+                <div className="text-sm text-red-600">Fraudes suspectées</div>
+              </div>
+            )}
+            {stats.urgent_disputes_count > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-700">{stats.urgent_disputes_count}</div>
+                <div className="text-sm text-red-600">Litiges urgents</div>
+              </div>
+            )}
+            {stats.reported_trips_count > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-700">{stats.reported_trips_count}</div>
+                <div className="text-sm text-red-600">Voyages signalés</div>
+              </div>
+            )}
+            {stats.failed_payments_count > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-700">{stats.failed_payments_count}</div>
+                <div className="text-sm text-red-600">Paiements échoués</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Graphiques */}
+      {charts && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SimpleChart
+            data={charts.user_growth}
+            title="Croissance des utilisateurs"
+            color="#3B82F6"
+            dataKey="count"
+          />
+          
+          <SimpleChart
+            data={charts.trip_growth}
+            title="Voyages publiés"
+            color="#10B981"
+            dataKey="count"
+          />
+          
+          <SimpleChart
+            data={charts.booking_growth}
+            title="Nouvelles réservations"
+            color="#F59E0B"
+            dataKey="count"
+          />
+          
+          <SimpleChart
+            data={charts.revenue_growth}
+            title="Revenus quotidiens"
+            color="#8B5CF6"
+            dataKey="amount"
+          />
+        </div>
+      )}
     </div>
   );
 }

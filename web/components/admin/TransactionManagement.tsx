@@ -175,7 +175,7 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-100 min-h-screen">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Gestion des transactions</h2>
         
@@ -184,19 +184,19 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-green-600">{stats.total_revenue?.toFixed(2) || '0.00'} €</div>
-              <div className="text-sm text-gray-500">Revenus totaux</div>
+              <div className="text-sm text-gray-600">Revenus totaux</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-blue-600">{stats.total_commission?.toFixed(2) || '0.00'} €</div>
-              <div className="text-sm text-gray-500">Commissions</div>
+              <div className="text-sm text-gray-600">Commissions</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-yellow-600">{stats.pending_count || 0}</div>
-              <div className="text-sm text-gray-500">En attente</div>
+              <div className="text-sm text-gray-600">En attente</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
               <div className="text-2xl font-bold text-red-600">{stats.failed_count || 0}</div>
-              <div className="text-sm text-gray-500">Échouées</div>
+              <div className="text-sm text-gray-600">Échouées</div>
             </div>
           </div>
         )}
@@ -207,7 +207,7 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
             >
               <option value="all">Tous les statuts</option>
               <option value="pending">En attente</option>
@@ -218,7 +218,7 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
             >
               <option value="all">Tous les types</option>
               <option value="payment">Paiements</option>
@@ -236,22 +236,22 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Transaction
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Utilisateur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Montant
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -276,7 +276,7 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                     <div className="text-sm text-gray-900">
                       {transaction.user?.first_name} {transaction.user?.last_name}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-600">
                       {transaction.user?.email}
                     </div>
                   </td>
@@ -284,7 +284,7 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                     <div className="text-sm font-medium text-gray-900">
                       {transaction.amount.toFixed(2)} {transaction.currency}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-600">
                       Net: {transaction.net_amount.toFixed(2)} {transaction.currency}
                     </div>
                   </td>
@@ -348,39 +348,39 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">ID Transaction</label>
+                        <label className="text-sm font-medium text-gray-700">ID Transaction</label>
                         <p className="mt-1 text-sm text-gray-900 font-mono">{selectedTransaction.id}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Stripe ID</label>
+                        <label className="text-sm font-medium text-gray-700">Stripe ID</label>
                         <p className="mt-1 text-sm text-gray-900 font-mono">{selectedTransaction.stripe_transaction_id}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Type</label>
+                        <label className="text-sm font-medium text-gray-700">Type</label>
                         <div className="mt-1 flex items-center">
                           {getTypeIcon(selectedTransaction.type)}
                           <span className="ml-2 text-sm text-gray-900 capitalize">{selectedTransaction.type}</span>
                         </div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Statut</label>
+                        <label className="text-sm font-medium text-gray-700">Statut</label>
                         <div className="mt-1">{getStatusBadge(selectedTransaction.status)}</div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Montant</label>
+                        <label className="text-sm font-medium text-gray-700">Montant</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {selectedTransaction.amount.toFixed(2)} {selectedTransaction.currency}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Montant net</label>
+                        <label className="text-sm font-medium text-gray-700">Montant net</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {selectedTransaction.net_amount.toFixed(2)} {selectedTransaction.currency}
                         </p>
                       </div>
                       {selectedTransaction.stripe_fee && (
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Frais Stripe</label>
+                          <label className="text-sm font-medium text-gray-700">Frais Stripe</label>
                           <p className="mt-1 text-sm text-gray-900">
                             {selectedTransaction.stripe_fee.toFixed(2)} {selectedTransaction.currency}
                           </p>
@@ -388,18 +388,18 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                       )}
                       {selectedTransaction.failure_reason && (
                         <div className="col-span-2">
-                          <label className="text-sm font-medium text-gray-500">Raison de l'échec</label>
+                          <label className="text-sm font-medium text-gray-700">Raison de l'échec</label>
                           <p className="mt-1 text-sm text-red-600">{selectedTransaction.failure_reason}</p>
                         </div>
                       )}
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Date de création</label>
+                        <label className="text-sm font-medium text-gray-700">Date de création</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {new Date(selectedTransaction.created_at).toLocaleString('fr-FR')}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Dernière mise à jour</label>
+                        <label className="text-sm font-medium text-gray-700">Dernière mise à jour</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {new Date(selectedTransaction.updated_at).toLocaleString('fr-FR')}
                         </p>
