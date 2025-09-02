@@ -9,6 +9,7 @@ import '../widgets/profile_info_tab.dart';
 import '../widgets/verification_tab.dart';
 import '../widgets/trust_badge_widget.dart';
 import '../../auth/services/auth_service.dart';
+import '../../../widgets/optimized_cloudinary_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -551,21 +552,15 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
       ),
-      child: CircleAvatar(
+      child: CloudinaryAvatar(
+        imageUrl: profile.avatarUrl,
+        userName: profile.displayName,
         radius: 37,
-        backgroundImage: profile.avatarUrl != null
-            ? NetworkImage(profile.avatarUrl!)
-            : null,
-        child: profile.avatarUrl == null
-            ? Text(
-                profile.initials,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              )
-            : null,
+        textStyle: const TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import '../../auth/models/user_model.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../../../themes/modern_theme.dart';
+import '../../../widgets/optimized_cloudinary_image.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -352,17 +353,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.grey.shade300, width: 2),
                   ),
-                  child: CircleAvatar(
-                    radius: 48,
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
-                        : (_currentProfile?.avatarUrl != null
-                            ? NetworkImage(_currentProfile!.avatarUrl!)
-                            : null) as ImageProvider?,
-                    child: _selectedImage == null && _currentProfile?.avatarUrl == null
-                        ? Icon(Icons.person, size: 40, color: Colors.grey.shade600)
-                        : null,
-                  ),
+                  child: _selectedImage != null
+                      ? CircleAvatar(
+                          radius: 48,
+                          backgroundImage: FileImage(_selectedImage!),
+                        )
+                      : CloudinaryAvatar(
+                          imageUrl: _currentProfile?.avatarUrl,
+                          userName: _currentProfile?.displayName ?? 'User',
+                          radius: 48,
+                        ),
                 ),
                 Positioned(
                   bottom: 0,

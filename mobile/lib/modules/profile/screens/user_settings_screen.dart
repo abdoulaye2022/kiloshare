@@ -9,6 +9,7 @@ import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/models/user_model.dart';
 import '../../../themes/modern_theme.dart';
 import '../../../utils/debug_storage_cleaner.dart';
+import '../../../widgets/optimized_cloudinary_image.dart';
 
 class UserSettingsScreen extends StatefulWidget {
   const UserSettingsScreen({super.key});
@@ -140,28 +141,25 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
             ),
-            child: CircleAvatar(
-              radius: 37,
-              backgroundImage: (isAuthenticated && user?.profilePicture != null)
-                  ? NetworkImage(user!.profilePicture!)
-                  : null,
-              child: (isAuthenticated && user?.profilePicture == null)
-                  ? Text(
-                      _getInitials(user),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    )
-                  : !isAuthenticated
-                      ? const Icon(
-                          Icons.person_outline,
-                          size: 40,
-                          color: Colors.white,
-                        )
-                      : null,
-            ),
+            child: isAuthenticated
+                ? CloudinaryAvatar(
+                    imageUrl: user?.profilePicture,
+                    userName: '${user?.firstName ?? ''} ${user?.lastName ?? ''}',
+                    radius: 37,
+                    textStyle: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  )
+                : const CircleAvatar(
+                    radius: 37,
+                    child: Icon(
+                      Icons.person_outline,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
           const SizedBox(height: 12),
           Text(
