@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
@@ -521,18 +522,43 @@ class CloudinaryAvatar extends StatelessWidget {
     Widget avatar;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
+      if (kDebugMode) {
+        print('[CloudinaryAvatar] Loading avatar: $imageUrl');
+        print('[CloudinaryAvatar] Is Cloudinary URL: ${_isCloudinaryUrl(imageUrl!)}');
+      }
       avatar = CircleAvatar(
         radius: radius,
         backgroundColor: backgroundColor ?? Colors.grey[200],
         child: ClipOval(
-          child: OptimizedCloudinaryImage(
-            imageUrl: imageUrl!,
-            imageType: 'avatar',
-            displayMode: radius <= 25 ? ImageDisplayMode.mini : ImageDisplayMode.thumbnail,
-            width: radius * 2,
-            height: radius * 2,
-            fit: BoxFit.cover,
-          ),
+          child: _isCloudinaryUrl(imageUrl!)
+              ? OptimizedCloudinaryImage(
+                  imageUrl: imageUrl!,
+                  imageType: 'avatar',
+                  displayMode: radius <= 25 ? ImageDisplayMode.mini : ImageDisplayMode.thumbnail,
+                  width: radius * 2,
+                  height: radius * 2,
+                  fit: BoxFit.cover,
+                )
+              : CachedNetworkImage(
+                  imageUrl: imageUrl!,
+                  width: radius * 2,
+                  height: radius * 2,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.person,
+                      size: radius * 0.8,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                ),
         ),
       );
     } else {
@@ -589,5 +615,12 @@ class CloudinaryAvatar extends StatelessWidget {
     
     final hash = name.hashCode.abs();
     return colors[hash % colors.length];
+  }
+
+  /// Vérifier si l'URL est une URL Cloudinary
+  bool _isCloudinaryUrl(String url) {
+    return url.contains('cloudinary.com') || 
+           url.contains('res.cloudinary.com') || 
+           url.contains('/image/upload/');
   }
 }
