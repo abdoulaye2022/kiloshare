@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import adminAuth from '../../lib/admin-auth';
+import { useAdminAuthStore } from '../../stores/adminAuthStore';
+import { ADMIN_ENDPOINTS, getDefaultHeaders } from '../../lib/api-config';
 
 interface DashboardStats {
   // KPIs Financiers
@@ -46,23 +47,44 @@ export default function Dashboard({ adminInfo, onLogout }: AdminDashboardProps) 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { token, isAuthenticated, logout } = useAdminAuthStore();
 
   useEffect(() => {
-    fetchDashboardStats();
-    // Rafraîchir les stats toutes les 5 minutes
-    const interval = setInterval(fetchDashboardStats, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (isAuthenticated && token) {
+      fetchDashboardStats();
+      // Rafraîchir les stats toutes les 5 minutes
+      const interval = setInterval(fetchDashboardStats, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, token]);
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await adminAuth.apiRequest('/api/v1/admin/dashboard/stats');
+      if (!token) {
+        setError('Aucun token d\'authentification disponible');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(ADMIN_ENDPOINTS.DASHBOARD_STATS, {
+        method: 'GET',
+        headers: getDefaultHeaders(token)
+      });
       
       if (response.ok) {
         const data = await response.json();
         setStats(data.stats);
         setError(null);
       } else {
+        // Si on reçoit une 401, c'est que le token n'est plus valide
+        if (response.status === 401) {
+          console.log('❌ Token expired, logging out');
+          logout();
+          onLogout();
+          return;
+        }
+        
         const errorData = await response.json();
         setError(errorData.message || 'Erreur lors du chargement des statistiques');
       }

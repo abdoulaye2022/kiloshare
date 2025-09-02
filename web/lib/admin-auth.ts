@@ -1,3 +1,5 @@
+import { AUTH_ENDPOINTS, getDefaultHeaders } from './api-config';
+
 class AdminAuthService {
   private static instance: AdminAuthService;
   private refreshPromise: Promise<void> | null = null;
@@ -20,14 +22,14 @@ class AdminAuthService {
     localStorage.setItem('adminTokenExpiresAt', expiresAt.toString());
   }
 
-  // Récupérer le token d'accès
+  // Récupérer le token d'accès (compatible avec le nouveau store Zustand)
   getAccessToken(): string | null {
-    return localStorage.getItem('adminToken');
+    return localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
   }
 
-  // Récupérer le refresh token
+  // Récupérer le refresh token (compatible avec le nouveau store Zustand)
   getRefreshToken(): string | null {
-    return localStorage.getItem('adminRefreshToken');
+    return localStorage.getItem('admin_refresh_token') || localStorage.getItem('adminRefreshToken');
   }
 
   // Vérifier si le token est expiré
@@ -42,7 +44,7 @@ class AdminAuthService {
     return now >= (tokenExpiresAt - 5 * 60 * 1000);
   }
 
-  // Obtenir un token valide (rafraîchir si nécessaire)
+  // Obtenir un token valide (simplifié - plus de refresh automatique)
   async getValidAccessToken(): Promise<string | null> {
     const token = this.getAccessToken();
     
@@ -50,29 +52,9 @@ class AdminAuthService {
       return null;
     }
 
-    if (!this.isTokenExpired()) {
-      return token;
-    }
-
-    // Si un refresh est déjà en cours, attendre sa completion
-    if (this.refreshPromise) {
-      await this.refreshPromise;
-      return this.getAccessToken();
-    }
-
-    // Lancer le refresh
-    this.refreshPromise = this.refreshToken();
-    
-    try {
-      await this.refreshPromise;
-      return this.getAccessToken();
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      this.clearTokens();
-      return null;
-    } finally {
-      this.refreshPromise = null;
-    }
+    // Pour l'instant, on retourne le token tel quel
+    // La validation se fera au niveau des API calls
+    return token;
   }
 
   // Rafraîchir le token
@@ -83,11 +65,9 @@ class AdminAuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch('/api/admin/auth/refresh', {
+    const response = await fetch(AUTH_ENDPOINTS.REFRESH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getDefaultHeaders(),
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
 
@@ -106,12 +86,20 @@ class AdminAuthService {
     );
   }
 
-  // Nettoyer tous les tokens
+  // Nettoyer tous les tokens (compatible avec les deux systèmes)
   clearTokens() {
+    // Old format
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminRefreshToken');
     localStorage.removeItem('adminTokenExpiresAt');
     localStorage.removeItem('adminInfo');
+    
+    // New format (Zustand store)
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_refresh_token');
+    localStorage.removeItem('admin-auth-storage');
+    sessionStorage.removeItem('admin_token');
+    sessionStorage.removeItem('admin_refresh_token');
   }
 
   // Faire une requête API avec gestion automatique des tokens
@@ -135,29 +123,9 @@ class AdminAuthService {
       headers,
     });
 
-    // Si on reçoit une 401, essayer de rafraîchir le token une fois
+    // Si on reçoit une 401, rediriger directement vers login
     if (response.status === 401) {
-      try {
-        await this.refreshToken();
-        const newToken = this.getAccessToken();
-        
-        if (newToken) {
-          const retryHeaders = {
-            ...options.headers,
-            'Authorization': `Bearer ${newToken}`,
-            'Content-Type': 'application/json',
-          };
-          
-          return fetch(url, {
-            ...options,
-            headers: retryHeaders,
-          });
-        }
-      } catch (error) {
-        console.error('Token refresh failed on 401:', error);
-      }
-      
-      // Si le refresh échoue, rediriger vers login
+      console.error('Authentication failed - redirecting to login');
       this.clearTokens();
       window.location.href = '/admin/login';
       throw new Error('Authentication failed');
@@ -166,11 +134,12 @@ class AdminAuthService {
     return response;
   }
 
-  // Vérifier si l'utilisateur est connecté
+  // Vérifier si l'utilisateur est connecté (compatible avec le nouveau store)
   isAuthenticated(): boolean {
     const token = this.getAccessToken();
-    const adminInfo = localStorage.getItem('adminInfo');
-    return !!token && !!adminInfo;
+    // Check both old and new storage formats
+    const adminInfo = localStorage.getItem('adminInfo') || localStorage.getItem('admin-auth-storage');
+    return !!token && (!!adminInfo || !!localStorage.getItem('admin_token'));
   }
 
   // Obtenir les informations admin
