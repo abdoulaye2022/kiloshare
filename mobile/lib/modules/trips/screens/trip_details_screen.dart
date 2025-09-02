@@ -41,11 +41,13 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     });
 
     try {
-      final trip = await AuthTokenService.instance.tripService.getTripById(widget.tripId);
-      
+      final trip = await AuthTokenService.instance.tripService
+          .getTripById(widget.tripId);
+
       // Vérifier le statut de favori en parallèle
-      final isFavorite = await FavoritesService.instance.isFavorite(widget.tripId);
-      
+      final isFavorite =
+          await FavoritesService.instance.isFavorite(widget.tripId);
+
       setState(() {
         _trip = trip;
         _isFavorite = isFavorite;
@@ -68,37 +70,40 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
       appBar: AppBar(
         title: const Text('Détails du voyage'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: _trip != null ? [
-          PopupMenuButton<String>(
-            onSelected: _handleMenuAction,
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit),
-                  title: Text('Modifier'),
-                  contentPadding: EdgeInsets.zero,
+        actions: _trip != null
+            ? [
+                PopupMenuButton<String>(
+                  onSelected: _handleMenuAction,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit),
+                        title: Text('Modifier'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: ListTile(
+                        leading: Icon(Icons.share),
+                        title: Text('Partager'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete, color: Colors.red),
+                        title: Text('Supprimer',
+                            style: TextStyle(color: Colors.red)),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'share',
-                child: ListTile(
-                  leading: Icon(Icons.share),
-                  title: Text('Partager'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(Icons.delete, color: Colors.red),
-                  title: Text('Supprimer', style: TextStyle(color: Colors.red)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-        ] : null,
+              ]
+            : null,
       ),
       body: _buildBody(),
     );
@@ -135,14 +140,15 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           ),
           const SizedBox(height: 16),
           // Trip Actions Widget (only for trip owner)
-          if (_isOwner) Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TripActionsWidget(
-              trip: _trip!,
-              onTripUpdated: (updatedTrip) => _handleTripUpdated(updatedTrip),
-              onTripDeleted: () => _handleTripDeleted(),
+          if (_isOwner)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: TripActionsWidget(
+                trip: _trip!,
+                onTripUpdated: (updatedTrip) => _handleTripUpdated(updatedTrip),
+                onTripDeleted: () => _handleTripDeleted(),
+              ),
             ),
-          ),
           _buildActionButtons(),
           _buildTripInfo(),
           _buildPricingInfo(),
@@ -158,7 +164,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildTripHeader() {
     final trip = _trip!;
-    
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
@@ -189,9 +195,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 child: Text(
                   trip.routeDisplay,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
               _buildStatusBadge(trip.status),
@@ -277,7 +283,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     final trip = _trip!;
     final dateFormatter = DateFormat('dd MMM yyyy', 'fr_FR');
     final timeFormatter = DateFormat('HH:mm', 'fr_FR');
-    
+
     return Row(
       children: [
         Expanded(
@@ -311,12 +317,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             ],
           ),
         ),
-        
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(
             children: [
-              Icon(Icons.schedule, size: 16, color: Colors.white.withOpacity(0.8)),
+              Icon(Icons.schedule,
+                  size: 16, color: Colors.white.withOpacity(0.8)),
               const SizedBox(height: 4),
               Text(
                 trip.durationDisplay,
@@ -328,7 +334,6 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             ],
           ),
         ),
-        
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -378,20 +383,23 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildPricingInfo() {
     final trip = _trip!;
-    
+
     return _buildSection(
       'Tarifs et capacité',
       [
-        _buildInfoRow('Poids disponible', '${trip.availableWeightKg.toStringAsFixed(1)} kg'),
-        _buildInfoRow('Prix par kg', '${trip.pricePerKg.toStringAsFixed(2)} ${trip.currency}'),
-        _buildInfoRow('Gain maximum', '${trip.totalEarningsPotential.toStringAsFixed(0)} ${trip.currency}'),
+        _buildInfoRow('Poids disponible',
+            '${trip.availableWeightKg.toStringAsFixed(1)} kg'),
+        _buildInfoRow('Prix par kg',
+            '${trip.pricePerKg.toStringAsFixed(2)} ${trip.currency}'),
+        _buildInfoRow('Gain maximum',
+            '${trip.totalEarningsPotential.toStringAsFixed(0)} ${trip.currency}'),
       ],
     );
   }
 
   Widget _buildFlightInfo() {
     final trip = _trip!;
-    
+
     if (trip.airline == null && trip.flightNumber == null) {
       return const SizedBox.shrink();
     }
@@ -416,7 +424,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildActionButtons() {
     if (_trip == null) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.all(16),
       child: Row(
@@ -435,9 +443,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ),
             ),
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // Share button
           Expanded(
             child: OutlinedButton.icon(
@@ -449,10 +457,10 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ),
             ),
           ),
-          
+
           if (_isOwner) ...[
             const SizedBox(width: 12),
-            
+
             // Edit button (owner only)
             Expanded(
               child: ElevatedButton.icon(
@@ -472,7 +480,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildContactInfo() {
     final trip = _trip!;
-    
+
     if (trip.user == null) {
       return const SizedBox.shrink();
     }
@@ -507,14 +515,15 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 children: [
                   Icon(Icons.star, size: 16, color: Colors.amber[600]),
                   const SizedBox(width: 4),
-                  const Text('4.8', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('4.8',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(width: 8),
                   Text('(127 avis)', style: TextStyle(color: Colors.grey[600])),
                 ],
               ),
             ],
           ),
-          trailing: !_isOwner 
+          trailing: !_isOwner
               ? ElevatedButton(
                   onPressed: _contactTransporter,
                   child: const Text('Contacter'),
@@ -527,7 +536,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildBookingSection() {
     if (_trip == null || _isOwner) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.all(16),
       child: Card(
@@ -551,25 +560,21 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   ),
                 ],
               ),
-              
               const SizedBox(height: 12),
-              
               Text(
                 'Capacité disponible: ${_trip!.availableWeightKg.toStringAsFixed(1)} kg',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              
               Text(
                 'Prix: ${_trip!.pricePerKg.toStringAsFixed(2)} ${_trip!.currency} par kg',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              
               const SizedBox(height: 16),
-              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _trip!.status == TripStatus.active ? _bookTrip : null,
+                  onPressed:
+                      _trip!.status == TripStatus.active ? _bookTrip : null,
                   icon: const Icon(Icons.book_online),
                   label: const Text('Réserver maintenant'),
                   style: ElevatedButton.styleFrom(
@@ -579,9 +584,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   ),
                 ),
               ),
-              
               const SizedBox(height: 8),
-              
               Text(
                 'Vous pourrez préciser le poids exact et les détails lors de la réservation',
                 style: TextStyle(
@@ -599,7 +602,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   Widget _buildSection(String title, List<Widget> children) {
     if (children.isEmpty) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Card(
@@ -611,8 +614,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 12),
               ...children,
@@ -667,15 +670,15 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           Text(
             'Erreur de chargement',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.red[600],
-            ),
+                  color: Colors.red[600],
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             _error!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[600],
-            ),
+                  color: Colors.grey[600],
+                ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -703,8 +706,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           Text(
             'Voyage introuvable',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey[600],
-            ),
+                  color: Colors.grey[600],
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -739,24 +742,36 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   void _toggleFavorite() async {
     if (_trip == null) return;
-    
-    final success = await FavoritesService.instance.toggleFavorite(_trip!.id.toString());
-    
-    if (success) {
-      setState(() {
-        _isFavorite = !_isFavorite;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris'),
-            backgroundColor: _isFavorite ? Colors.green : Colors.grey[600],
-            duration: const Duration(seconds: 2),
-          ),
-        );
+
+    try {
+      final result = await FavoritesService.instance.toggleFavorite(_trip!.id.toString());
+
+      if (result['success'] == true) {
+        setState(() {
+          _isFavorite = result['isFavorite'] ?? false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris'),
+              backgroundColor: _isFavorite ? Colors.green : Colors.grey[600],
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors de la mise à jour des favoris'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
-    } else {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -790,14 +805,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   Text(
                     'Contacter le transporteur',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ],
               ),
-              
               const SizedBox(height: 16),
-              
               const TextField(
                 decoration: InputDecoration(
                   labelText: 'Votre message',
@@ -806,9 +819,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 ),
                 maxLines: 4,
               ),
-              
               const SizedBox(height: 16),
-              
               Row(
                 children: [
                   Expanded(
@@ -863,27 +874,22 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   Text(
                     'Réserver cet espace',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green[800],
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[800],
+                        ),
                   ),
                 ],
               ),
-              
               const SizedBox(height: 16),
-              
               Text(
                 'Route: ${_trip!.routeDisplay}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              
               Text(
                 'Prix: ${_trip!.pricePerKg.toStringAsFixed(2)} ${_trip!.currency}/kg',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              
               const SizedBox(height: 16),
-              
               const TextField(
                 decoration: InputDecoration(
                   labelText: 'Poids à transporter (kg)',
@@ -892,20 +898,17 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 ),
                 keyboardType: TextInputType.number,
               ),
-              
               const SizedBox(height: 12),
-              
               const TextField(
                 decoration: InputDecoration(
                   labelText: 'Description du colis',
-                  hintText: 'Décrivez brièvement ce que vous voulez transporter...',
+                  hintText:
+                      'Décrivez brièvement ce que vous voulez transporter...',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
               ),
-              
               const SizedBox(height: 16),
-              
               Row(
                 children: [
                   Expanded(
@@ -962,7 +965,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
 Réservez maintenant: https://kiloshare.app/trips/${trip.id}
     ''';
-    
+
     // In a real app, you would use the share plugin
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -994,7 +997,7 @@ Réservez maintenant: https://kiloshare.app/trips/${trip.id}
     setState(() {
       _trip = updatedTrip;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Voyage mis à jour avec succès'),
@@ -1002,7 +1005,7 @@ Réservez maintenant: https://kiloshare.app/trips/${trip.id}
       ),
     );
   }
-  
+
   void _handleTripDeleted() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1010,7 +1013,7 @@ Réservez maintenant: https://kiloshare.app/trips/${trip.id}
         backgroundColor: Colors.green,
       ),
     );
-    
+
     // Navigate back to trips list
     context.pop();
   }
@@ -1032,7 +1035,8 @@ Réservez maintenant: https://kiloshare.app/trips/${trip.id}
             onPressed: () async {
               Navigator.of(context).pop();
               try {
-                await AuthTokenService.instance.tripService.deleteTrip(widget.tripId);
+                await AuthTokenService.instance.tripService
+                    .deleteTrip(widget.tripId);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

@@ -32,18 +32,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _professionController = TextEditingController();
   final _companyController = TextEditingController();
   final _websiteController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
   final _cityController = TextEditingController();
+  final _stateProvinceController = TextEditingController();
   final _postalCodeController = TextEditingController();
+  final _nationalityController = TextEditingController();
+  final _emergencyContactNameController = TextEditingController();
+  final _emergencyContactPhoneController = TextEditingController();
+  final _emergencyContactRelationController = TextEditingController();
   
   // State
   File? _selectedImage;
   String? _selectedGender;
   String? _selectedCountry;
+  String? _selectedLanguage;
+  String? _selectedTimezone;
+  String? _selectedProfileVisibility;
   DateTime? _selectedBirthDate;
   UserProfile? _currentProfile;
   bool _isLoading = false;
   bool _isLoadingProfile = true;
+  bool _newsletterSubscribed = true;
+  bool _marketingEmails = false;
 
   @override
   void initState() {
@@ -60,9 +71,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _professionController.dispose();
     _companyController.dispose();
     _websiteController.dispose();
-    _addressController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
     _cityController.dispose();
+    _stateProvinceController.dispose();
     _postalCodeController.dispose();
+    _nationalityController.dispose();
+    _emergencyContactNameController.dispose();
+    _emergencyContactPhoneController.dispose();
+    _emergencyContactRelationController.dispose();
     super.dispose();
   }
 
@@ -79,11 +96,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _professionController.text = profile.profession ?? '';
           _companyController.text = profile.company ?? '';
           _websiteController.text = profile.website ?? '';
-          _addressController.text = profile.address ?? '';
+          _addressLine1Controller.text = profile.address ?? '';
           _cityController.text = profile.city ?? '';
           _postalCodeController.text = profile.postalCode ?? '';
-          _selectedGender = profile.gender;
-          _selectedCountry = profile.country;
+          // Pour les nouveaux champs, on utilise des valeurs vides pour l'instant
+          _selectedLanguage = 'fr';
+          _selectedTimezone = 'Europe/Paris';
+          _selectedProfileVisibility = 'public';
+          // Utiliser le genre du profil ou une chaîne vide par défaut
+          _selectedGender = profile.gender ?? '';
+          // Utiliser le pays du profil ou une chaîne vide par défaut
+          _selectedCountry = profile.country ?? '';
           _selectedBirthDate = profile.dateOfBirth;
           _isLoadingProfile = false;
         });
@@ -163,12 +186,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'profession': _professionController.text.trim(),
         'company': _companyController.text.trim(),
         'website': _websiteController.text.trim(),
-        'address': _addressController.text.trim(),
+        'address_line1': _addressLine1Controller.text.trim(),
+        'address_line2': _addressLine2Controller.text.trim(),
         'city': _cityController.text.trim(),
+        'state_province': _stateProvinceController.text.trim(),
         'postal_code': _postalCodeController.text.trim(),
         'gender': _selectedGender,
         'country': _selectedCountry,
+        'nationality': _nationalityController.text.trim(),
         'date_of_birth': _selectedBirthDate?.toIso8601String().split('T')[0],
+        'emergency_contact_name': _emergencyContactNameController.text.trim(),
+        'emergency_contact_phone': _emergencyContactPhoneController.text.trim(),
+        'emergency_contact_relation': _emergencyContactRelationController.text.trim(),
+        'preferred_language': _selectedLanguage,
+        'timezone': _selectedTimezone,
+        'profile_visibility': _selectedProfileVisibility,
+        'newsletter_subscribed': _newsletterSubscribed ? 1 : 0,
+        'marketing_emails': _marketingEmails ? 1 : 0,
         if (avatarUrl != null) 'profile_picture': avatarUrl,
       };
 
@@ -276,6 +310,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _buildProfessionalInfoSection(),
                     const SizedBox(height: 24),
                     _buildAddressSection(),
+                    const SizedBox(height: 24),
+                    _buildAdditionalInfoSection(),
+                    const SizedBox(height: 24),
+                    _buildEmergencyContactSection(),
+                    const SizedBox(height: 24),
+                    _buildPreferencesSection(),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -554,13 +594,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _addressController,
+              controller: _addressLine1Controller,
               decoration: const InputDecoration(
-                labelText: 'Adresse complète',
+                labelText: 'Adresse ligne 1',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on),
               ),
-              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _addressLine2Controller,
+              decoration: const InputDecoration(
+                labelText: 'Adresse ligne 2 (optionnel)',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             Row(
@@ -588,6 +635,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            TextFormField(
+              controller: _stateProvinceController,
+              decoration: const InputDecoration(
+                labelText: 'État/Province (optionnel)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedCountry,
               decoration: const InputDecoration(
@@ -597,12 +652,188 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               items: _profileService.getAvailableCountries()
                   .map((country) => DropdownMenuItem(
                         value: country,
-                        child: Text(country),
+                        child: Text(country.isEmpty ? 'Non spécifié' : country),
                       ))
                   .toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedCountry = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdditionalInfoSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Informations complémentaires',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nationalityController,
+              decoration: const InputDecoration(
+                labelText: 'Nationalité',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.flag),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyContactSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Contact d\'urgence',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emergencyContactNameController,
+              decoration: const InputDecoration(
+                labelText: 'Nom du contact',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emergencyContactPhoneController,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone du contact',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emergencyContactRelationController,
+              decoration: const InputDecoration(
+                labelText: 'Relation (ex: conjoint, parent, ami)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.family_restroom),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreferencesSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Préférences',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedLanguage,
+              decoration: const InputDecoration(
+                labelText: 'Langue préférée',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.language),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'fr', child: Text('Français')),
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'es', child: Text('Español')),
+                DropdownMenuItem(value: 'de', child: Text('Deutsch')),
+                DropdownMenuItem(value: 'it', child: Text('Italiano')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedLanguage = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedTimezone,
+              decoration: const InputDecoration(
+                labelText: 'Fuseau horaire',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.access_time),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Europe/Paris', child: Text('Europe/Paris (CET)')),
+                DropdownMenuItem(value: 'Europe/London', child: Text('Europe/London (GMT)')),
+                DropdownMenuItem(value: 'America/New_York', child: Text('America/New_York (EST)')),
+                DropdownMenuItem(value: 'America/Los_Angeles', child: Text('America/Los_Angeles (PST)')),
+                DropdownMenuItem(value: 'Asia/Tokyo', child: Text('Asia/Tokyo (JST)')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedTimezone = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedProfileVisibility,
+              decoration: const InputDecoration(
+                labelText: 'Visibilité du profil',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.visibility),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'public', child: Text('Public')),
+                DropdownMenuItem(value: 'private', child: Text('Privé')),
+                DropdownMenuItem(value: 'friends_only', child: Text('Amis uniquement')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedProfileVisibility = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Recevoir la newsletter'),
+              subtitle: const Text('Informations sur les nouvelles fonctionnalités'),
+              value: _newsletterSubscribed,
+              onChanged: (value) {
+                setState(() {
+                  _newsletterSubscribed = value;
+                });
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Emails marketing'),
+              subtitle: const Text('Promotions et offres spéciales'),
+              value: _marketingEmails,
+              onChanged: (value) {
+                setState(() {
+                  _marketingEmails = value;
                 });
               },
             ),

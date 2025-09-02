@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../../config/app_config.dart';
@@ -8,11 +7,11 @@ import '../models/trip_model.dart';
 class FavoritesService {
   static FavoritesService? _instance;
   static FavoritesService get instance => _instance ??= FavoritesService._();
-  
+
   FavoritesService._();
 
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: '${AppConfig.baseUrl}/v1',
+    baseUrl: AppConfig.baseUrl,
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
     headers: {
@@ -35,15 +34,30 @@ class FavoritesService {
   /// Ajouter un voyage aux favoris
   Future<bool> addToFavorites(String tripId) async {
     try {
+      final options = await _getAuthHeaders();
+      
+      if (kDebugMode) {
+        print('[FavoritesService] Adding to favorites - URL: ${AppConfig.baseUrl}/favorites/trips/$tripId');
+        print('[FavoritesService] Headers: ${options.headers}');
+      }
+
       final response = await _dio.post(
-        '/trips/$tripId/favorite',
-        options: await _getAuthHeaders(),
+        '/favorites/trips/$tripId',
+        options: options,
       );
+
+      if (kDebugMode) {
+        print('[FavoritesService] Response: ${response.data}');
+      }
 
       return response.data['success'] == true;
     } catch (e) {
       if (kDebugMode) {
         print('[FavoritesService] Erreur ajout favoris: $e');
+        if (e is DioException && e.response != null) {
+          print('[FavoritesService] Error response: ${e.response?.data}');
+          print('[FavoritesService] Error status: ${e.response?.statusCode}');
+        }
       }
       return false;
     }
@@ -57,12 +71,13 @@ class FavoritesService {
       }
 
       final response = await _dio.delete(
-        '/trips/$tripId/favorite',
+        '/favorites/trips/$tripId',
         options: await _getAuthHeaders(),
       );
 
       if (kDebugMode) {
-        print('[FavoritesService] Réponse suppression favoris: ${response.data}');
+        print(
+            '[FavoritesService] Réponse suppression favoris: ${response.data}');
       }
 
       return response.data['success'] == true;
@@ -78,12 +93,16 @@ class FavoritesService {
   Future<bool> isFavorite(String tripId) async {
     try {
       final response = await _dio.get(
-        '/trips/$tripId/favorite/status',
+        '/favorites/trips/$tripId/status',
         options: await _getAuthHeaders(),
       );
 
-      return response.data['success'] == true && 
-             response.data['is_favorite'] == true;
+      if (kDebugMode) {
+        print('[FavoritesService] Status check response: ${response.data}');
+      }
+
+      return response.data['success'] == true &&
+          response.data['data']['is_favorite'] == true;
     } catch (e) {
       if (kDebugMode) {
         print('[FavoritesService] Erreur vérification favoris: $e');
@@ -96,7 +115,7 @@ class FavoritesService {
   Future<List<Trip>> getFavoriteTrips() async {
     try {
       final response = await _dio.get(
-        '/trips/favorites',
+        '/favorites',
         options: await _getAuthHeaders(),
       );
 
@@ -115,20 +134,34 @@ class FavoritesService {
   }
 
   /// Basculer l'état favoris d'un voyage
-  Future<bool> toggleFavorite(String tripId) async {
+  /// Retourne un Map avec {success: bool, isFavorite: bool}
+  Future<Map<String, dynamic>> toggleFavorite(String tripId) async {
     try {
-      final isFav = await isFavorite(tripId);
-      
-      if (isFav) {
-        return await removeFromFavorites(tripId);
-      } else {
-        return await addToFavorites(tripId);
+      if (kDebugMode) {
+        print('[FavoritesService] Toggle favorite for trip: $tripId');
       }
+
+      final response = await _dio.post(
+        '/favorites/trips/$tripId/toggle',
+        options: await _getAuthHeaders(),
+      );
+
+      if (kDebugMode) {
+        print('[FavoritesService] Toggle response: ${response.data}');
+      }
+
+      return {
+        'success': response.data['success'] == true,
+        'isFavorite': response.data['data']?['data']?['is_favorite'] ?? false,
+      };
     } catch (e) {
       if (kDebugMode) {
         print('[FavoritesService] Erreur toggle favoris: $e');
+        if (e is DioException && e.response != null) {
+          print('[FavoritesService] Toggle error response: ${e.response?.data}');
+        }
       }
-      return false;
+      return {'success': false, 'isFavorite': false};
     }
   }
 }

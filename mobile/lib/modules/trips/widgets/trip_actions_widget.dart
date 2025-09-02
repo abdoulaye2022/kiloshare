@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
 import '../services/trip_state_manager.dart';
+import '../services/favorites_service.dart';
 
 class TripActionsWidget extends StatefulWidget {
   final Trip trip;
   final Function(Trip)? onTripUpdated;
   final Function()? onTripDeleted;
-  
+
   const TripActionsWidget({
     Key? key,
     required this.trip,
@@ -25,9 +26,11 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final availableActions = TripStateManager.getAvailableActions(widget.trip.status)
-        .where((action) => TripStateManager.canPerformAction(widget.trip, action))
-        .toList();
+    final availableActions =
+        TripStateManager.getAvailableActions(widget.trip.status)
+            .where((action) =>
+                TripStateManager.canPerformAction(widget.trip, action))
+            .toList();
 
     if (availableActions.isEmpty) {
       return const SizedBox.shrink();
@@ -42,14 +45,16 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
             Text(
               'Actions disponibles',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: availableActions.map((action) => _buildActionButton(action)).toList(),
+              children: availableActions
+                  .map((action) => _buildActionButton(action))
+                  .toList(),
             ),
           ],
         ),
@@ -58,15 +63,20 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
   }
 
   Widget _buildActionButton(TripAction action) {
-    final isDestructive = [TripAction.delete, TripAction.cancel].contains(action);
-    final isPrimary = [TripAction.publish, TripAction.republish, TripAction.resume].contains(action);
-    
+    final isDestructive =
+        [TripAction.delete, TripAction.cancel].contains(action);
+    final isPrimary = [
+      TripAction.publish,
+      TripAction.republish,
+      TripAction.resume
+    ].contains(action);
+
     return ElevatedButton.icon(
       onPressed: _isLoading ? null : () => _handleAction(action),
       icon: Text(TripStateManager.getActionIcon(action)),
       label: Text(TripStateManager.getActionLabel(action)),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isDestructive 
+        backgroundColor: isDestructive
             ? Colors.red[50]
             : isPrimary
                 ? Theme.of(context).primaryColor
@@ -149,7 +159,8 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
 
   Future<void> _pauseTrip() async {
     final reason = await _showReasonDialog('Raison de la pause (optionnel)');
-    final updatedTrip = await _tripService.pauseTrip(widget.trip.id, reason: reason);
+    final updatedTrip =
+        await _tripService.pauseTrip(widget.trip.id, reason: reason);
     widget.onTripUpdated?.call(updatedTrip);
     _showSuccessSnackBar('Voyage mis en pause');
   }
@@ -165,11 +176,12 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
       'Annuler le voyage',
       'Êtes-vous sûr de vouloir annuler ce voyage ?',
     );
-    
+
     if (!confirmed) return;
 
     final reason = await _showReasonDialog('Raison de l\'annulation');
-    final updatedTrip = await _tripService.cancelTrip(widget.trip.id, reason: reason);
+    final updatedTrip =
+        await _tripService.cancelTrip(widget.trip.id, reason: reason);
     widget.onTripUpdated?.call(updatedTrip);
     _showSuccessSnackBar('Voyage annulé');
   }
@@ -179,7 +191,7 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
       'Marquer comme terminé',
       'Confirmer que ce voyage est terminé ?',
     );
-    
+
     if (!confirmed) return;
 
     final updatedTrip = await _tripService.completeTrip(widget.trip.id);
@@ -188,13 +200,11 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
   }
 
   Future<void> _shareTrip() async {
-    final shareUrl = await _tripService.shareTrip(widget.trip.id);
     // TODO: Implement actual sharing (share_plus package)
     _showSuccessSnackBar('Lien de partage généré');
   }
 
   Future<void> _duplicateTrip() async {
-    final duplicatedTrip = await _tripService.duplicateTrip(widget.trip.id);
     // TODO: Navigate to edit screen with duplicated trip
     _showSuccessSnackBar('Voyage dupliqué');
   }
@@ -204,7 +214,7 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
       'Supprimer le voyage',
       'Cette action est irréversible. Continuer ?',
     );
-    
+
     if (!confirmed) return;
 
     await _tripService.deleteTrip(widget.trip.id);
@@ -228,13 +238,21 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
   }
 
   Future<void> _addToFavorites() async {
-    await _tripService.addToFavorites(widget.trip.id);
-    _showSuccessSnackBar('Ajouté aux favoris');
+    final result = await FavoritesService.instance.toggleFavorite(widget.trip.id);
+    if (result['success'] == true) {
+      _showSuccessSnackBar(result['isFavorite'] == true ? 'Ajouté aux favoris' : 'Retiré des favoris');
+    } else {
+      _showErrorSnackBar('Erreur lors de la mise à jour des favoris');
+    }
   }
 
   Future<void> _removeFromFavorites() async {
-    await _tripService.removeFromFavorites(widget.trip.id);
-    _showSuccessSnackBar('Retiré des favoris');
+    final result = await FavoritesService.instance.toggleFavorite(widget.trip.id);
+    if (result['success'] == true) {
+      _showSuccessSnackBar(result['isFavorite'] == true ? 'Ajouté aux favoris' : 'Retiré des favoris');
+    } else {
+      _showErrorSnackBar('Erreur lors de la mise à jour des favoris');
+    }
   }
 
   Future<void> _reportTrip() async {
@@ -272,7 +290,7 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
 
   Future<String?> _showReasonDialog(String title) async {
     final controller = TextEditingController();
-    
+
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -301,7 +319,7 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
 
   Future<String?> _showReportDialog() async {
     String? selectedType;
-    
+
     final result = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -311,18 +329,21 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               'spam',
-              'fraud', 
+              'fraud',
               'inappropriate',
               'misleading',
               'prohibited_items',
               'suspicious_price',
               'other'
-            ].map((type) => RadioListTile<String>(
-              title: Text(_getReportTypeLabel(type)),
-              value: type,
-              groupValue: selectedType,
-              onChanged: (value) => setState(() => selectedType = value),
-            )).toList(),
+            ]
+                .map((type) => RadioListTile<String>(
+                      title: Text(_getReportTypeLabel(type)),
+                      value: type,
+                      groupValue: selectedType,
+                      onChanged: (value) =>
+                          setState(() => selectedType = value),
+                    ))
+                .toList(),
           ),
           actions: [
             TextButton(

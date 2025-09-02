@@ -83,11 +83,14 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       bool isFavorite = false;
       if (isAuth && userId != null && trip.userId != userId) {
         try {
+          print('TripDetailsFinal: Checking favorite status for trip: ${widget.tripId}');
           isFavorite = await FavoritesService.instance.isFavorite(widget.tripId);
           print('TripDetailsFinal: Trip is favorite: $isFavorite');
         } catch (e) {
           print('TripDetailsFinal: Error checking favorite status: $e');
         }
+      } else {
+        print('TripDetailsFinal: Skipping favorite check - isAuth: $isAuth, isOwner: ${trip.userId == userId}');
       }
       
       if (mounted) {
@@ -922,6 +925,8 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   }
 
   void _toggleFavorite() async {
+    print('TripDetailsFinal: Toggle favorite clicked - current state: $_isFavorite');
+    
     if (!_isAuthenticated) {
       _showMessage('Veuillez vous connecter pour ajouter aux favoris', Colors.orange);
       return;
@@ -933,11 +938,19 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     }
     
     try {
-      final success = await FavoritesService.instance.toggleFavorite(widget.tripId);
-      if (success) {
+      final result = await FavoritesService.instance.toggleFavorite(widget.tripId);
+      print('TripDetailsFinal: Toggle result: $result');
+      
+      if (result['success'] == true) {
+        final newFavoriteState = result['isFavorite'] ?? false;
+        print('TripDetailsFinal: Updating state from $_isFavorite to $newFavoriteState');
+        
         setState(() {
-          _isFavorite = !_isFavorite;
+          _isFavorite = newFavoriteState;
         });
+        
+        print('TripDetailsFinal: State updated - new _isFavorite: $_isFavorite');
+        
         _showMessage(
           _isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris', 
           Colors.green
@@ -946,6 +959,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
       }
     } catch (e) {
+      print('TripDetailsFinal: Toggle error: $e');
       _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
     }
   }
