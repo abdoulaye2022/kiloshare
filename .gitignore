@@ -17,7 +17,10 @@ STRIPE_*.md
 FIREBASE_*.md
 DATABASE_*.md
 ENV_SETUP_GUIDE.md
+ENV_SETUP_GUIDE.md.bak
 env
+env.example.bak
+*.bak
 
 # Claude Code
 .claude_session/
