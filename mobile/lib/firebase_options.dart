@@ -41,30 +41,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBZlgmN3PnUZzQ7YAm1cJzFdnA_example',
-    appId: '1:123456789012:web:abcdef123456789012345',
-    messagingSenderId: '123456789012',
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:web:kiloshare-web',
+    messagingSenderId: '450200476606',
     projectId: 'kiloshare-8f7fa',
     authDomain: 'kiloshare-8f7fa.firebaseapp.com',
-    storageBucket: 'kiloshare-8f7fa.appspot.com',
-    measurementId: 'G-ABCDEF123',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
+    measurementId: 'G-MEASUREMENT_ID',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBZlgmN3PnUZzQ7YAm1cJzFdnA_example',
-    appId: '1:123456789012:android:abcdef123456789012345',
-    messagingSenderId: '123456789012',
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:android:abe80a47c7c1fb421537ef',
+    messagingSenderId: '450200476606',
     projectId: 'kiloshare-8f7fa',
-    storageBucket: 'kiloshare-8f7fa.appspot.com',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBZlgmN3PnUZzQ7YAm1cJzFdnA_example',
-    appId: '1:123456789012:ios:abcdef123456789012345',
-    messagingSenderId: '123456789012',
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:ios:kiloshare-ios',
+    messagingSenderId: '450200476606',
     projectId: 'kiloshare-8f7fa',
-    iosBundleId: 'com.kiloshare.app',
-    storageBucket: 'kiloshare-8f7fa.appspot.com',
+    iosBundleId: 'com.m2atech.kiloshare',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

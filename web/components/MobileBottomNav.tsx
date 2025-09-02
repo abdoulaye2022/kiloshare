@@ -10,17 +10,17 @@ export default function MobileBottomNav() {
 
   const isActive = (path: string) => pathname === path;
 
-  // Ne pas afficher sur la page d'accueil
-  if (pathname === '/') return null;
+  // Ne pas afficher sur la page d'accueil et les pages admin
+  if (pathname === '/' || pathname?.startsWith('/admin')) return null;
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
       <div className="grid grid-cols-4 h-16">
         {/* Rechercher */}
         <Link
-          href="/trips"
+          href="/admin/search"
           className={`flex flex-col items-center justify-center space-y-1 ${
-            isActive('/trips')
+            isActive('/admin/search')
               ? 'text-blue-600 bg-blue-50'
               : 'text-gray-600'
           }`}
@@ -31,9 +31,9 @@ export default function MobileBottomNav() {
 
         {/* Mes voyages */}
         <Link
-          href="/my-trips"
+          href="/admin/my-trips"
           className={`flex flex-col items-center justify-center space-y-1 relative ${
-            isActive('/my-trips')
+            isActive('/admin/my-trips')
               ? 'text-blue-600 bg-blue-50'
               : 'text-gray-600'
           }`}
@@ -50,9 +50,9 @@ export default function MobileBottomNav() {
 
         {/* Propositions */}
         <Link
-          href="/proposals"
+          href="/admin/proposals"
           className={`flex flex-col items-center justify-center space-y-1 relative ${
-            isActive('/proposals')
+            isActive('/admin/proposals')
               ? 'text-blue-600 bg-blue-50'
               : 'text-gray-600'
           }`}

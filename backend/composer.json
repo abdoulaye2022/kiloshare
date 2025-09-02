@@ -1,51 +1,49 @@
 {
-    "name": "kiloshare/backend",
-    "description": "KiloShare Backend API - Application de partage d'espace bagages",
+    "name": "kiloshare/backend-api",
+    "description": "KiloShare Backend API - Refactored with Illuminate ORM",
     "type": "project",
+    "license": "MIT",
     "require": {
         "php": "^8.1",
-        "cloudinary/cloudinary_php": "^3.1",
+        "cloudinary/cloudinary_php": "^2.13",
         "firebase/php-jwt": "^6.8",
-        "getbrevo/brevo-php": "1.x.x",
-        "league/flysystem": "^3.0",
-        "league/flysystem-ftp": "^3.0",
-        "monolog/monolog": "^3.0",
-        "php-di/php-di": "^7.0",
+        "illuminate/database": "^10.0",
+        "illuminate/events": "^10.48",
+        "league/fractal": "^0.20",
+        "monolog/monolog": "^3.4",
+        "nesbot/carbon": "^2.68",
+        "php-di/slim-bridge": "^3.4",
+        "phpmailer/phpmailer": "^6.8",
+        "predis/predis": "^2.2",
         "ramsey/uuid": "^4.7",
         "respect/validation": "^2.2",
         "slim/psr7": "^1.6",
-        "slim/slim": "4.*",
-        "stripe/stripe-php": "^17.6",
-        "twilio/sdk": "^8.7",
+        "slim/slim": "^4.12",
+        "stripe/stripe-php": "^12.0",
         "vlucas/phpdotenv": "^5.5"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.0",
-        "squizlabs/php_codesniffer": "^3.7"
+        "phpunit/phpunit": "^9.6"
     },
     "autoload": {
         "psr-4": {
-            "KiloShare\\": "src/",
-            "App\\": "src/"
-        },
-        "classmap": [
-            "src/modules/"
-        ]
+            "KiloShare\\": "src/"
+        }
     },
     "autoload-dev": {
         "psr-4": {
-            "KiloShare\\Tests\\": "tests/"
+            "Tests\\": "tests/"
         }
     },
-    "scripts": {
-        "start": "php -S localhost:8080 -t public",
-        "test": "phpunit",
-        "cs-check": "phpcs",
-        "cs-fix": "phpcbf"
-    },
     "config": {
-        "process-timeout": 0,
-        "sort-packages": true,
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse src",
+        "cs-fix": "phpcbf",
+        "cs-check": "phpcs"
     }
 }

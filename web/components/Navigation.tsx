@@ -9,6 +9,11 @@ export default function Navigation() {
   const pathname = usePathname();
 
   const isActive = (path: string) => pathname === path;
+  
+  // Ne pas afficher sur les pages admin
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -23,9 +28,9 @@ export default function Navigation() {
           {/* Navigation Links */}
           <div className="hidden md:flex space-x-6">
             <Link
-              href="/trips"
+              href="/admin/search"
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive('/trips')
+                isActive('/admin/search')
                   ? 'bg-blue-100 text-blue-700'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
@@ -35,9 +40,9 @@ export default function Navigation() {
             </Link>
 
             <Link
-              href="/my-trips"
+              href="/admin/my-trips"
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive('/my-trips')
+                isActive('/admin/my-trips')
                   ? 'bg-blue-100 text-blue-700'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
@@ -51,9 +56,9 @@ export default function Navigation() {
             </Link>
 
             <Link
-              href="/proposals"
+              href="/admin/proposals"
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive('/proposals')
+                isActive('/admin/proposals')
                   ? 'bg-blue-100 text-blue-700'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}

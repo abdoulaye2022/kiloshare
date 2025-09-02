@@ -1,51 +1,46 @@
+'use client';
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { usePathname } from 'next/navigation';
 import Navigation from '../components/Navigation';
 import MobileBottomNav from '../components/MobileBottomNav';
+import AdminStoreInitializer from '../components/admin/AdminStoreInitializer';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
-
-export const metadata: Metadata = {
-  title: 'KiloShare - Partagez vos espaces bagages',
-  description: 'La plateforme de partage d\'espace bagages qui connecte voyageurs et expéditeurs pour des transports plus économiques et écologiques.',
-  keywords: ['bagages', 'voyage', 'transport', 'économique', 'écologique', 'partage'],
-  authors: [{ name: 'KiloShare Team' }],
-  viewport: 'width=device-width, initial-scale=1',
-  robots: 'index, follow',
-  openGraph: {
-    title: 'KiloShare - Partagez vos espaces bagages',
-    description: 'Connectez voyageurs et expéditeurs pour des transports plus économiques et écologiques.',
-    type: 'website',
-    url: process.env.NEXT_PUBLIC_APP_URL,
-    siteName: 'KiloShare',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'KiloShare - Partagez vos espaces bagages',
-    description: 'Connectez voyageurs et expéditeurs pour des transports plus économiques et écologiques.',
-  },
-};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const isHomePage = typeof window !== 'undefined' && window.location.pathname === '/';
+  const pathname = usePathname();
+  const isAdminPage = pathname?.startsWith('/admin');
+  const isHomePage = pathname === '/';
   
   return (
     <html lang="fr">
       <body className={inter.className}>
-        {/* Navigation desktop */}
-        <Navigation />
+        <AdminStoreInitializer />
         
-        <main className="pb-16 md:pb-0">
+        {!isAdminPage && !isHomePage && (
+          <>
+            {/* Navigation desktop */}
+            <Navigation />
+          </>
+        )}
+        
+        <main className={!isAdminPage && !isHomePage ? "pb-16 md:pb-0" : ""}>
           {children}
         </main>
         
-        {/* Navigation mobile en bas */}
-        <MobileBottomNav />
+        {!isAdminPage && !isHomePage && (
+          <>
+            {/* Navigation mobile en bas */}
+            <MobileBottomNav />
+          </>
+        )}
       </body>
     </html>
   );
