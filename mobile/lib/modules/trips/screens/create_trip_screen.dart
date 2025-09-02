@@ -24,7 +24,7 @@ import 'dart:io';
 class CreateTripScreen extends StatefulWidget {
   final TransportType? initialTransportType;
   final String? tripId; // For edit mode
-  
+
   const CreateTripScreen({
     super.key,
     this.initialTransportType,
@@ -38,24 +38,24 @@ class CreateTripScreen extends StatefulWidget {
 class _CreateTripScreenState extends State<CreateTripScreen> {
   final PageController _pageController = PageController();
   final TripService _tripService = TripService();
-  
+
   int _currentStep = 0;
   final int _totalSteps = 6;
-  
+
   // Form data
   final Map<String, dynamic> _tripData = {};
-  
+
   // Images
   List<File> _selectedImages = [];
   List<TripImage> _existingImages = [];
   final TripImageService _tripImageService = TripImageService();
-  
+
   // Form controllers
   final _flightNumberController = TextEditingController();
   final _airlineController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _specialNotesController = TextEditingController();
-  
+
   bool _isLoading = false;
   PriceSuggestion? _priceSuggestion;
   String? _routeError;
@@ -67,7 +67,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     if (widget.initialTransportType != null) {
       _tripData['transport_type'] = widget.initialTransportType!.value;
     }
-    
+
     // Load trip data if in edit mode
     if (widget.tripId != null) {
       _loadTripForEdit();
@@ -86,12 +86,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
   Future<void> _loadTripForEdit() async {
     if (widget.tripId == null) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final trip = await _tripService.getTripById(widget.tripId!);
-      
+
       // Populate form data
       setState(() {
         _tripData.addAll({
@@ -115,22 +115,23 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           'restricted_categories': trip.restrictedCategories ?? [],
           'restriction_notes': trip.restrictionNotes ?? '',
         });
-        
+
         // Debug logging for restrictions
         print('CreateTripScreen: Loaded trip restrictions:');
         print('  restricted_categories: ${trip.restrictedCategories}');
         print('  restricted_items: ${trip.restrictedItems}');
         print('  restriction_notes: ${trip.restrictionNotes}');
-        print('  _tripData restricted_categories: ${_tripData['restricted_categories']}');
+        print(
+            '  _tripData restricted_categories: ${_tripData['restricted_categories']}');
         print('  _tripData restricted_items: ${_tripData['restricted_items']}');
-        
+
         // Update text controllers
         _flightNumberController.text = trip.flightNumber ?? '';
         _airlineController.text = trip.airline ?? '';
         _descriptionController.text = trip.description ?? '';
         _specialNotesController.text = trip.specialNotes ?? '';
       });
-      
+
       // Load existing images
       try {
         final images = await _tripImageService.getTripImages(widget.tripId!);
@@ -140,7 +141,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       } catch (e) {
         print('Warning: Failed to load trip images: $e');
       }
-      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -163,13 +163,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     final departureCountry = _tripData['departure_country'];
     final arrivalCity = _tripData['arrival_city'];
     final arrivalCountry = _tripData['arrival_country'];
-    
-    if (transportType != null && 
-        departureCity != null && 
-        departureCountry != null && 
-        arrivalCity != null && 
+
+    if (transportType != null &&
+        departureCity != null &&
+        departureCountry != null &&
+        arrivalCity != null &&
         arrivalCountry != null) {
-      
       final error = DestinationValidatorService.validateRoute(
         transportType: TransportType.fromString(transportType),
         departureCity: departureCity,
@@ -177,11 +176,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         arrivalCity: arrivalCity,
         arrivalCountry: arrivalCountry,
       );
-      
+
       setState(() {
         _routeError = error;
       });
-      
+
       if (error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -223,7 +222,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   Widget _buildCreateTripScreen(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.tripId != null ? 'Modifier voyage' : 'Créer un voyage'),
+        title:
+            Text(widget.tripId != null ? 'Modifier voyage' : 'Créer un voyage'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           EllipsisButton.text(
@@ -264,13 +264,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             children: List.generate(_totalSteps, (index) {
               final isActive = index <= _currentStep;
               final isCompleted = index < _currentStep;
-              
+
               return Expanded(
                 child: Container(
                   height: 4,
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
-                    color: isActive 
+                    color: isActive
                         ? Theme.of(context).primaryColor
                         : Colors.grey[300],
                     borderRadius: BorderRadius.circular(2),
@@ -283,8 +283,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             _getStepTitle(_currentStep),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -293,16 +293,22 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
   String _getStepTitle(int step) {
     switch (step) {
-      case 0: return 'Itinéraire';
-      case 1: return 'Dates et heures';
-      case 2: return 'Capacité et prix';
-      case 3: return _tripData['transport_type'] == 'flight' 
-          ? 'Détails du vol' 
-          : _tripData['transport_type'] == 'car' 
-            ? 'Détails du voyage'
-            : 'Détails du transport';
-      case 4: return 'Restrictions';
-      default: return '';
+      case 0:
+        return 'Itinéraire';
+      case 1:
+        return 'Dates et heures';
+      case 2:
+        return 'Capacité et prix';
+      case 3:
+        return _tripData['transport_type'] == 'flight'
+            ? 'Détails du vol'
+            : _tripData['transport_type'] == 'car'
+                ? 'Détails du voyage'
+                : 'Détails du transport';
+      case 4:
+        return 'Restrictions';
+      default:
+        return '';
     }
   }
 
@@ -316,8 +322,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Où allez-vous ?',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -325,17 +331,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
+
           // Transport type selection (especially useful in edit mode)
           _buildTransportTypeSelector(),
-          
+
           const SizedBox(height: 24),
-          
+
           CityAutocompleteField(
             label: 'Ville de départ',
             icon: Icons.flight_takeoff,
             initialValue: _tripData['departure_city'],
-            transportType: _tripData['transport_type'] != null 
+            transportType: _tripData['transport_type'] != null
                 ? TransportType.fromString(_tripData['transport_type'])
                 : null,
             onCitySelected: (city, country, code) {
@@ -347,14 +353,14 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               _validateRoute();
             },
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           CityAutocompleteField(
             label: 'Ville d\'arrivée',
             icon: Icons.flight_land,
             initialValue: _tripData['arrival_city'],
-            transportType: _tripData['transport_type'] != null 
+            transportType: _tripData['transport_type'] != null
                 ? TransportType.fromString(_tripData['transport_type'])
                 : null,
             onCitySelected: (city, country, code) {
@@ -366,9 +372,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               _validateRoute();
             },
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Transport restrictions info
           if (_tripData['transport_type'] != null)
             Container(
@@ -378,33 +384,43 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 color: _routeError != null ? Colors.red[50] : Colors.blue[50],
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _routeError != null ? Colors.red[200]! : Colors.blue[200]!,
+                  color: _routeError != null
+                      ? Colors.red[200]!
+                      : Colors.blue[200]!,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _routeError != null ? Icons.error_outline : Icons.info_outline,
-                    color: _routeError != null ? Colors.red[700] : Colors.blue[700],
+                    _routeError != null
+                        ? Icons.error_outline
+                        : Icons.info_outline,
+                    color: _routeError != null
+                        ? Colors.red[700]
+                        : Colors.blue[700],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _routeError ?? DestinationValidatorService.getTransportRestrictions(
-                        TransportType.fromString(_tripData['transport_type'])
-                      ),
+                      _routeError ??
+                          DestinationValidatorService.getTransportRestrictions(
+                              TransportType.fromString(
+                                  _tripData['transport_type'])),
                       style: TextStyle(
                         fontSize: 13,
-                        color: _routeError != null ? Colors.red[700] : Colors.blue[700],
+                        color: _routeError != null
+                            ? Colors.red[700]
+                            : Colors.blue[700],
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          
-          if (_tripData['departure_city'] != null && _tripData['arrival_city'] != null)
+
+          if (_tripData['departure_city'] != null &&
+              _tripData['arrival_city'] != null)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -448,8 +464,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 Text(
                   'Moyen de transport',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ],
             ),
@@ -488,7 +504,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     required String description,
   }) {
     final isSelected = _tripData['transport_type'] == transportType.value;
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -506,24 +522,32 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade300,
+            color: isSelected
+                ? Theme.of(context).primaryColor
+                : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
-          color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : null,
+          color: isSelected
+              ? Theme.of(context).primaryColor.withOpacity(0.1)
+              : null,
         ),
         child: Column(
           children: [
             Icon(
               icon,
               size: 32,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+              color: isSelected
+                  ? Theme.of(context).primaryColor
+                  : Colors.grey.shade600,
             ),
             const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade800,
+                color: isSelected
+                    ? Theme.of(context).primaryColor
+                    : Colors.grey.shade800,
               ),
             ),
             const SizedBox(height: 4),
@@ -531,7 +555,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               description,
               style: TextStyle(
                 fontSize: 12,
-                color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+                color: isSelected
+                    ? Theme.of(context).primaryColor
+                    : Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
             ),
@@ -551,8 +577,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Quand partez-vous ?',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -560,7 +586,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           DateTimePickerField(
             label: 'Date et heure de départ',
             icon: Icons.flight_takeoff,
@@ -571,9 +596,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               });
             },
           ),
-          
           const SizedBox(height: 16),
-          
           DateTimePickerField(
             label: 'Date et heure d\'arrivée',
             icon: Icons.flight_land,
@@ -585,10 +608,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               });
             },
           ),
-          
           const SizedBox(height: 24),
-          
-          if (_tripData['departure_date'] != null && _tripData['arrival_date'] != null)
+          if (_tripData['departure_date'] != null &&
+              _tripData['arrival_date'] != null)
             Card(
               color: Colors.blue[50],
               child: Padding(
@@ -633,8 +655,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Capacité et prix',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -642,7 +664,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           WeightSliderWidget(
             weight: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
             onWeightChanged: (weight) {
@@ -653,9 +674,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               });
             },
           ),
-          
           const SizedBox(height: 24),
-          
           if (_canShowPriceCalculator())
             PriceCalculatorWidget(
               departureCity: _tripData['departure_city'],
@@ -663,11 +682,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               arrivalCity: _tripData['arrival_city'],
               arrivalCountry: _tripData['arrival_country'],
               weightKg: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
-              transportType: _tripData['transport_type'] != null 
+              transportType: _tripData['transport_type'] != null
                   ? TransportType.fromString(_tripData['transport_type'])
                   : null,
               onPriceSelected: (pricePerKg, currency) {
-                print('DEBUG: Price selected - pricePerKg: $pricePerKg, currency: $currency');
+                print(
+                    'DEBUG: Price selected - pricePerKg: $pricePerKg, currency: $currency');
                 setState(() {
                   _tripData['price_per_kg'] = pricePerKg;
                   _tripData['currency'] = currency;
@@ -701,8 +721,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Détails du vol',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -710,7 +730,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           TextFormField(
             controller: _flightNumberController,
             decoration: const InputDecoration(
@@ -721,9 +740,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             textCapitalization: TextCapitalization.characters,
           ),
-          
           const SizedBox(height: 16),
-          
           TextFormField(
             controller: _airlineController,
             decoration: const InputDecoration(
@@ -734,9 +751,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             textCapitalization: TextCapitalization.words,
           ),
-          
           const SizedBox(height: 16),
-          
           TextFormField(
             controller: _descriptionController,
             maxLines: 3,
@@ -747,9 +762,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          
           const SizedBox(height: 16),
-          
           TextFormField(
             controller: _specialNotesController,
             maxLines: 2,
@@ -774,8 +787,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Détails du voyage en voiture',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -783,7 +796,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           TextFormField(
             controller: _descriptionController,
             maxLines: 3,
@@ -794,9 +806,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          
           const SizedBox(height: 16),
-          
           TextFormField(
             controller: _specialNotesController,
             maxLines: 2,
@@ -807,9 +817,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          
           const SizedBox(height: 24),
-          
           Card(
             color: Colors.green[50],
             child: Padding(
@@ -842,8 +850,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Détails du voyage',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -851,7 +859,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           TextFormField(
             controller: _descriptionController,
             maxLines: 3,
@@ -862,9 +869,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          
           const SizedBox(height: 16),
-          
           TextFormField(
             controller: _specialNotesController,
             maxLines: 2,
@@ -890,8 +895,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Objets interdits',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -899,7 +904,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          
           RestrictedItemsSelector(
             selectedCategories: _tripData['restricted_categories'] ?? [],
             selectedItems: _tripData['restricted_items'] ?? [],
@@ -910,9 +914,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               });
             },
           ),
-          
           const SizedBox(height: 16),
-          
           Card(
             color: Colors.orange[50],
             child: Padding(
@@ -945,18 +947,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Text(
             'Photos de l\'annonce',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Ajoutez des photos pour rendre votre annonce plus attractive et gagner la confiance des expéditeurs.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+                  color: Colors.grey.shade600,
+                ),
           ),
           const SizedBox(height: 24),
-          
           TripImagePicker(
             initialImages: _selectedImages,
             existingImages: _existingImages,
@@ -965,23 +966,25 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 _selectedImages = images;
               });
             },
-            onDeleteExisting: widget.tripId != null 
-              ? (image) async {
-                  try {
-                    await _tripImageService.deleteTripImage(widget.tripId!, image.id);
-                    setState(() {
-                      _existingImages.removeWhere((img) => img.id == image.id);
-                    });
-                    _showSnackBar('Photo supprimée avec succès', Colors.green);
-                  } catch (e) {
-                    _showSnackBar('Erreur lors de la suppression: $e', Colors.red);
+            onDeleteExisting: widget.tripId != null
+                ? (image) async {
+                    try {
+                      await _tripImageService.deleteTripImage(
+                          widget.tripId!, image.id);
+                      setState(() {
+                        _existingImages
+                            .removeWhere((img) => img.id == image.id);
+                      });
+                      _showSnackBar(
+                          'Photo supprimée avec succès', Colors.green);
+                    } catch (e) {
+                      _showSnackBar(
+                          'Erreur lors de la suppression: $e', Colors.red);
+                    }
                   }
-                }
-              : null,
+                : null,
           ),
-          
           const SizedBox(height: 24),
-          
           Card(
             color: Colors.blue[50],
             child: Padding(
@@ -1027,9 +1030,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 text: 'Précédent',
               ),
             ),
-          
           if (_currentStep > 0) const SizedBox(width: 16),
-          
           Expanded(
             flex: _currentStep > 0 ? 1 : 2,
             child: _isLoading
@@ -1043,9 +1044,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   )
                 : EllipsisButton.elevated(
                     onPressed: !_canContinue() ? null : _nextStep,
-                    text: _currentStep < _totalSteps - 1 
-                        ? 'Suivant' 
-                        : (widget.tripId != null ? 'Modifier l\'annonce' : 'Créer l\'annonce'),
+                    text: _currentStep < _totalSteps - 1
+                        ? 'Suivant'
+                        : (widget.tripId != null
+                            ? 'Modifier l\'annonce'
+                            : 'Créer l\'annonce'),
                   ),
           ),
         ],
@@ -1056,15 +1059,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   bool _canContinue() {
     switch (_currentStep) {
       case 0: // Route
-        return _tripData['departure_city'] != null && 
-               _tripData['arrival_city'] != null &&
-               _tripData['departure_city'] != _tripData['arrival_city'];
+        return _tripData['departure_city'] != null &&
+            _tripData['arrival_city'] != null &&
+            _tripData['departure_city'] != _tripData['arrival_city'];
       case 1: // Dates
-        return _tripData['departure_date'] != null && 
-               _tripData['arrival_date'] != null;
+        return _tripData['departure_date'] != null &&
+            _tripData['arrival_date'] != null;
       case 2: // Capacity and pricing
         return _tripData['available_weight_kg'] != null &&
-               _tripData['price_per_kg'] != null;
+            _tripData['price_per_kg'] != null;
       case 3: // Flight details (all optional)
         return true;
       case 4: // Restrictions (optional)
@@ -1078,9 +1081,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
   bool _canShowPriceCalculator() {
     return _tripData['departure_city'] != null &&
-           _tripData['arrival_city'] != null &&
-           _tripData['departure_country'] != null &&
-           _tripData['arrival_country'] != null;
+        _tripData['arrival_city'] != null &&
+        _tripData['departure_country'] != null &&
+        _tripData['arrival_country'] != null;
   }
 
   void _nextStep() {
@@ -1088,7 +1091,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     print('Current step: $_currentStep');
     print('Total steps: $_totalSteps');
     print('Can continue: ${_canContinue()}');
-    
+
     if (_currentStep < _totalSteps - 1) {
       print('Moving to next step');
       setState(() {
@@ -1117,17 +1120,18 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   String _calculateDuration() {
-    if (_tripData['departure_date'] == null || _tripData['arrival_date'] == null) {
+    if (_tripData['departure_date'] == null ||
+        _tripData['arrival_date'] == null) {
       return '';
     }
-    
+
     final departure = _tripData['departure_date'] as DateTime;
     final arrival = _tripData['arrival_date'] as DateTime;
     final duration = arrival.difference(departure);
-    
+
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
-    
+
     if (hours > 0) {
       return '${hours}h${minutes > 0 ? ' ${minutes}min' : ''}';
     } else {
@@ -1140,30 +1144,47 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     print('DEBUG: _tripData full contents: $_tripData');
     print('DEBUG: _tripData keys: ${_tripData.keys.toList()}');
     print('DEBUG: _tripData is null: ${_tripData == null}');
-    
+
     // Debug each key access that might be null
     print('DEBUG: Checking individual keys...');
-    print('DEBUG: transport_type: ${_tripData['transport_type']} (type: ${_tripData['transport_type']?.runtimeType})');
-    print('DEBUG: departure_city: ${_tripData['departure_city']} (type: ${_tripData['departure_city']?.runtimeType})');
-    print('DEBUG: departure_country: ${_tripData['departure_country']} (type: ${_tripData['departure_country']?.runtimeType})');
-    print('DEBUG: arrival_city: ${_tripData['arrival_city']} (type: ${_tripData['arrival_city']?.runtimeType})');
-    print('DEBUG: arrival_country: ${_tripData['arrival_country']} (type: ${_tripData['arrival_country']?.runtimeType})');
-    print('DEBUG: departure_date: ${_tripData['departure_date']} (type: ${_tripData['departure_date']?.runtimeType})');
-    print('DEBUG: arrival_date: ${_tripData['arrival_date']} (type: ${_tripData['arrival_date']?.runtimeType})');
-    print('DEBUG: available_weight_kg: ${_tripData['available_weight_kg']} (type: ${_tripData['available_weight_kg']?.runtimeType})');
-    print('DEBUG: price_per_kg: ${_tripData['price_per_kg']} (type: ${_tripData['price_per_kg']?.runtimeType})');
-    print('DEBUG: currency: ${_tripData['currency']} (type: ${_tripData['currency']?.runtimeType})');
-    print('DEBUG: departure_airport_code: ${_tripData['departure_airport_code']} (type: ${_tripData['departure_airport_code']?.runtimeType})');
-    print('DEBUG: arrival_airport_code: ${_tripData['arrival_airport_code']} (type: ${_tripData['arrival_airport_code']?.runtimeType})');
-    print('DEBUG: restricted_categories: ${_tripData['restricted_categories']} (type: ${_tripData['restricted_categories']?.runtimeType})');
-    print('DEBUG: restricted_items: ${_tripData['restricted_items']} (type: ${_tripData['restricted_items']?.runtimeType})');
-    
+    print(
+        'DEBUG: transport_type: ${_tripData['transport_type']} (type: ${_tripData['transport_type']?.runtimeType})');
+    print(
+        'DEBUG: departure_city: ${_tripData['departure_city']} (type: ${_tripData['departure_city']?.runtimeType})');
+    print(
+        'DEBUG: departure_country: ${_tripData['departure_country']} (type: ${_tripData['departure_country']?.runtimeType})');
+    print(
+        'DEBUG: arrival_city: ${_tripData['arrival_city']} (type: ${_tripData['arrival_city']?.runtimeType})');
+    print(
+        'DEBUG: arrival_country: ${_tripData['arrival_country']} (type: ${_tripData['arrival_country']?.runtimeType})');
+    print(
+        'DEBUG: departure_date: ${_tripData['departure_date']} (type: ${_tripData['departure_date']?.runtimeType})');
+    print(
+        'DEBUG: arrival_date: ${_tripData['arrival_date']} (type: ${_tripData['arrival_date']?.runtimeType})');
+    print(
+        'DEBUG: available_weight_kg: ${_tripData['available_weight_kg']} (type: ${_tripData['available_weight_kg']?.runtimeType})');
+    print(
+        'DEBUG: price_per_kg: ${_tripData['price_per_kg']} (type: ${_tripData['price_per_kg']?.runtimeType})');
+    print(
+        'DEBUG: currency: ${_tripData['currency']} (type: ${_tripData['currency']?.runtimeType})');
+    print(
+        'DEBUG: departure_airport_code: ${_tripData['departure_airport_code']} (type: ${_tripData['departure_airport_code']?.runtimeType})');
+    print(
+        'DEBUG: arrival_airport_code: ${_tripData['arrival_airport_code']} (type: ${_tripData['arrival_airport_code']?.runtimeType})');
+    print(
+        'DEBUG: restricted_categories: ${_tripData['restricted_categories']} (type: ${_tripData['restricted_categories']?.runtimeType})');
+    print(
+        'DEBUG: restricted_items: ${_tripData['restricted_items']} (type: ${_tripData['restricted_items']?.runtimeType})');
+
     // Debug controllers
-    print('DEBUG: _descriptionController.text: "${_descriptionController.text}"');
-    print('DEBUG: _specialNotesController.text: "${_specialNotesController.text}"');
-    print('DEBUG: _flightNumberController.text: "${_flightNumberController.text}"');
+    print(
+        'DEBUG: _descriptionController.text: "${_descriptionController.text}"');
+    print(
+        'DEBUG: _specialNotesController.text: "${_specialNotesController.text}"');
+    print(
+        'DEBUG: _flightNumberController.text: "${_flightNumberController.text}"');
     print('DEBUG: _airlineController.text: "${_airlineController.text}"');
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -1171,7 +1192,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     try {
       final isEditMode = widget.tripId != null;
       print('DEBUG: isEditMode: $isEditMode');
-      
+
       if (isEditMode) {
         // Edit existing trip
         print('DEBUG: Creating updateData for edit mode...');
@@ -1188,14 +1209,20 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             'available_weight_kg': _tripData['available_weight_kg']?.toDouble(),
             'price_per_kg': _tripData['price_per_kg']?.toDouble(),
             'currency': _tripData['currency'] ?? 'CAD',
-            'description': _descriptionController.text.trim().isEmpty 
-                ? null : _descriptionController.text.trim(),
-            'special_notes': _specialNotesController.text.trim().isEmpty 
-                ? null : _specialNotesController.text.trim(),
-            'restricted_categories': (_tripData['restricted_categories'] as List?)?.isEmpty == false 
-                ? _tripData['restricted_categories'] : null,
-            'restricted_items': (_tripData['restricted_items'] as List?)?.isEmpty == false 
-                ? _tripData['restricted_items'] : null,
+            'description': _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
+            'special_notes': _specialNotesController.text.trim().isEmpty
+                ? null
+                : _specialNotesController.text.trim(),
+            'restricted_categories':
+                (_tripData['restricted_categories'] as List?)?.isEmpty == false
+                    ? _tripData['restricted_categories']
+                    : null,
+            'restricted_items':
+                (_tripData['restricted_items'] as List?)?.isEmpty == false
+                    ? _tripData['restricted_items']
+                    : null,
           };
           print('DEBUG: updateData created successfully: $updateData');
         } catch (e) {
@@ -1203,16 +1230,18 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           print('DEBUG: Error type: ${e.runtimeType}');
           rethrow;
         }
-        
+
         // Add flight-specific fields only for flight transport
         if (_tripData['transport_type'] == 'flight') {
           updateData.addAll({
             'departure_airport_code': _tripData['departure_airport_code'],
             'arrival_airport_code': _tripData['arrival_airport_code'],
-            'flight_number': _flightNumberController.text.trim().isEmpty 
-                ? null : _flightNumberController.text.trim(),
-            'airline': _airlineController.text.trim().isEmpty 
-                ? null : _airlineController.text.trim(),
+            'flight_number': _flightNumberController.text.trim().isEmpty
+                ? null
+                : _flightNumberController.text.trim(),
+            'airline': _airlineController.text.trim().isEmpty
+                ? null
+                : _airlineController.text.trim(),
           });
         } else {
           // For non-flight transport, explicitly set airport codes to null
@@ -1223,18 +1252,19 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             'airline': null,
           });
         }
-        
+
         await _tripService.updateTrip(widget.tripId!, updateData);
-        
+
         // Upload images if any selected
         if (_selectedImages.isNotEmpty) {
           try {
-            await _tripImageService.uploadTripImages(widget.tripId!, _selectedImages);
+            await _tripImageService.uploadTripImages(
+                widget.tripId!, _selectedImages);
           } catch (e) {
             print('Warning: Image upload failed: $e');
           }
         }
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1242,7 +1272,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          
+
           context.pop(); // Go back to trip details
         }
       } else {
@@ -1253,57 +1283,79 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           print('DEBUG: transportType: ${_tripData['transport_type']}');
           print('DEBUG: departureCity: ${_tripData['departure_city']}');
           print('DEBUG: departureCountry: ${_tripData['departure_country']}');
-          print('DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null}');
+          print(
+              'DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null}');
           print('DEBUG: departureDate: ${_tripData['departure_date']}');
           print('DEBUG: arrivalCity: ${_tripData['arrival_city']}');
           print('DEBUG: arrivalCountry: ${_tripData['arrival_country']}');
-          print('DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null}');
+          print(
+              'DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null}');
           print('DEBUG: arrivalDate: ${_tripData['arrival_date']}');
-          print('DEBUG: availableWeightKg: ${(_tripData['available_weight_kg'] ?? 0).toDouble()}');
-          print('DEBUG: pricePerKg: ${(_tripData['price_per_kg'] ?? 0).toDouble()}');
+          print(
+              'DEBUG: availableWeightKg: ${(_tripData['available_weight_kg'] ?? 0).toDouble()}');
+          print(
+              'DEBUG: pricePerKg: ${(_tripData['price_per_kg'] ?? 0).toDouble()}');
           print('DEBUG: currency: ${_tripData['currency'] ?? 'CAD'}');
-          print('DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
-          print('DEBUG: restrictedItems: ${(_tripData['restricted_items'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_items']) : null}');
-          
+          print(
+              'DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
+          print(
+              'DEBUG: restrictedItems: ${(_tripData['restricted_items'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_items']) : null}');
+
           final createdTrip = await _tripService.createTrip(
             transportType: _tripData['transport_type'],
             departureCity: _tripData['departure_city'],
             departureCountry: _tripData['departure_country'],
-            departureAirportCode: _tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null,
+            departureAirportCode: _tripData['transport_type'] == 'flight'
+                ? _tripData['departure_airport_code']
+                : null,
             departureDate: _tripData['departure_date'],
             arrivalCity: _tripData['arrival_city'],
             arrivalCountry: _tripData['arrival_country'],
-            arrivalAirportCode: _tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null,
+            arrivalAirportCode: _tripData['transport_type'] == 'flight'
+                ? _tripData['arrival_airport_code']
+                : null,
             arrivalDate: _tripData['arrival_date'],
-            availableWeightKg: (_tripData['available_weight_kg'] ?? 0).toDouble(),
+            availableWeightKg:
+                (_tripData['available_weight_kg'] ?? 0).toDouble(),
             pricePerKg: (_tripData['price_per_kg'] ?? 0).toDouble(),
             currency: _tripData['currency'] ?? 'CAD',
-            flightNumber: _tripData['transport_type'] == 'flight' && !_flightNumberController.text.trim().isEmpty 
-                ? _flightNumberController.text.trim() : null,
-            airline: _tripData['transport_type'] == 'flight' && !_airlineController.text.trim().isEmpty 
-                ? _airlineController.text.trim() : null,
-            description: _descriptionController.text.trim().isEmpty 
-                ? null : _descriptionController.text.trim(),
-            specialNotes: _specialNotesController.text.trim().isEmpty 
-                ? null : _specialNotesController.text.trim(),
-            restrictedCategories: (_tripData['restricted_categories'] as List?)?.isEmpty == false 
-                ? List<String>.from(_tripData['restricted_categories']) : null,
-            restrictedItems: (_tripData['restricted_items'] as List?)?.isEmpty == false 
-                ? List<String>.from(_tripData['restricted_items']) : null,
+            flightNumber: _tripData['transport_type'] == 'flight' &&
+                    !_flightNumberController.text.trim().isEmpty
+                ? _flightNumberController.text.trim()
+                : null,
+            airline: _tripData['transport_type'] == 'flight' &&
+                    !_airlineController.text.trim().isEmpty
+                ? _airlineController.text.trim()
+                : null,
+            description: _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
+            specialNotes: _specialNotesController.text.trim().isEmpty
+                ? null
+                : _specialNotesController.text.trim(),
+            restrictedCategories:
+                (_tripData['restricted_categories'] as List?)?.isEmpty == false
+                    ? List<String>.from(_tripData['restricted_categories'])
+                    : null,
+            restrictedItems:
+                (_tripData['restricted_items'] as List?)?.isEmpty == false
+                    ? List<String>.from(_tripData['restricted_items'])
+                    : null,
           );
           print('DEBUG: _tripService.createTrip completed successfully');
-          
+
           // Upload images if any selected
           if (_selectedImages.isNotEmpty && createdTrip.id != null) {
             try {
-              print('DEBUG: Uploading ${_selectedImages.length} images for trip ${createdTrip.id}');
-              await _tripImageService.uploadTripImages(createdTrip.id.toString(), _selectedImages);
+              print(
+                  'DEBUG: Uploading ${_selectedImages.length} images for trip ${createdTrip.id}');
+              await _tripImageService.uploadTripImages(
+                  createdTrip.id.toString(), _selectedImages);
               print('DEBUG: Images uploaded successfully');
             } catch (e) {
               print('Warning: Image upload failed: $e');
             }
           }
-          
         } catch (e) {
           print('DEBUG: ERROR in createTrip: $e');
           print('DEBUG: Error type: ${e.runtimeType}');
@@ -1317,7 +1369,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          
+
           context.go('/home');
         }
       }
@@ -1325,7 +1377,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       print('=== DEBUG: Final catch block - error: $e');
       print('DEBUG: Error type: ${e.runtimeType}');
       print('DEBUG: Error stack trace: ${StackTrace.current}');
-      
+
       // Extract user-friendly error message
       String errorMessage = 'Une erreur est survenue';
       if (e.toString().contains('TripException:')) {
@@ -1341,7 +1393,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       } else {
         errorMessage = e.toString();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
