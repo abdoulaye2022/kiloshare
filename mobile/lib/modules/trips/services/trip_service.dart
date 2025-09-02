@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../config/app_config.dart';
 import '../models/trip_model.dart';
 import '../../../data/locations_data.dart';
@@ -15,7 +16,7 @@ class TripService {
 
   static Dio _createDio() {
     final dio = Dio(BaseOptions(
-      baseUrl: '${AppConfig.baseUrl}/v1',
+      baseUrl: AppConfig.baseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
@@ -74,17 +75,23 @@ class TripService {
 
       print('TripService: Token validation successful, preparing API call...');
 
+      // Générer un titre automatiquement si la description est vide
+      final tripTitle = (description != null && description.isNotEmpty) 
+          ? description 
+          : '$departureCity → $arrivalCity';
+
       final data = {
         'transport_type': transportType,
+        'title': tripTitle, // Champ requis par l'API
         'departure_city': departureCity,
         'departure_country': departureCountry,
         'departure_airport_code': departureAirportCode,
-        'departure_date': departureDate.toIso8601String(),
+        'departure_date': departureDate.toIso8601String().split('T')[0], // Format YYYY-MM-DD
         'arrival_city': arrivalCity,
         'arrival_country': arrivalCountry,
         'arrival_airport_code': arrivalAirportCode,
-        'arrival_date': arrivalDate.toIso8601String(),
-        'available_weight_kg': availableWeightKg,
+        'arrival_date': arrivalDate.toIso8601String().split('T')[0], // Format YYYY-MM-DD
+        'max_weight': availableWeightKg, // L'API attend max_weight, pas available_weight_kg
         'price_per_kg': pricePerKg,
         'currency': currency,
         'flight_number': flightNumber,
@@ -97,10 +104,10 @@ class TripService {
       };
 
       print('TripService: Request data prepared: ${data.keys.toList()}');
-      print('TripService: Making API call to /trips/create...');
+      print('TripService: Making API call to /trips...');
 
       final response = await _dio.post(
-        '/trips/create', 
+        '/trips', 
         data: data,
         options: Options(
           headers: {
@@ -175,7 +182,7 @@ class TripService {
       }
 
       print('TripService: Making request to /trips/list...');
-      final response = await _dio.get('/trips/list', 
+      final response = await _dio.get('/user/trips', 
         queryParameters: {
           'page': page,
           'limit': limit,
@@ -275,8 +282,23 @@ class TripService {
       
       if (response.data['success'] == true) {
         print('TripService: Response indicates success, parsing trip data...');
-        final tripData = response.data['trip'];
+        
+        // API returns data in response.data['data']['trip']
+        final dataSection = response.data['data'];
+        if (dataSection == null) {
+          print('TripService: ERROR - No data section in response');
+          throw TripException('Invalid response format: missing data section');
+        }
+        
+        final tripData = dataSection['trip'];
         print('TripService: Trip data type: ${tripData.runtimeType}');
+        
+        if (tripData == null) {
+          print('TripService: ERROR - No trip data in data section');
+          print('TripService: Data section keys: ${dataSection.keys.toList()}');
+          throw TripException('Trip not found');
+        }
+        
         if (tripData is Map) {
           print('TripService: Trip data keys: ${tripData.keys.toList()}');
           print('TripService: Trip ID from response: ${tripData['id']}');
@@ -284,7 +306,7 @@ class TripService {
           print('TripService: Trip user_id from response: ${tripData['user_id']}');
         }
         
-        final trip = Trip.fromJson(response.data['trip']);
+        final trip = Trip.fromJson(tripData);
         print('TripService: Trip parsed successfully');
         print('TripService: - Parsed Trip ID: ${trip.id}');
         print('TripService: - Parsed Trip Status: ${trip.status}');
@@ -445,7 +467,7 @@ class TripService {
       }
 
       print('TripService: Making PUT request to /trips/$tripId/update');
-      final response = await _dio.put('/trips/$tripId/update', 
+      final response = await _dio.put('/trips/$tripId', 
         data: updates,
         options: Options(
           headers: {
@@ -485,7 +507,7 @@ class TripService {
         throw const TripException('Authentication token is required. Please log in again.');
       }
 
-      final response = await _dio.delete('/trips/$tripId/delete',
+      final response = await _dio.delete('/trips/$tripId',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1086,10 +1108,16 @@ class TripService {
   /// Get public trips (approved and published)
   Future<List<Trip>> getPublicTrips({int limit = 10}) async {
     try {
-      final response = await _dio.get('/trips/public',
+      if (kDebugMode) {
+        print('[TripService] ===== DEBUG GET PUBLIC TRIPS =====');
+        print('[TripService] Requesting public trips with limit: $limit');
+        print('[TripService] URL: ${_dio.options.baseUrl}/trips');
+      }
+      
+      final response = await _dio.get('/trips',
         queryParameters: {
           'limit': limit,
-          'status': 'published',
+          // Removed 'status': 'published' as API already filters for published trips
         },
         options: Options(
           headers: {
@@ -1099,16 +1127,74 @@ class TripService {
         ),
       );
       
+      if (kDebugMode) {
+        print('[TripService] Response status: ${response.statusCode}');
+        print('[TripService] Response data keys: ${response.data?.keys}');
+        print('[TripService] Response success: ${response.data?['success']}');
+      }
+      
       if (response.data['success'] == true) {
-        final tripsData = response.data['trips'] as List<dynamic>;
-        final trips = tripsData.map((json) => Trip.fromJson(json)).toList();
+        // API returns data.trips, not just trips
+        final dataSection = response.data['data'];
+        if (dataSection == null) {
+          if (kDebugMode) {
+            print('[TripService] ERROR: No data section in response');
+            print('[TripService] Full response: ${response.data}');
+          }
+          throw TripException('Invalid response format: missing data section');
+        }
+        
+        final tripsData = dataSection['trips'] as List<dynamic>?;
+        if (tripsData == null) {
+          if (kDebugMode) {
+            print('[TripService] ERROR: No trips array in data section');
+            print('[TripService] Data section keys: ${dataSection.keys}');
+          }
+          throw TripException('Invalid response format: missing trips array');
+        }
+        
+        if (kDebugMode) {
+          print('[TripService] Found ${tripsData.length} trips in response');
+        }
+        
+        final trips = tripsData.map((json) {
+          if (kDebugMode) {
+            print('[TripService] Parsing trip: ${json['id']} - ${json['departure_city']} → ${json['arrival_city']}');
+          }
+          return Trip.fromJson(json);
+        }).toList();
+        
+        if (kDebugMode) {
+          print('[TripService] Successfully parsed ${trips.length} trips');
+          print('[TripService] ===================================');
+        }
+        
         return trips;
       } else {
-        throw TripException(response.data['message'] ?? 'Failed to fetch public trips');
+        final errorMessage = response.data['message'] ?? 'Failed to fetch public trips';
+        if (kDebugMode) {
+          print('[TripService] ERROR: API returned success=false');
+          print('[TripService] Error message: $errorMessage');
+        }
+        throw TripException(errorMessage);
       }
     } on DioException catch (e) {
+      if (kDebugMode) {
+        print('[TripService] ===== DIO EXCEPTION =====');
+        print('[TripService] DioException type: ${e.type}');
+        print('[TripService] Status code: ${e.response?.statusCode}');
+        print('[TripService] Response data: ${e.response?.data}');
+        print('[TripService] Error message: ${e.message}');
+        print('[TripService] ==========================');
+      }
       throw _handleDioException(e);
     } catch (e) {
+      if (kDebugMode) {
+        print('[TripService] ===== GENERAL EXCEPTION =====');
+        print('[TripService] Exception type: ${e.runtimeType}');
+        print('[TripService] Exception message: $e');
+        print('[TripService] ==============================');
+      }
       rethrow;
     }
   }

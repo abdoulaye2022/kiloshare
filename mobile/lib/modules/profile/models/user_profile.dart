@@ -6,15 +6,27 @@ class UserProfile {
   final DateTime? dateOfBirth;
   final String? gender;
   final String? phone;
-  final String? address;
+  final String? address; // Legacy field
+  final String? addressLine1;
+  final String? addressLine2;
   final String? city;
+  final String? stateProvince;
   final String? country;
   final String? postalCode;
+  final String? nationality;
   final String? avatarUrl;
   final String? bio;
   final String? profession;
   final String? company;
   final String? website;
+  final String? preferredLanguage;
+  final String? timezone;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
+  final String? emergencyContactRelation;
+  final String? profileVisibility;
+  final bool? newsletterSubscribed;
+  final bool? marketingEmails;
   final bool isVerified;
   final String verificationLevel;
   final double trustScore;
@@ -34,14 +46,26 @@ class UserProfile {
     this.gender,
     this.phone,
     this.address,
+    this.addressLine1,
+    this.addressLine2,
     this.city,
+    this.stateProvince,
     this.country,
     this.postalCode,
+    this.nationality,
     this.avatarUrl,
     this.bio,
     this.profession,
     this.company,
     this.website,
+    this.preferredLanguage,
+    this.timezone,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
+    this.emergencyContactRelation,
+    this.profileVisibility,
+    this.newsletterSubscribed,
+    this.marketingEmails,
     this.isVerified = false,
     this.verificationLevel = 'none',
     this.trustScore = 0.0,
@@ -65,14 +89,26 @@ class UserProfile {
       gender: json['gender'],
       phone: json['phone'],
       address: json['address'],
+      addressLine1: json['address_line1'],
+      addressLine2: json['address_line2'],
       city: json['city'],
+      stateProvince: json['state_province'],
       country: json['country'],
       postalCode: json['postal_code'],
+      nationality: json['nationality'],
       avatarUrl: json['profile_picture'],
       bio: json['bio'],
       profession: json['profession'],
       company: json['company'],
       website: json['website'],
+      preferredLanguage: json['preferred_language'],
+      timezone: json['timezone'],
+      emergencyContactName: json['emergency_contact_name'],
+      emergencyContactPhone: json['emergency_contact_phone'],
+      emergencyContactRelation: json['emergency_contact_relation'],
+      profileVisibility: json['profile_visibility'],
+      newsletterSubscribed: json['newsletter_subscribed'] == 1 || json['newsletter_subscribed'] == true,
+      marketingEmails: json['marketing_emails'] == 1 || json['marketing_emails'] == true,
       isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
       verificationLevel: json['verification_level'] ?? 'none',
       trustScore: double.tryParse(json['trust_score'].toString()) ?? 0.0,
@@ -97,14 +133,26 @@ class UserProfile {
       'gender': gender,
       'phone': phone,
       'address': address,
+      'address_line1': addressLine1,
+      'address_line2': addressLine2,
       'city': city,
+      'state_province': stateProvince,
       'country': country,
       'postal_code': postalCode,
+      'nationality': nationality,
       'profile_picture': avatarUrl,
       'bio': bio,
       'profession': profession,
       'company': company,
       'website': website,
+      'preferred_language': preferredLanguage,
+      'timezone': timezone,
+      'emergency_contact_name': emergencyContactName,
+      'emergency_contact_phone': emergencyContactPhone,
+      'emergency_contact_relation': emergencyContactRelation,
+      'profile_visibility': profileVisibility,
+      'newsletter_subscribed': newsletterSubscribed,
+      'marketing_emails': marketingEmails,
       'is_verified': isVerified,
       'verification_level': verificationLevel,
       'trust_score': trustScore,
@@ -126,14 +174,26 @@ class UserProfile {
     String? gender,
     String? phone,
     String? address,
+    String? addressLine1,
+    String? addressLine2,
     String? city,
+    String? stateProvince,
     String? country,
     String? postalCode,
+    String? nationality,
     String? avatarUrl,
     String? bio,
     String? profession,
     String? company,
     String? website,
+    String? preferredLanguage,
+    String? timezone,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
+    String? profileVisibility,
+    bool? newsletterSubscribed,
+    bool? marketingEmails,
     bool? isVerified,
     String? verificationLevel,
     double? trustScore,
@@ -153,14 +213,26 @@ class UserProfile {
       gender: gender ?? this.gender,
       phone: phone ?? this.phone,
       address: address ?? this.address,
+      addressLine1: addressLine1 ?? this.addressLine1,
+      addressLine2: addressLine2 ?? this.addressLine2,
       city: city ?? this.city,
+      stateProvince: stateProvince ?? this.stateProvince,
       country: country ?? this.country,
       postalCode: postalCode ?? this.postalCode,
+      nationality: nationality ?? this.nationality,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       bio: bio ?? this.bio,
       profession: profession ?? this.profession,
       company: company ?? this.company,
       website: website ?? this.website,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      timezone: timezone ?? this.timezone,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+      emergencyContactRelation: emergencyContactRelation ?? this.emergencyContactRelation,
+      profileVisibility: profileVisibility ?? this.profileVisibility,
+      newsletterSubscribed: newsletterSubscribed ?? this.newsletterSubscribed,
+      marketingEmails: marketingEmails ?? this.marketingEmails,
       isVerified: isVerified ?? this.isVerified,
       verificationLevel: verificationLevel ?? this.verificationLevel,
       trustScore: trustScore ?? this.trustScore,

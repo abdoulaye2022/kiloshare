@@ -30,7 +30,7 @@ class StripeService {
       print('Creating Stripe connected account...');
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/api/v1/stripe/account/create'),
+        Uri.parse('${_baseUrl}/stripe/account/create'),
         headers: headers,
       );
 
@@ -71,7 +71,7 @@ class StripeService {
       print('Getting Stripe account status...');
 
       final response = await http.get(
-        Uri.parse('${_baseUrl}/api/v1/stripe/account/status'),
+        Uri.parse('${_baseUrl}/stripe/account/status'),
         headers: headers,
       );
 
@@ -112,7 +112,7 @@ class StripeService {
       print('Refreshing Stripe account link...');
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/api/v1/stripe/account/refresh-link'),
+        Uri.parse('${_baseUrl}/stripe/account/refresh-link'),
         headers: headers,
       );
 

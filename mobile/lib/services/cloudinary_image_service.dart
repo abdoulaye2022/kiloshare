@@ -95,7 +95,7 @@ class CloudinaryImageService {
 
       // Upload avec progression
       final response = await _dio.post(
-        '/api/v1/images/avatar',
+        '/images/avatar',
         data: formData,
         options: Options(
           headers: {
@@ -131,7 +131,7 @@ class CloudinaryImageService {
         await _addToUploadQueue(UploadTask(
           type: 'avatar',
           file: imageFile,
-          endpoint: '/api/v1/images/avatar',
+          endpoint: '/images/avatar',
           onProgress: onProgress,
         ));
         throw CloudinaryException('Upload ajouté à la file d\'attente (mode offline)');
@@ -167,7 +167,7 @@ class CloudinaryImageService {
       });
 
       final response = await _dio.post(
-        '/api/v1/images/kyc',
+        '/images/kyc',
         data: formData,
         options: Options(
           headers: {
@@ -241,7 +241,7 @@ class CloudinaryImageService {
       });
 
       final response = await _dio.post(
-        '/api/v1/images/trip',
+        '/images/trip',
         data: formData,
         options: Options(
           headers: {
@@ -310,7 +310,7 @@ class CloudinaryImageService {
       });
 
       final response = await _dio.post(
-        '/api/v1/images/package',
+        '/images/package',
         data: formData,
         options: Options(
           headers: {
@@ -366,7 +366,7 @@ class CloudinaryImageService {
       });
 
       final response = await _dio.post(
-        '/api/v1/images/delivery-proof',
+        '/images/delivery-proof',
         data: formData,
         options: Options(
           headers: {
@@ -476,7 +476,7 @@ class CloudinaryImageService {
   Future<bool> deleteImage(String publicId) async {
     try {
       final response = await _dio.delete(
-        '/api/v1/images/${Uri.encodeComponent(publicId)}',
+        '/images/${Uri.encodeComponent(publicId)}',
         options: Options(
           headers: {
             if (await _getAccessToken() != null) 
@@ -533,7 +533,7 @@ class CloudinaryImageService {
   Future<CloudinaryUsageStats?> getUsageStats() async {
     try {
       final response = await _dio.get(
-        '/api/v1/images/stats',
+        '/images/stats',
         options: Options(
           headers: {
             if (await _getAccessToken() != null) 

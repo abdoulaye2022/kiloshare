@@ -91,10 +91,14 @@ class User {
     trustScore: json['trust_score'] as int? ?? 0,
     completedTrips: json['completed_trips'] as int? ?? 0,
     totalTrips: json['total_trips'] as int? ?? 0,
-    createdAt: DateTime.parse(json['created_at'] as String),
+    createdAt: json['created_at'] != null 
+        ? DateTime.parse(json['created_at'] as String)
+        : DateTime.now(),
     updatedAt: json['updated_at'] != null 
         ? DateTime.parse(json['updated_at'] as String)
-        : DateTime.parse(json['created_at'] as String),
+        : (json['created_at'] != null 
+            ? DateTime.parse(json['created_at'] as String)
+            : DateTime.now()),
   );
 
   Map<String, dynamic> toJson() => {
@@ -248,7 +252,7 @@ class AuthTokens {
     accessToken: json['access_token'] as String,
     refreshToken: json['refresh_token'] as String?,
     tokenType: json['token_type'] as String? ?? 'Bearer',
-    expiresIn: json['expires_in'] as int,
+    expiresIn: json['expires_in'] as int? ?? 3600, // Default to 1 hour if not provided
   );
 
   Map<String, dynamic> toJson() => {

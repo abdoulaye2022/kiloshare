@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import '../models/user_model.dart';
-import '../../../config/app_config.dart';
 
 class PhoneAuthService {
   final Dio _dio;
@@ -11,7 +10,7 @@ class PhoneAuthService {
   Future<PhoneCodeResult> sendVerificationCode(String phoneNumber) async {
     try {
       print('📞 Sending SMS verification code to: $phoneNumber');
-      
+
       final response = await _dio.post(
         '/auth/phone/send-code',
         data: {
@@ -33,12 +32,12 @@ class PhoneAuthService {
       );
     } on DioException catch (e) {
       print('❌ SMS API Error: ${e.response?.data}');
-      
+
       String errorMessage = 'Erreur réseau lors de l\'envoi du SMS';
       if (e.response?.data != null && e.response!.data['message'] != null) {
         errorMessage = e.response!.data['message'];
       }
-      
+
       return PhoneCodeResult(
         success: false,
         message: errorMessage,
@@ -61,7 +60,7 @@ class PhoneAuthService {
   }) async {
     try {
       print('🔍 Verifying SMS code for: $phoneNumber');
-      
+
       final requestData = {
         'phone_number': phoneNumber,
         'code': code,
@@ -92,11 +91,11 @@ class PhoneAuthService {
       return AuthResponse.fromJson(response.data['data']);
     } on DioException catch (e) {
       print('❌ SMS Verification API Error: ${e.response?.data}');
-      
+
       if (e.response?.data != null && e.response!.data['message'] != null) {
         throw Exception(e.response!.data['message']);
       }
-      
+
       throw Exception('Erreur réseau lors de la vérification');
     } catch (e) {
       print('❌ SMS Verification Error: $e');
@@ -107,7 +106,7 @@ class PhoneAuthService {
   /// Valide le format d'un numéro de téléphone (France, USA, Canada)
   static bool validatePhoneNumber(String phoneNumber) {
     final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\+\d]'), '');
-    
+
     final patterns = [
       // France : +33 X XX XX XX XX ou 0X XX XX XX XX
       RegExp(r'^(\+33[1-9]\d{8}|0[1-9]\d{8})$'),
@@ -116,31 +115,31 @@ class PhoneAuthService {
       // Format international général (10-15 chiffres avec +)
       RegExp(r'^\+\d{10,15}$'),
     ];
-    
+
     return patterns.any((pattern) => pattern.hasMatch(cleanNumber));
   }
 
   /// Formate un numéro de téléphone pour l'affichage
   static String formatPhoneNumber(String phoneNumber) {
     final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
-    
+
     if (cleanNumber.length == 10 && cleanNumber.startsWith('0')) {
       // Format français: 06 12 34 56 78
       return '${cleanNumber.substring(0, 2)} ${cleanNumber.substring(2, 4)} '
-             '${cleanNumber.substring(4, 6)} ${cleanNumber.substring(6, 8)} '
-             '${cleanNumber.substring(8, 10)}';
+          '${cleanNumber.substring(4, 6)} ${cleanNumber.substring(6, 8)} '
+          '${cleanNumber.substring(8, 10)}';
     }
-    
+
     if (cleanNumber.length == 10 && !cleanNumber.startsWith('0')) {
       // Format nord-américain: (123) 456-7890
       return '(${cleanNumber.substring(0, 3)}) ${cleanNumber.substring(3, 6)}-${cleanNumber.substring(6, 10)}';
     }
-    
+
     if (cleanNumber.length == 11 && cleanNumber.startsWith('1')) {
       // Format nord-américain avec 1: 1 (123) 456-7890
       return '${cleanNumber.substring(0, 1)} (${cleanNumber.substring(1, 4)}) ${cleanNumber.substring(4, 7)}-${cleanNumber.substring(7, 11)}';
     }
-    
+
     return phoneNumber; // Retourner tel quel si pas de format reconnu
   }
 }

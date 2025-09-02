@@ -33,7 +33,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   final TripService _tripService = TripService();
   final MultiTransportService _multiTransportService = MultiTransportService();
   final TextEditingController _priceController = TextEditingController();
-  
+
   PriceSuggestion? _priceSuggestion;
   MultiTransportPriceSuggestion? _multiTransportSuggestion;
   bool _isLoadingSuggestion = false;
@@ -78,11 +78,11 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     print('DEBUG: arrivalCountry: ${widget.arrivalCountry}');
     print('DEBUG: weightKg: ${widget.weightKg}');
     print('DEBUG: transportType: ${widget.transportType}');
-    
+
     // Safety check: ensure all required parameters are not null
-    if (widget.departureCity == null || 
-        widget.departureCountry == null || 
-        widget.arrivalCity == null || 
+    if (widget.departureCity == null ||
+        widget.departureCountry == null ||
+        widget.arrivalCity == null ||
         widget.arrivalCountry == null) {
       print('DEBUG: Missing required location data - setting default price');
       // Set default price if required data is missing
@@ -96,18 +96,19 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       widget.onPriceSelected(defaultPrice, _selectedCurrency);
       return;
     }
-    
+
     setState(() {
       _isLoadingSuggestion = true;
     });
-    
+
     print('DEBUG: Starting price suggestion calculation...');
 
     try {
       // Use multi-transport service if transport type is specified
       if (widget.transportType != null) {
         try {
-          final multiSuggestion = await _multiTransportService.getPriceSuggestionMulti(
+          final multiSuggestion =
+              await _multiTransportService.getPriceSuggestionMulti(
             transportType: widget.transportType!.value,
             departureCity: widget.departureCity!,
             arrivalCity: widget.arrivalCity!,
@@ -121,13 +122,15 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
           });
 
           // Auto-select the suggested price
-          widget.onPriceSelected(multiSuggestion.suggestedPricePerKg, _selectedCurrency);
+          widget.onPriceSelected(
+              multiSuggestion.suggestedPricePerKg, _selectedCurrency);
         } catch (e) {
           // If multi-transport endpoint is not available, fallback to original service
           print('DEBUG: Multi-transport error: $e');
           print('DEBUG: Error type: ${e.runtimeType}');
           if (e.toString().contains('ENDPOINT_NOT_AVAILABLE')) {
-            print('DEBUG: Multi-transport endpoint not available, using fallback');
+            print(
+                'DEBUG: Multi-transport endpoint not available, using fallback');
             await _useFallbackPriceSuggestion();
           } else {
             print('DEBUG: Rethrowing error: $e');
@@ -138,7 +141,6 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
         print('DEBUG: No transport type specified, using fallback');
         await _useFallbackPriceSuggestion();
       }
-
     } catch (e) {
       print('DEBUG: Final catch block - error: $e');
       print('DEBUG: Error type: ${e.runtimeType}');
@@ -149,7 +151,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
             backgroundColor: Colors.orange,
           ),
         );
-        
+
         // Set a default price when suggestion fails
         final defaultPrice = 15.0; // CAD per kg
         _priceController.text = defaultPrice.toString();
@@ -165,7 +167,6 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       });
     }
   }
-
 
   void _onCustomPriceChanged(String value) {
     final price = double.tryParse(value);
@@ -216,7 +217,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     print('DEBUG: - arrivalCity: ${widget.arrivalCity}');
     print('DEBUG: - arrivalCountry: ${widget.arrivalCountry}');
     print('DEBUG: - currency: $_selectedCurrency');
-    
+
     final suggestion = await _tripService.getPriceSuggestion(
       departureCity: widget.departureCity!,
       departureCountry: widget.departureCountry!,
@@ -226,7 +227,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     );
 
     print('DEBUG: Received suggestion: $suggestion');
-    print('DEBUG: Suggested price: ${suggestion?.suggestedPricePerKg}');
+    print('DEBUG: Suggested price: ${suggestion.suggestedPricePerKg}');
 
     setState(() {
       _priceSuggestion = suggestion;
@@ -261,10 +262,9 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
-            
+
             // Price suggestion
             if (_isLoadingSuggestion)
               _buildLoadingState()
@@ -272,9 +272,9 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
               _buildPriceSuggestion()
             else
               _buildManualPriceInput(),
-            
+
             const SizedBox(height: 16),
-            
+
             // Total earnings preview
             if (_getCurrentPrice() != null && widget.weightKg > 0)
               _buildEarningsPreview(),
@@ -283,7 +283,6 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       ),
     );
   }
-
 
   Widget _buildLoadingState() {
     return Container(
@@ -308,11 +307,11 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _useSuggestedPrice 
+              color: _useSuggestedPrice
                   ? Theme.of(context).primaryColor.withOpacity(0.1)
                   : Colors.transparent,
               border: Border.all(
-                color: _useSuggestedPrice 
+                color: _useSuggestedPrice
                     ? Theme.of(context).primaryColor
                     : Colors.grey[300]!,
               ),
@@ -366,18 +365,18 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
             ),
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Custom price option
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: !_useSuggestedPrice 
+            color: !_useSuggestedPrice
                 ? Theme.of(context).primaryColor.withOpacity(0.1)
                 : Colors.transparent,
             border: Border.all(
-              color: !_useSuggestedPrice 
+              color: !_useSuggestedPrice
                   ? Theme.of(context).primaryColor
                   : Colors.grey[300]!,
             ),
@@ -398,9 +397,11 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
               Expanded(
                 child: TextFormField(
                   controller: _priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d{0,2}')),
                   ],
                   decoration: InputDecoration(
                     labelText: 'Prix personnalisé',
@@ -437,7 +438,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
         widget.onPriceSelected(defaultPrice, _selectedCurrency);
       });
     }
-    
+
     return TextFormField(
       controller: _priceController,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -456,7 +457,8 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
 
   Widget _buildEarningsPreview() {
     final price = _getCurrentPriceWithFallback();
-    final weightKg = widget.weightKg <= 0 ? 1.0 : widget.weightKg; // Avoid zero weight
+    final weightKg =
+        widget.weightKg <= 0 ? 1.0 : widget.weightKg; // Avoid zero weight
     final totalEarnings = price * weightKg;
     final commission = totalEarnings * 0.15; // 15% commission
     final netEarnings = totalEarnings - commission;
@@ -482,15 +484,19 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
           ),
           const SizedBox(height: 12),
           _buildEarningsRow('Total client', totalEarnings, _selectedCurrency),
-          _buildEarningsRow('Commission KiloShare (15%)', commission, _selectedCurrency, isNegative: true),
+          _buildEarningsRow(
+              'Commission KiloShare (15%)', commission, _selectedCurrency,
+              isNegative: true),
           const Divider(),
-          _buildEarningsRow('Vos gains nets', netEarnings, _selectedCurrency, isBold: true),
+          _buildEarningsRow('Vos gains nets', netEarnings, _selectedCurrency,
+              isBold: true),
         ],
       ),
     );
   }
 
-  Widget _buildEarningsRow(String label, double amount, String currency, {bool isNegative = false, bool isBold = false}) {
+  Widget _buildEarningsRow(String label, double amount, String currency,
+      {bool isNegative = false, bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -506,8 +512,11 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
           style: TextStyle(
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             fontSize: isBold ? 16 : 14,
-            color: isNegative ? Colors.red[600] : 
-                   isBold ? Colors.green[700] : null,
+            color: isNegative
+                ? Colors.red[600]
+                : isBold
+                    ? Colors.green[700]
+                    : null,
           ),
         ),
       ],
@@ -522,7 +531,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     }
     return null;
   }
-  
+
   double _getCurrentPriceWithFallback() {
     final price = _getCurrentPrice();
     return price ?? 15.0; // Default fallback price

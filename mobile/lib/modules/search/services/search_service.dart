@@ -45,7 +45,7 @@ class SearchService {
         ...params.toQueryParams(),
       };
 
-      final uri = Uri.parse('${AppConfig.baseUrl}/v1/search/trips')
+      final uri = Uri.parse('${AppConfig.baseUrl}/search/trips')
           .replace(queryParameters: queryParams);
 
       final token = await _getAuthToken();
@@ -82,7 +82,7 @@ class SearchService {
         'limit': limit.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.baseUrl}/v1/search/suggestions')
+      final uri = Uri.parse('${AppConfig.baseUrl}/search/suggestions')
           .replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -116,7 +116,7 @@ class SearchService {
       }
 
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/v1/search/save-alert'),
+        Uri.parse('${AppConfig.baseUrl}/search/save-alert'),
         headers: _getHeaders(token),
         body: json.encode(alert.toJson()),
       );
@@ -150,7 +150,7 @@ class SearchService {
         'limit': limit.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.baseUrl}/v1/search/recent')
+      final uri = Uri.parse('${AppConfig.baseUrl}/search/recent')
           .replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -187,7 +187,7 @@ class SearchService {
         'active_only': activeOnly.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.baseUrl}/v1/search/alerts')
+      final uri = Uri.parse('${AppConfig.baseUrl}/search/alerts')
           .replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -221,7 +221,7 @@ class SearchService {
       }
 
       final response = await http.delete(
-        Uri.parse('${AppConfig.baseUrl}/v1/search/alerts/$alertId'),
+        Uri.parse('${AppConfig.baseUrl}/search/alerts/$alertId'),
         headers: _getHeaders(token),
       );
 
@@ -246,7 +246,7 @@ class SearchService {
       }
 
       final response = await http.patch(
-        Uri.parse('${AppConfig.baseUrl}/v1/search/alerts/$alertId/toggle'),
+        Uri.parse('${AppConfig.baseUrl}/search/alerts/$alertId/toggle'),
         headers: _getHeaders(token),
       );
 
@@ -269,7 +269,7 @@ class SearchService {
         'limit': limit.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.baseUrl}/v1/search/popular-routes')
+      final uri = Uri.parse('${AppConfig.baseUrl}/search/popular-routes')
           .replace(queryParameters: queryParams);
 
       final response = await http.get(

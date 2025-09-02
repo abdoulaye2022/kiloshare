@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response = await _dio.get('http://127.0.0.1:8080/health');
+      final response = await _dio.get('http://127.0.0.1:8080/');
       setState(() {
         _message = 'Backend OK ✅\n${response.data}';
       });
@@ -167,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await _dio.post(
-        'http://127.0.0.1:8080/api/auth/register',
+        'http://127.0.0.1:8080/api/v1/auth/register',
         data: {
           'email': _emailController.text,
           'password': _passwordController.text,
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await _dio.post(
-        'http://127.0.0.1:8080/api/auth/login',
+        'http://127.0.0.1:8080/api/v1/auth/login',
         data: {
           'email': _emailController.text,
           'password': _passwordController.text,

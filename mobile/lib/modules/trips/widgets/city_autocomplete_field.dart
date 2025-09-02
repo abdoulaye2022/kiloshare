@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../data/locations_data.dart';
 import '../models/transport_models.dart';
-import '../services/destination_validator_service.dart';
 
 class CityAutocompleteField extends StatefulWidget {
   final String label;
@@ -63,7 +62,7 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
 
     // Get all cities first
     final allCities = LocationsData.searchCities(query);
-    
+
     // Filter based on transport type
     switch (widget.transportType!) {
       case TransportType.car:
@@ -71,7 +70,7 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
         return allCities.where((city) {
           return city['country'] == 'Canada';
         }).toList();
-        
+
       case TransportType.flight:
         // Flight: all cities (international allowed)
         return allCities;
@@ -83,7 +82,7 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
     setState(() {
       _suggestions = [];
     });
-    
+
     widget.onCitySelected(
       city['city'],
       city['country'],
@@ -116,7 +115,6 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
           onChanged: _onTextChanged,
           textCapitalization: TextCapitalization.words,
         ),
-        
         if (_suggestions.isNotEmpty)
           Card(
             margin: const EdgeInsets.only(top: 4),

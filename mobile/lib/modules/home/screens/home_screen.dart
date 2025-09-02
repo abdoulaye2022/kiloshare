@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../auth/blocs/auth/auth_bloc.dart';
 import '../../auth/blocs/auth/auth_state.dart';
 import '../../../themes/modern_theme.dart';
-import '../../trips/screens/my_trips_screen_bloc.dart';
 import '../../trips/bloc/trip_bloc.dart';
-import '../../trips/models/trip_model.dart';
 import '../../trips/widgets/trip_card_widget.dart';
 import '../../booking/screens/bookings_list_screen.dart';
 
@@ -32,63 +30,63 @@ class _HomeScreenState extends State<HomeScreen> {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         final isAuthenticated = state is AuthAuthenticated;
-        
+
         return Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _pages,
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _currentIndex,
-          selectedItemColor: ModernTheme.primaryBlue,
-          unselectedItemColor: ModernTheme.gray400,
-          backgroundColor: ModernTheme.white,
-          elevation: 8,
-          onTap: (index) {
-            // Vérifier l'authentification pour certains onglets
-            if (!isAuthenticated && (index == 2 || index == 3)) {
-              // Réservations (index 2) et Messages (index 3) nécessitent une connexion
-              String message = index == 2 
-                  ? 'Connectez-vous pour voir vos voyages et réservations'
-                  : 'Connectez-vous pour accéder à la messagerie';
-                  
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(message),
-                  action: SnackBarAction(
-                    label: 'Se connecter',
-                    onPressed: () => context.push('/login'),
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            currentIndex: _currentIndex,
+            selectedItemColor: ModernTheme.primaryBlue,
+            unselectedItemColor: ModernTheme.gray400,
+            backgroundColor: ModernTheme.white,
+            elevation: 8,
+            onTap: (index) {
+              // Vérifier l'authentification pour certains onglets
+              if (!isAuthenticated && (index == 2 || index == 3)) {
+                // Réservations (index 2) et Messages (index 3) nécessitent une connexion
+                String message = index == 2
+                    ? 'Connectez-vous pour voir vos voyages et réservations'
+                    : 'Connectez-vous pour accéder à la messagerie';
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    action: SnackBarAction(
+                      label: 'Se connecter',
+                      onPressed: () => context.push('/login'),
+                    ),
+                    duration: const Duration(seconds: 4),
                   ),
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-              return;
-            }
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Accueil',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: 'Rechercher',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark),
-              label: 'Réservations',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.message),
-              label: 'Messages',
-            ),
-          ],
-        ),
-      );
+                );
+                return;
+              }
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: 'Accueil',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.search),
+                label: 'Rechercher',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.bookmark),
+                label: 'Réservations',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.message),
+                label: 'Messages',
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -282,11 +280,11 @@ class _HomePage extends StatelessWidget {
           BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
               final isAuthenticated = state is AuthAuthenticated;
-              
+
               return Row(
                 children: [
                   Expanded(
-                    child: isAuthenticated 
+                    child: isAuthenticated
                         ? _buildActionCard(
                             context,
                             Icons.add_location,
@@ -416,23 +414,23 @@ class _HomePage extends StatelessWidget {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                
+
                 if (state is PublicTripsLoaded && state.trips.isNotEmpty) {
                   return Column(
-                    children: state.trips.map((trip) => 
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: TripCardWidget(
-                          trip: trip,
-                          isCompact: true,
-                          showUserInfo: true,
-                          onTap: () => context.push('/trips/${trip.id}'),
-                        ),
-                      )
-                    ).toList(),
+                    children: state.trips
+                        .map((trip) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: TripCardWidget(
+                                trip: trip,
+                                isCompact: true,
+                                showUserInfo: true,
+                                onTap: () => context.push('/trips/${trip.id}'),
+                              ),
+                            ))
+                        .toList(),
                   );
                 }
-                
+
                 // Empty state
                 return ModernCard(
                   padding: const EdgeInsets.all(ModernTheme.spacing24),
@@ -562,7 +560,8 @@ class _SearchPage extends StatelessWidget {
                   padding: const EdgeInsets.all(ModernTheme.spacing24),
                   decoration: BoxDecoration(
                     color: ModernTheme.lightBlue.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(ModernTheme.radiusXLarge),
+                    borderRadius:
+                        BorderRadius.circular(ModernTheme.radiusXLarge),
                   ),
                   child: Icon(
                     Icons.search,
@@ -642,7 +641,8 @@ class _MessagesPage extends StatelessWidget {
                   padding: const EdgeInsets.all(ModernTheme.spacing24),
                   decoration: BoxDecoration(
                     color: ModernTheme.lightBlue.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(ModernTheme.radiusXLarge),
+                    borderRadius:
+                        BorderRadius.circular(ModernTheme.radiusXLarge),
                   ),
                   child: Icon(
                     Icons.message,

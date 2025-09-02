@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/booking_service.dart';
-import '../models/booking_model.dart';
 import '../../trips/models/trip_model.dart';
 
 class CreateBookingScreen extends StatefulWidget {

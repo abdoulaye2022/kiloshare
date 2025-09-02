@@ -14,12 +14,11 @@ class TripHistoryScreen extends StatefulWidget {
   State<TripHistoryScreen> createState() => _TripHistoryScreenState();
 }
 
-class _TripHistoryScreenState extends State<TripHistoryScreen> 
+class _TripHistoryScreenState extends State<TripHistoryScreen>
     with SingleTickerProviderStateMixin {
-  
   late TabController _tabController;
   final TripService _tripService = AuthTokenService.instance.tripService;
-  
+
   // State
   List<Trip> _myTrips = [];
   List<Trip> _completedTrips = [];
@@ -53,7 +52,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       });
 
       final trips = await _tripService.getUserTrips();
-      
+
       setState(() {
         _myTrips = trips;
         _isLoadingMyTrips = false;
@@ -73,10 +72,10 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       });
 
       // Filter completed trips from my trips
-      final completedTrips = _myTrips.where((trip) => 
-        trip.status == TripStatus.completed
-      ).toList();
-      
+      final completedTrips = _myTrips
+          .where((trip) => trip.status == TripStatus.completed)
+          .toList();
+
       setState(() {
         _completedTrips = completedTrips;
         _isLoadingCompleted = false;
@@ -301,11 +300,12 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
               label: const Text('Modifier'),
               style: TextButton.styleFrom(
                 foregroundColor: statusColor,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               ),
             ),
           ],
-          if (trip.viewCount != null) ...[
+          ...[
             Icon(Icons.visibility, color: Colors.grey.shade600, size: 14),
             const SizedBox(width: 4),
             Text(
@@ -355,7 +355,8 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Fonctionnalité d\'évaluation bientôt disponible'),
+                        content: Text(
+                            'Fonctionnalité d\'évaluation bientôt disponible'),
                       ),
                     );
                   },
@@ -363,7 +364,8 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
                   label: const Text('Évaluer'),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   ),
                 ),
               ],
@@ -396,16 +398,16 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade500,
-              ),
+                    color: Colors.grey.shade500,
+                  ),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null && onAction != null) ...[
@@ -444,16 +446,16 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
             Text(
               'Erreur de chargement',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.red.shade600,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: Colors.red.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
               error,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade600,
-              ),
+                    color: Colors.grey.shade600,
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),

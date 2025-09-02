@@ -471,9 +471,14 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
       final results = await AuthTokenService.instance.tripService.searchTrips(
         departureCity: _departureCity,
         arrivalCity: _arrivalCity,
+        departureCountry: _departureCountry,
+        arrivalCountry: _arrivalCountry,
         departureDateFrom: _departureDate?.toIso8601String(),
+        departureDateTo: _departureDateTo?.toIso8601String(),
         maxPricePerKg: _maxPricePerKg,
         minWeight: _minWeightKg,
+        verifiedOnly: _verifiedOnly,
+        ticketVerified: _ticketVerifiedOnly,
       );
       
       print('DEBUG: Search completed successfully');

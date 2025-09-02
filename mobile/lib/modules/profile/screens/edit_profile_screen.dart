@@ -96,18 +96,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _professionController.text = profile.profession ?? '';
           _companyController.text = profile.company ?? '';
           _websiteController.text = profile.website ?? '';
-          _addressLine1Controller.text = profile.address ?? '';
+          _addressLine1Controller.text = profile.addressLine1 ?? profile.address ?? '';
+          _addressLine2Controller.text = profile.addressLine2 ?? '';
           _cityController.text = profile.city ?? '';
+          _stateProvinceController.text = profile.stateProvince ?? '';
           _postalCodeController.text = profile.postalCode ?? '';
-          // Pour les nouveaux champs, on utilise des valeurs vides pour l'instant
-          _selectedLanguage = 'fr';
-          _selectedTimezone = 'Europe/Paris';
-          _selectedProfileVisibility = 'public';
-          // Utiliser le genre du profil ou une chaîne vide par défaut
+          _nationalityController.text = profile.nationality ?? '';
+          _emergencyContactNameController.text = profile.emergencyContactName ?? '';
+          _emergencyContactPhoneController.text = profile.emergencyContactPhone ?? '';
+          _emergencyContactRelationController.text = profile.emergencyContactRelation ?? '';
+          // Utiliser les valeurs du profil ou des valeurs par défaut
+          _selectedLanguage = profile.preferredLanguage ?? 'fr';
+          _selectedTimezone = profile.timezone ?? 'Europe/Paris';
+          _selectedProfileVisibility = profile.profileVisibility ?? 'public';
           _selectedGender = profile.gender ?? '';
-          // Utiliser le pays du profil ou une chaîne vide par défaut
           _selectedCountry = profile.country ?? '';
           _selectedBirthDate = profile.dateOfBirth;
+          _newsletterSubscribed = profile.newsletterSubscribed ?? false;
+          _marketingEmails = profile.marketingEmails ?? false;
           _isLoadingProfile = false;
         });
       } else {

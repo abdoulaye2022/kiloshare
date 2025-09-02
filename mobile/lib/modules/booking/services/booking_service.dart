@@ -47,11 +47,11 @@ class BookingService {
         'special_instructions': specialInstructions,
       });
 
-      print('Booking request URL: ${_baseUrl}/v1/bookings/request');
+      print('Booking request URL: ${_baseUrl}/bookings');
       print('Booking request body: $body');
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/v1/bookings/request'),
+        Uri.parse('${_baseUrl}/bookings'),
         headers: headers,
         body: body,
       );
@@ -87,7 +87,7 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
       
-      String url = '${_baseUrl}/v1/bookings/list';
+      String url = '${_baseUrl}/bookings';
       if (role != null) {
         url += '?role=$role';
       }
@@ -129,10 +129,10 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Get booking URL: ${_baseUrl}/v1/bookings/$bookingId');
+      print('Get booking URL: ${_baseUrl}/bookings/$bookingId');
 
       final response = await http.get(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId'),
         headers: headers,
       );
 
@@ -169,10 +169,10 @@ class BookingService {
         if (finalPrice != null) 'final_price': finalPrice,
       });
 
-      print('Accept booking URL: ${_baseUrl}/v1/bookings/$bookingId/accept');
+      print('Accept booking URL: ${_baseUrl}/bookings/$bookingId/accept');
 
       final response = await http.put(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId/accept'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId/accept'),
         headers: headers,
         body: body,
       );
@@ -208,10 +208,10 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Reject booking URL: ${_baseUrl}/v1/bookings/$bookingId/reject');
+      print('Reject booking URL: ${_baseUrl}/bookings/$bookingId/reject');
 
       final response = await http.put(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId/reject'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId/reject'),
         headers: headers,
       );
 
@@ -249,10 +249,10 @@ class BookingService {
         if (message != null) 'message': message,
       });
 
-      print('Add negotiation URL: ${_baseUrl}/v1/bookings/$bookingId/negotiate');
+      print('Add negotiation URL: ${_baseUrl}/bookings/$bookingId/negotiate');
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId/negotiate'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId/negotiate'),
         headers: headers,
         body: body,
       );
@@ -288,10 +288,10 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Mark payment ready URL: ${_baseUrl}/v1/bookings/$bookingId/payment-ready');
+      print('Mark payment ready URL: ${_baseUrl}/bookings/$bookingId/payment-ready');
 
       final response = await http.put(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId/payment-ready'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId/payment-ready'),
         headers: headers,
       );
 
@@ -330,10 +330,10 @@ class BookingService {
         if (photoType != null) 'photo_type': photoType,
       });
 
-      print('Add package photo URL: ${_baseUrl}/v1/bookings/$bookingId/photos');
+      print('Add package photo URL: ${_baseUrl}/bookings/$bookingId/photos');
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/v1/bookings/$bookingId/photos'),
+        Uri.parse('${_baseUrl}/bookings/$bookingId/photos'),
         headers: headers,
         body: body,
       );

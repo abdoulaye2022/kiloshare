@@ -22,7 +22,7 @@ class ProfileService {
 
   static Dio _createDio() {
     final dio = Dio(BaseOptions(
-      baseUrl: '${AppConfig.baseUrl}/v1',
+      baseUrl: AppConfig.baseUrl, // Déjà configuré avec http://127.0.0.1:8080/api/v1
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
@@ -62,17 +62,59 @@ class ProfileService {
   Future<UserProfile?> getUserProfile() async {
     try {
       if (kDebugMode) {
+        print('[ProfileService] ===== DEBUG PROFILE SERVICE =====');
         print('[ProfileService] Récupération du profil utilisateur');
+        print('[ProfileService] URL appelée: /user/profile');
+        print('[ProfileService] Base URL: ${_dio.options.baseUrl}');
+        print('[ProfileService] =================================');
       }
 
-      final response = await _dio.get('/profile', options: await _getAuthHeaders());
+      final response = await _dio.get('/user/profile', options: await _getAuthHeaders());
 
       if (kDebugMode) {
         print('[ProfileService] Réponse du serveur: ${response.data}');
       }
 
       if (response.data['success'] == true && response.data['data'] != null) {
-        return UserProfile.fromJson(response.data['data']);
+        // L'API renvoie les données utilisateur dans data.user
+        final userData = response.data['data']['user'];
+        if (userData != null) {
+          if (kDebugMode) {
+            print('[ProfileService] UserData received: $userData');
+          }
+          
+          // Adapter toutes les données utilisateur au format UserProfile
+          return UserProfile.fromJson({
+            'first_name': userData['first_name'],
+            'last_name': userData['last_name'],
+            'phone': userData['phone'],
+            'email': userData['email'],
+            'profile_picture': userData['profile_picture'],
+            'is_verified': userData['is_verified'],
+            'gender': userData['gender'],
+            'date_of_birth': userData['date_of_birth'],
+            'nationality': userData['nationality'],
+            'bio': userData['bio'],
+            'profession': userData['profession'],
+            'company': userData['company'],
+            'website': userData['website'],
+            'address': userData['address_line1'] ?? userData['address_line2'] ?? '', // Compatibilité legacy
+            'address_line1': userData['address_line1'],
+            'address_line2': userData['address_line2'],
+            'city': userData['city'],
+            'state_province': userData['state_province'],
+            'postal_code': userData['postal_code'],
+            'country': userData['country'],
+            'preferred_language': userData['preferred_language'],
+            'timezone': userData['timezone'],
+            'emergency_contact_name': userData['emergency_contact_name'],
+            'emergency_contact_phone': userData['emergency_contact_phone'],
+            'emergency_contact_relation': userData['emergency_contact_relation'],
+            'profile_visibility': userData['profile_visibility'],
+            'newsletter_subscribed': userData['newsletter_subscribed'],
+            'marketing_emails': userData['marketing_emails'],
+          });
+        }
       }
 
       return null;
@@ -98,7 +140,7 @@ class ProfileService {
         print('[ProfileService] Création du profil: $profileData');
       }
 
-      final response = await _dio.post('/profile', data: profileData, options: await _getAuthHeaders());
+      final response = await _dio.put('/user/profile', data: profileData, options: await _getAuthHeaders());
 
       if (kDebugMode) {
         print('[ProfileService] Réponse création profil: ${response.data}');
@@ -123,7 +165,7 @@ class ProfileService {
         print('[ProfileService] Mise à jour du profil: $profileData');
       }
 
-      final response = await _dio.put('/profile', data: profileData, options: await _getAuthHeaders());
+      final response = await _dio.put('/user/profile', data: profileData, options: await _getAuthHeaders());
 
       if (kDebugMode) {
         print('[ProfileService] Réponse mise à jour profil: ${response.data}');
@@ -156,7 +198,7 @@ class ProfileService {
         ),
       });
 
-      final response = await _dio.post('/images/avatar', data: formData, options: Options(
+      final response = await _dio.post('/user/profile/picture', data: formData, options: Options(
         headers: {
           if (await _getAccessToken() != null) 'Authorization': 'Bearer ${await _getAccessToken()}',
         },
@@ -181,149 +223,51 @@ class ProfileService {
     }
   }
 
-  // Document Verification
+  // ENDPOINT NON DISPONIBLE - Upload de documents non supporté
   Future<VerificationDocument> uploadDocument({
     required File documentFile,
     required String documentType,
     String? documentNumber,
     DateTime? expiryDate,
   }) async {
-    try {
-      if (kDebugMode) {
-        print('[ProfileService] Upload document: $documentType, ${documentFile.path}');
-      }
-
-      FormData formData = FormData.fromMap({
-        'document': await MultipartFile.fromFile(
-          documentFile.path,
-          filename: 'document_${DateTime.now().millisecondsSinceEpoch}.${documentFile.path.split('.').last}',
-        ),
-        'document_type': documentType,
-        if (documentNumber != null) 'document_number': documentNumber,
-        if (expiryDate != null) 'expiry_date': expiryDate.toIso8601String().split('T')[0],
-      });
-
-      final response = await _dio.post('/profile/documents', data: formData, options: Options(
-        headers: {
-          if (await _getAccessToken() != null) 'Authorization': 'Bearer ${await _getAccessToken()}',
-        },
-      ));
-
-      if (kDebugMode) {
-        print('[ProfileService] Réponse upload document: ${response.data}');
-      }
-
-      if (response.data['success'] == true && response.data['data'] != null) {
-        return VerificationDocument.fromJson(response.data['data']);
-      }
-
-      throw Exception(response.data['message'] ?? 'Erreur lors de l\'upload du document');
-    } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur upload document: $e');
-      }
-      rethrow;
+    if (kDebugMode) {
+      print('[ProfileService] Upload document endpoint non disponible');
     }
+    throw Exception('Upload de documents non supporté pour le moment');
   }
 
+  // ENDPOINT NON DISPONIBLE - Documents non supportés pour le moment
   Future<List<VerificationDocument>> getUserDocuments() async {
-    try {
-      if (kDebugMode) {
-        print('[ProfileService] Récupération des documents utilisateur');
-      }
-
-      final response = await _dio.get('/profile/documents', options: await _getAuthHeaders());
-
-      if (kDebugMode) {
-        print('[ProfileService] Réponse documents: ${response.data}');
-      }
-
-      if (response.data['success'] == true && response.data['data'] != null) {
-        List<dynamic> documentsJson = response.data['data'];
-        return documentsJson.map((doc) => VerificationDocument.fromJson(doc)).toList();
-      }
-
-      return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur récupération documents: $e');
-      }
-      rethrow;
+    if (kDebugMode) {
+      print('[ProfileService] Documents endpoint non disponible - retour liste vide');
     }
+    return [];
   }
 
+  // ENDPOINT NON DISPONIBLE - Suppression documents non supportée
   Future<bool> deleteDocument(int documentId) async {
-    try {
-      if (kDebugMode) {
-        print('[ProfileService] Suppression document: $documentId');
-      }
-
-      final response = await _dio.delete('/profile/documents/$documentId', options: await _getAuthHeaders());
-
-      if (kDebugMode) {
-        print('[ProfileService] Réponse suppression document: ${response.data}');
-      }
-
-      return response.data['success'] == true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur suppression document: $e');
-      }
-      rethrow;
+    if (kDebugMode) {
+      print('[ProfileService] Delete document endpoint non disponible');
     }
+    return false;
   }
 
   // Trust Badges
+  // ENDPOINT NON DISPONIBLE - Badges non supportés pour le moment
   Future<List<TrustBadge>> getUserBadges() async {
-    try {
-      if (kDebugMode) {
-        print('[ProfileService] Récupération des badges utilisateur');
-      }
-
-      final response = await _dio.get('/profile/badges', options: await _getAuthHeaders());
-
-      if (kDebugMode) {
-        print('[ProfileService] Réponse badges: ${response.data}');
-      }
-
-      if (response.data['success'] == true && response.data['data'] != null) {
-        List<dynamic> badgesJson = response.data['data'];
-        return badgesJson.map((badge) => TrustBadge.fromJson(badge)).toList();
-      }
-
-      return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur récupération badges: $e');
-      }
-      rethrow;
+    if (kDebugMode) {
+      print('[ProfileService] Badges endpoint non disponible - retour liste vide');
     }
+    return [];
   }
 
   // Verification Status
+  // ENDPOINT NON DISPONIBLE - Statut de vérification non supporté
   Future<VerificationStatus> getVerificationStatus() async {
-    try {
-      if (kDebugMode) {
-        print('[ProfileService] Récupération du statut de vérification');
-      }
-
-      final response = await _dio.get('/profile/verification-status', options: await _getAuthHeaders());
-
-      if (kDebugMode) {
-        print('[ProfileService] Réponse statut vérification: ${response.data}');
-      }
-
-      if (response.data['success'] == true && response.data['data'] != null) {
-        return VerificationStatus.fromJson(response.data['data']);
-      }
-
-      return const VerificationStatus();
-    } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur récupération statut vérification: $e');
-      }
-      rethrow;
+    if (kDebugMode) {
+      print('[ProfileService] Verification status endpoint non disponible - retour statut par défaut');
     }
+    return const VerificationStatus();
   }
 
   // Helper Methods
@@ -370,11 +314,13 @@ class ProfileService {
   }
 
   List<String> getAvailableGenders() {
-    return ['male', 'female', 'other'];
+    return ['', 'male', 'female', 'other'];
   }
 
   String getGenderDisplayName(String gender) {
     switch (gender) {
+      case '':
+        return 'Non spécifié';
       case 'male':
         return 'Homme';
       case 'female':
@@ -388,6 +334,7 @@ class ProfileService {
 
   List<String> getAvailableCountries() {
     return [
+      '', // Option vide pour "Non spécifié"
       'France',
       'Belgique',
       'Suisse',
