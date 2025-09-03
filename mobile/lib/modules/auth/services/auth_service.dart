@@ -40,11 +40,9 @@ class AuthService {
       onError: (DioException err, ErrorInterceptorHandler handler) async {
         // Check if this is a 401 error (Unauthorized)
         if (err.response?.statusCode == 401) {
-          print('AuthService: Received 401, attempting token refresh...');
           
           final refreshToken = await _storage.read(key: 'refresh_token');
           if (refreshToken == null) {
-            print('AuthService: No refresh token, clearing tokens');
             await clearTokens();
             handler.next(err);
             return;
@@ -53,7 +51,6 @@ class AuthService {
           try {
             // Attempt to refresh the token
             await refreshTokens('');
-            print('AuthService: Token refresh successful, retrying request');
             
             // Retry the original request with the new token
             final newToken = await _storage.read(key: 'access_token');
@@ -64,7 +61,6 @@ class AuthService {
             handler.resolve(response);
             
           } catch (refreshError) {
-            print('AuthService: Token refresh failed: $refreshError');
             await clearTokens();
             handler.next(err);
           }
@@ -92,50 +88,13 @@ class AuthService {
       },
     ));
 
-    // Add logging interceptor in debug mode
-    dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-      logPrint: (obj) => print(obj),
-    ));
     
-    // Add custom interceptor for debugging format exception
-    dio.interceptors.add(InterceptorsWrapper(
-      onResponse: (response, handler) {
-        print('=== Raw Response Debug ===');
-        print('Status: ${response.statusCode}');
-        print('Data type: ${response.data.runtimeType}');
-        print('Raw data: ${response.data}');
-        if (response.data is String) {
-          final dataStr = response.data as String;
-          print('String length: ${dataStr.length}');
-          if (dataStr.isNotEmpty) {
-            print('First char code: ${dataStr.codeUnitAt(0)}');
-            print('First 10 chars: "${dataStr.substring(0, dataStr.length > 10 ? 10 : dataStr.length)}"');
-          }
-        }
-        print('========================');
-        handler.next(response);
-      },
-      onError: (error, handler) {
-        print('=== Interceptor Error Debug ===');
-        print('Error type: ${error.runtimeType}');
-        print('Message: ${error.message}');
-        print('Response: ${error.response}');
-        print('==============================');
-        handler.next(error);
-      },
-    ));
 
     return dio;
   }
 
   // Token management
   Future<void> _saveTokens(AuthTokens tokens) async {
-    print('AuthService: _saveTokens() called');
-    print('AuthService: Access token length: ${tokens.accessToken.length}');
-    print('AuthService: Refresh token present: ${tokens.refreshToken != null}');
-    print('AuthService: Token expiry: ${tokens.expiryDate}');
     
     try {
       await Future.wait([
@@ -144,24 +103,13 @@ class AuthService {
           _storage.write(key: 'refresh_token', value: tokens.refreshToken!),
         _storage.write(key: 'token_expires_at', value: tokens.expiryDate.toIso8601String()),
       ]);
-      print('AuthService: Tokens saved successfully');
-      
-      // Vérification immédiate
-      final savedToken = await _storage.read(key: 'access_token');
-      print('AuthService: Verification - saved token length: ${savedToken?.length ?? 0}');
     } catch (e) {
-      print('AuthService: Error saving tokens: $e');
       rethrow;
     }
   }
 
   Future<String?> getAccessToken() async {
     final token = await _storage.read(key: 'access_token');
-    print('AuthService: getAccessToken() - Token found: ${token != null}');
-    if (token != null) {
-      print('AuthService: Token length: ${token.length}');
-      print('AuthService: Token starts with: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
-    }
     return token;
   }
 
@@ -246,13 +194,6 @@ class AuthService {
       }
       
       final requestData = request.toJson();
-      print('=== Final API Request Debug ===');
-      print('Register Request Data: $requestData');
-      print('Register Request Email: "${request.email}"');
-      print('Email validation passed: ${emailRegex.hasMatch(request.email)}');
-      print('JSON keys: ${requestData.keys.toList()}');
-      print('JSON values: ${requestData.values.toList()}');
-      print('==============================');
       
       final response = await _dio.post(
         '/auth/register', 
@@ -271,21 +212,9 @@ class AuthService {
       try {
         responseData = jsonDecode(response.data as String);
       } catch (e) {
-        print('=== JSON Parsing Error ===');
-        print('Error: $e');
-        print('Raw response: "${response.data}"');
-        print('Response length: ${response.data?.toString().length ?? 0}');
-        print('=========================');
         throw FormatException('Invalid JSON response from server');
       }
       
-      // Debug response content
-      print('=== Response Debug ===');
-      print('Status Code: ${response.statusCode}');
-      print('Response Headers: ${response.headers}');
-      print('Raw Response Type: ${response.data.runtimeType}');
-      print('Raw Response Content: ${response.data}');
-      print('=====================');
       
       final apiResponse = ApiResponse.fromJson(
         responseData,
@@ -302,37 +231,17 @@ class AuthService {
 
       return authResponse;
     } on DioException catch (e) {
-      print('=== DioException Debug ===');
-      print('Type: ${e.type}');
-      print('Message: ${e.message}');
-      print('Response: ${e.response}');
-      if (e.response != null) {
-        print('Status Code: ${e.response!.statusCode}');
-        print('Response Data: ${e.response!.data}');
-      }
-      print('========================');
       throw _handleDioException(e);
     } on FormatException catch (e) {
-      print('=== FormatException Debug ===');
-      print('Message: ${e.message}');
-      print('Source: ${e.source}');
-      print('Offset: ${e.offset}');
-      print('=============================');
       throw AuthException('Invalid server response format: ${e.message}');
     } catch (e) {
-      print('=== Unknown Exception Debug ===');
-      print('Type: ${e.runtimeType}');
-      print('Message: $e');
-      print('===============================');
       throw AuthException('Registration failed: $e');
     }
   }
 
   Future<AuthResponse> login(LoginRequest request) async {
     try {
-      print('AuthService: Starting login for ${request.email}');
       final response = await _dio.post('/auth/login', data: request.toJson());
-      print('AuthService: Login response received, status: ${response.statusCode}');
       
       final apiResponse = ApiResponse.fromJson(
         response.data,
@@ -344,19 +253,14 @@ class AuthService {
       }
 
       final authResponse = apiResponse.data!;
-      print('AuthService: AuthResponse parsed successfully');
-      print('AuthService: Tokens - Access: ${authResponse.tokens.accessToken.length}, Refresh: ${authResponse.tokens.refreshToken?.length ?? 0}');
       
       await _saveTokens(authResponse.tokens);
       await _saveUser(authResponse.user);
-      print('AuthService: Login completed successfully');
 
       return authResponse;
     } on DioException catch (e) {
-      print('AuthService: DioException during login - Status: ${e.response?.statusCode}, Type: ${e.type}');
       throw _handleDioException(e);
     } catch (e) {
-      print('AuthService: Exception during login: $e');
       throw AuthException('Login failed: $e');
     }
   }
@@ -390,13 +294,6 @@ class AuthService {
     required String lastName,
     String? phone,
   }) async {
-    print('=== AuthService registerUser Debug ===');
-    print('Creating RegisterRequest with:');
-    print('Email: "$email"');
-    print('Password: "$password"');
-    print('FirstName: "$firstName"');
-    print('LastName: "$lastName"');
-    print('Phone: "$phone"');
     
     final request = RegisterRequest(
       email: email,
@@ -406,8 +303,6 @@ class AuthService {
       phone: phone,
     );
     
-    print('RegisterRequest created successfully');
-    print('=====================================');
     
     return await register(request);
   }
@@ -455,37 +350,27 @@ class AuthService {
   }
 
   Future<AuthResponse> googleSignIn() async {
-    print('AuthService: Starting Google Sign-In...');
     final socialResponse = await _socialAuthService.signInWithGoogle();
     if (socialResponse == null) {
       throw const AuthCancelledException('Google Sign-In was cancelled by user');
     }
     
-    print('AuthService: Google Sign-In successful, saving tokens...');
-    print('AuthService: Tokens - Access: ${socialResponse.tokens.accessToken.length}, Refresh: ${socialResponse.tokens.refreshToken?.length ?? 0}');
-    
-    // 🔥 CORRECTION: Sauvegarder les tokens et l'utilisateur
+    // Sauvegarder les tokens et l'utilisateur
     await _saveTokens(socialResponse.tokens);
     await _saveUser(socialResponse.user);
-    print('AuthService: Google Sign-In tokens saved successfully');
     
     return socialResponse;
   }
 
   Future<AuthResponse> appleSignIn() async {
-    print('AuthService: Starting Apple Sign-In...');
     final socialResponse = await _socialAuthService.signInWithApple();
     if (socialResponse == null) {
       throw const AuthCancelledException('Apple Sign-In was cancelled by user');
     }
     
-    print('AuthService: Apple Sign-In successful, saving tokens...');
-    print('AuthService: Tokens - Access: ${socialResponse.tokens.accessToken.length}, Refresh: ${socialResponse.tokens.refreshToken?.length ?? 0}');
-    
-    // 🔥 CORRECTION: Sauvegarder les tokens et l'utilisateur
+    // Sauvegarder les tokens et l'utilisateur
     await _saveTokens(socialResponse.tokens);
     await _saveUser(socialResponse.user);
-    print('AuthService: Apple Sign-In tokens saved successfully');
     
     return socialResponse;
   }
@@ -649,40 +534,32 @@ class AuthService {
 
   // Ensure valid token (refresh if needed)
   Future<String?> getValidAccessToken() async {
-    print('AuthService: getValidAccessToken() - Starting validation...');
     final token = await getAccessToken();
     
     if (token == null) {
-      print('AuthService: No access token found in storage');
       return null;
     }
     
     // Vérifier si le token est expiré
     bool expired = isTokenExpired(token);
-    print('AuthService: Token expired: $expired');
     
     if (expired) {
-      print('AuthService: Token expired, attempting refresh...');
       final refreshToken = await getRefreshToken();
       
       if (refreshToken == null) {
-        print('AuthService: No refresh token available, clearing tokens');
         await clearTokens();
         return null;
       }
       
       try {
         await refreshTokens(refreshToken);
-        print('AuthService: Token refreshed successfully');
         return await getAccessToken();
       } catch (e) {
-        print('AuthService: Token refresh failed: $e');
         await clearTokens();
         return null;
       }
     }
 
-    print('AuthService: Returning valid token');
     return token;
   }
 

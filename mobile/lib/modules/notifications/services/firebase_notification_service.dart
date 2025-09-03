@@ -73,14 +73,7 @@ class FirebaseNotificationService {
 
       _isInitialized = true;
 
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Initialized successfully');
-        print('[FirebaseNotificationService] FCM Token: $_fcmToken');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Initialization error: $e');
-      }
       rethrow;
     }
   }
@@ -182,9 +175,6 @@ class FirebaseNotificationService {
         await _sendTokenToBackend(newToken);
       });
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error getting FCM token: $e');
-      }
     }
   }
 
@@ -192,13 +182,7 @@ class FirebaseNotificationService {
   Future<void> _sendTokenToBackend(String token) async {
     try {
       await _notificationApiService.registerFCMToken(token);
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] FCM token sent to backend: $token');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error sending token to backend: $e');
-      }
     }
   }
 
@@ -206,26 +190,17 @@ class FirebaseNotificationService {
   Future<void> _configureMessageHandlers() async {
     // Messages reçus quand l'app est en foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Message reçu en foreground: ${message.data}');
-      }
       _showLocalNotification(message);
     });
 
     // Messages qui ont ouvert l'app (background/terminated)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Message a ouvert l\'app: ${message.data}');
-      }
       _handleNotificationTap(message.data);
     });
 
     // Vérifier si l'app a été ouverte via une notification (terminated)
     final RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] App ouverte via notification: ${initialMessage.data}');
-      }
       _handleNotificationTap(initialMessage.data);
     }
   }
@@ -321,9 +296,6 @@ class FirebaseNotificationService {
         final data = jsonDecode(response.payload!);
         _handleNotificationTap(data);
       } catch (e) {
-        if (kDebugMode) {
-          print('[FirebaseNotificationService] Error parsing notification payload: $e');
-        }
       }
     }
   }
@@ -373,9 +345,6 @@ class FirebaseNotificationService {
         GoRouter.of(_context!).push('/notifications');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error handling notification tap: $e');
-      }
       // Fallback vers les notifications
       GoRouter.of(_context!).push('/notifications');
     }
@@ -386,9 +355,6 @@ class FirebaseNotificationService {
     try {
       await _notificationApiService.markAsRead(notificationId);
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error marking notification as read: $e');
-      }
     }
   }
 
@@ -397,9 +363,6 @@ class FirebaseNotificationService {
     try {
       return await _notificationApiService.getUnreadCount();
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error getting unread count: $e');
-      }
       return 0;
     }
   }
@@ -408,13 +371,7 @@ class FirebaseNotificationService {
   Future<void> subscribeToTopic(String topic) async {
     try {
       await _firebaseMessaging.subscribeToTopic(topic);
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Subscribed to topic: $topic');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error subscribing to topic $topic: $e');
-      }
     }
   }
 
@@ -422,13 +379,7 @@ class FirebaseNotificationService {
   Future<void> unsubscribeFromTopic(String topic) async {
     try {
       await _firebaseMessaging.unsubscribeFromTopic(topic);
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Unsubscribed from topic: $topic');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[FirebaseNotificationService] Error unsubscribing from topic $topic: $e');
-      }
     }
   }
 
@@ -453,9 +404,6 @@ class FirebaseNotificationService {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   
-  if (kDebugMode) {
-    print('[FirebaseNotificationService] Message reçu en background: ${message.data}');
-  }
   
   // Traitement des messages en background si nécessaire
 }

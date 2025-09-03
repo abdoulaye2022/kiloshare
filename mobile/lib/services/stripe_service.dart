@@ -27,15 +27,12 @@ class StripeService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Creating Stripe connected account...');
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/stripe/account/create'),
         headers: headers,
       );
 
-      print('Stripe account creation response status: ${response.statusCode}');
-      print('Stripe account creation response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -68,15 +65,12 @@ class StripeService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Getting Stripe account status...');
 
       final response = await http.get(
         Uri.parse('${_baseUrl}/stripe/account/status'),
         headers: headers,
       );
 
-      print('Stripe account status response status: ${response.statusCode}');
-      print('Stripe account status response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -109,15 +103,12 @@ class StripeService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Refreshing Stripe account link...');
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/stripe/account/refresh-link'),
         headers: headers,
       );
 
-      print('Stripe refresh link response status: ${response.statusCode}');
-      print('Stripe refresh link response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 

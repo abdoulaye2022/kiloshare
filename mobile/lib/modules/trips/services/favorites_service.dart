@@ -36,29 +36,15 @@ class FavoritesService {
     try {
       final options = await _getAuthHeaders();
       
-      if (kDebugMode) {
-        print('[FavoritesService] Adding to favorites - URL: ${AppConfig.baseUrl}/favorites/trips/$tripId');
-        print('[FavoritesService] Headers: ${options.headers}');
-      }
 
       final response = await _dio.post(
         '/favorites/trips/$tripId',
         options: options,
       );
 
-      if (kDebugMode) {
-        print('[FavoritesService] Response: ${response.data}');
-      }
 
       return response.data['success'] == true;
     } catch (e) {
-      if (kDebugMode) {
-        print('[FavoritesService] Erreur ajout favoris: $e');
-        if (e is DioException && e.response != null) {
-          print('[FavoritesService] Error response: ${e.response?.data}');
-          print('[FavoritesService] Error status: ${e.response?.statusCode}');
-        }
-      }
       return false;
     }
   }
@@ -66,25 +52,15 @@ class FavoritesService {
   /// Retirer un voyage des favoris
   Future<bool> removeFromFavorites(String tripId) async {
     try {
-      if (kDebugMode) {
-        print('[FavoritesService] Suppression des favoris: $tripId');
-      }
 
       final response = await _dio.delete(
         '/favorites/trips/$tripId',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print(
-            '[FavoritesService] Réponse suppression favoris: ${response.data}');
-      }
 
       return response.data['success'] == true;
     } catch (e) {
-      if (kDebugMode) {
-        print('[FavoritesService] Erreur suppression favoris: $e');
-      }
       return false;
     }
   }
@@ -97,16 +73,10 @@ class FavoritesService {
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[FavoritesService] Status check response: ${response.data}');
-      }
 
       return response.data['success'] == true &&
           response.data['data']['is_favorite'] == true;
     } catch (e) {
-      if (kDebugMode) {
-        print('[FavoritesService] Erreur vérification favoris: $e');
-      }
       return false;
     }
   }
@@ -126,9 +96,6 @@ class FavoritesService {
 
       return [];
     } catch (e) {
-      if (kDebugMode) {
-        print('[FavoritesService] Erreur récupération favoris: $e');
-      }
       return [];
     }
   }
@@ -137,30 +104,18 @@ class FavoritesService {
   /// Retourne un Map avec {success: bool, isFavorite: bool}
   Future<Map<String, dynamic>> toggleFavorite(String tripId) async {
     try {
-      if (kDebugMode) {
-        print('[FavoritesService] Toggle favorite for trip: $tripId');
-      }
 
       final response = await _dio.post(
         '/favorites/trips/$tripId/toggle',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[FavoritesService] Toggle response: ${response.data}');
-      }
 
       return {
         'success': response.data['success'] == true,
         'isFavorite': response.data['data']?['data']?['is_favorite'] ?? false,
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('[FavoritesService] Erreur toggle favoris: $e');
-        if (e is DioException && e.response != null) {
-          print('[FavoritesService] Toggle error response: ${e.response?.data}');
-        }
-      }
       return {'success': false, 'isFavorite': false};
     }
   }

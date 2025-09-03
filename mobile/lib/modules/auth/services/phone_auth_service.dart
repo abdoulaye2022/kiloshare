@@ -9,7 +9,6 @@ class PhoneAuthService {
   /// Envoie un code de vérification SMS
   Future<PhoneCodeResult> sendVerificationCode(String phoneNumber) async {
     try {
-      print('📞 Sending SMS verification code to: $phoneNumber');
 
       final response = await _dio.post(
         '/auth/phone/send-code',
@@ -18,8 +17,6 @@ class PhoneAuthService {
         },
       );
 
-      print('✅ SMS verification code sent successfully');
-      print('📋 Response data: ${response.data}');
 
       if (response.data['success'] != true) {
         throw Exception(response.data['message'] ?? 'Failed to send code');
@@ -31,7 +28,6 @@ class PhoneAuthService {
         phoneNumber: response.data['data']['phone'],
       );
     } on DioException catch (e) {
-      print('❌ SMS API Error: ${e.response?.data}');
 
       String errorMessage = 'Erreur réseau lors de l\'envoi du SMS';
       if (e.response?.data != null && e.response!.data['message'] != null) {
@@ -43,7 +39,6 @@ class PhoneAuthService {
         message: errorMessage,
       );
     } catch (e) {
-      print('❌ SMS General Error: $e');
       return PhoneCodeResult(
         success: false,
         message: 'Erreur lors de l\'envoi du SMS',
@@ -59,7 +54,6 @@ class PhoneAuthService {
     String? lastName,
   }) async {
     try {
-      print('🔍 Verifying SMS code for: $phoneNumber');
 
       final requestData = {
         'phone_number': phoneNumber,
@@ -74,15 +68,12 @@ class PhoneAuthService {
         requestData['last_name'] = lastName;
       }
 
-      print('📤 Request data: $requestData');
 
       final response = await _dio.post(
         '/auth/phone/verify-login',
         data: requestData,
       );
 
-      print('✅ SMS verification successful');
-      print('📋 Response data: ${response.data}');
 
       if (response.data['success'] != true) {
         throw Exception(response.data['message'] ?? 'Code verification failed');
@@ -90,7 +81,6 @@ class PhoneAuthService {
 
       return AuthResponse.fromJson(response.data['data']);
     } on DioException catch (e) {
-      print('❌ SMS Verification API Error: ${e.response?.data}');
 
       if (e.response?.data != null && e.response!.data['message'] != null) {
         throw Exception(e.response!.data['message']);
@@ -98,7 +88,6 @@ class PhoneAuthService {
 
       throw Exception('Erreur réseau lors de la vérification');
     } catch (e) {
-      print('❌ SMS Verification Error: $e');
       rethrow;
     }
   }

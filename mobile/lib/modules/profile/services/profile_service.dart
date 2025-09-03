@@ -31,14 +31,6 @@ class ProfileService {
       },
     ));
 
-    // Add logging interceptor in debug mode
-    if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (obj) => print(obj),
-      ));
-    }
 
     return dio;
   }
@@ -61,27 +53,14 @@ class ProfileService {
   // Profile Management
   Future<UserProfile?> getUserProfile() async {
     try {
-      if (kDebugMode) {
-        print('[ProfileService] ===== DEBUG PROFILE SERVICE =====');
-        print('[ProfileService] Récupération du profil utilisateur');
-        print('[ProfileService] URL appelée: /user/profile');
-        print('[ProfileService] Base URL: ${_dio.options.baseUrl}');
-        print('[ProfileService] =================================');
-      }
 
       final response = await _dio.get('/user/profile', options: await _getAuthHeaders());
 
-      if (kDebugMode) {
-        print('[ProfileService] Réponse du serveur: ${response.data}');
-      }
 
       if (response.data['success'] == true && response.data['data'] != null) {
         // L'API renvoie les données utilisateur dans data.user
         final userData = response.data['data']['user'];
         if (userData != null) {
-          if (kDebugMode) {
-            print('[ProfileService] UserData received: $userData');
-          }
           
           // Adapter toutes les données utilisateur au format UserProfile
           return UserProfile.fromJson({
@@ -121,30 +100,18 @@ class ProfileService {
     } catch (e) {
       if (e is DioException && e.response?.statusCode == 404) {
         // Profil non trouvé - c'est normal pour un nouvel utilisateur
-        if (kDebugMode) {
-          print('[ProfileService] Profil non trouvé - utilisateur sans profil');
-        }
         return null;
       }
       
-      if (kDebugMode) {
-        print('[ProfileService] Erreur lors de la récupération du profil: $e');
-      }
       rethrow;
     }
   }
 
   Future<UserProfile> createUserProfile(Map<String, dynamic> profileData) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileService] Création du profil: $profileData');
-      }
 
       final response = await _dio.put('/user/profile', data: profileData, options: await _getAuthHeaders());
 
-      if (kDebugMode) {
-        print('[ProfileService] Réponse création profil: ${response.data}');
-      }
 
       if (response.data['success'] == true && response.data['data'] != null) {
         return UserProfile.fromJson(response.data['data']);
@@ -152,24 +119,15 @@ class ProfileService {
 
       throw Exception(response.data['message'] ?? 'Erreur lors de la création du profil');
     } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur création profil: $e');
-      }
       rethrow;
     }
   }
 
   Future<UserProfile> updateUserProfile(Map<String, dynamic> profileData) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileService] Mise à jour du profil: $profileData');
-      }
 
       final response = await _dio.put('/user/profile', data: profileData, options: await _getAuthHeaders());
 
-      if (kDebugMode) {
-        print('[ProfileService] Réponse mise à jour profil: ${response.data}');
-      }
 
       if (response.data['success'] == true && response.data['data'] != null) {
         return UserProfile.fromJson(response.data['data']);
@@ -177,9 +135,6 @@ class ProfileService {
 
       throw Exception(response.data['message'] ?? 'Erreur lors de la mise à jour du profil');
     } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur mise à jour profil: $e');
-      }
       rethrow;
     }
   }
@@ -187,9 +142,6 @@ class ProfileService {
   // Avatar Upload avec Cloudinary
   Future<String> uploadAvatar(File imageFile) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileService] Upload avatar vers Cloudinary: ${imageFile.path}');
-      }
 
       FormData formData = FormData.fromMap({
         'avatar': await MultipartFile.fromFile(
@@ -204,9 +156,6 @@ class ProfileService {
         },
       ));
 
-      if (kDebugMode) {
-        print('[ProfileService] Réponse upload avatar Cloudinary: ${response.data}');
-      }
 
       if (response.data['success'] == true && response.data['data'] != null) {
         return response.data['data']['avatar_url'] ?? 
@@ -216,9 +165,6 @@ class ProfileService {
 
       throw Exception(response.data['message'] ?? 'Erreur lors de l\'upload de l\'avatar vers Cloudinary');
     } catch (e) {
-      if (kDebugMode) {
-        print('[ProfileService] Erreur upload avatar Cloudinary: $e');
-      }
       rethrow;
     }
   }
@@ -230,43 +176,28 @@ class ProfileService {
     String? documentNumber,
     DateTime? expiryDate,
   }) async {
-    if (kDebugMode) {
-      print('[ProfileService] Upload document endpoint non disponible');
-    }
     throw Exception('Upload de documents non supporté pour le moment');
   }
 
   // ENDPOINT NON DISPONIBLE - Documents non supportés pour le moment
   Future<List<VerificationDocument>> getUserDocuments() async {
-    if (kDebugMode) {
-      print('[ProfileService] Documents endpoint non disponible - retour liste vide');
-    }
     return [];
   }
 
   // ENDPOINT NON DISPONIBLE - Suppression documents non supportée
   Future<bool> deleteDocument(int documentId) async {
-    if (kDebugMode) {
-      print('[ProfileService] Delete document endpoint non disponible');
-    }
     return false;
   }
 
   // Trust Badges
   // ENDPOINT NON DISPONIBLE - Badges non supportés pour le moment
   Future<List<TrustBadge>> getUserBadges() async {
-    if (kDebugMode) {
-      print('[ProfileService] Badges endpoint non disponible - retour liste vide');
-    }
     return [];
   }
 
   // Verification Status
   // ENDPOINT NON DISPONIBLE - Statut de vérification non supporté
   Future<VerificationStatus> getVerificationStatus() async {
-    if (kDebugMode) {
-      print('[ProfileService] Verification status endpoint non disponible - retour statut par défaut');
-    }
     return const VerificationStatus();
   }
 

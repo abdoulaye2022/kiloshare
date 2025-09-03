@@ -39,6 +39,20 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   Future<void> _loadBookings() async {
     if (!mounted) return;
     
+    // Vérifier si l'utilisateur est connecté
+    final token = await _authService.getValidAccessToken();
+    if (token == null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _sentBookings = [];
+          _receivedBookings = [];
+          _error = null;
+        });
+      }
+      return;
+    }
+    
     setState(() {
       _isLoading = true;
       _error = null;

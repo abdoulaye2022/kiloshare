@@ -264,14 +264,6 @@ class Trip {
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
-    try {
-      if (kDebugMode) {
-        print('[Trip.fromJson] Début parsing trip ID: ${json['id']}');
-        print('[Trip.fromJson] Tous les champs reçus: ${json.keys.toList()}');
-      }
-    } catch (e) {
-      // Ignore debug print errors
-    }
     
     return Trip(
       id: json['id']?.toString() ?? '',

@@ -19,30 +19,23 @@ class SocialAuthService {
   /// Authentification avec Google
   Future<AuthResponse?> signInWithGoogle() async {
     try {
-      print('🔍 Starting Google Sign-In...');
-      print('📱 Google Sign-In Configuration: ${_googleSignIn.clientId}');
-      print('🌐 Server Client ID: 325498754106-ocf60iqo99m4la6viaahfkvc0c9pcs4k.apps.googleusercontent.com');
       
       // Vérifier si Google Sign-In est disponible
       final isAvailable = await _googleSignIn.isSignedIn();
-      print('🔍 Google Sign-In available: $isAvailable');
       
       // Déconnecter silencieusement sans lever d'exception
       try {
         await _googleSignIn.signOut();
       } catch (e) {
-        print('⚠️ Silent sign out failed: $e');
         // Continue anyway
       }
       
       final GoogleSignInAccount? googleAccount = await _googleSignIn.signIn();
       
       if (googleAccount == null) {
-        print('❌ Google Sign-In: User cancelled');
         return null;
       }
       
-      print('✅ Google account selected: ${googleAccount.email}');
       
       final GoogleSignInAuthentication googleAuth = await googleAccount.authentication;
       
@@ -50,7 +43,6 @@ class SocialAuthService {
         throw Exception('Failed to get Google access token');
       }
       
-      print('🔑 Google access token obtained');
       
       // Appeler l'API backend
       return await _authenticateWithProvider(
@@ -59,7 +51,6 @@ class SocialAuthService {
       );
       
     } catch (e) {
-      print('❌ Google Sign-In error: $e');
       rethrow;
     }
   }
@@ -68,7 +59,6 @@ class SocialAuthService {
   /// Authentification avec Apple
   Future<AuthResponse?> signInWithApple() async {
     try {
-      print('🔍 Starting Apple Sign-In...');
       
       final credential = await SignInWithApple.getAppleIDCredential(
         scopes: [
@@ -81,8 +71,6 @@ class SocialAuthService {
         ),
       );
       
-      print('✅ Apple Sign-In successful');
-      print('🔑 Apple ID token obtained');
       
       // Appeler l'API backend
       return await _authenticateWithProvider(
@@ -91,7 +79,6 @@ class SocialAuthService {
       );
       
     } catch (e) {
-      print('❌ Apple Sign-In error: $e');
       rethrow;
     }
   }
@@ -102,15 +89,12 @@ class SocialAuthService {
     Map<String, String> credentials,
   ) async {
     try {
-      print('📡 Calling backend API for $provider authentication...');
       
       final response = await _dio.post(
         '/auth/$provider',
         data: credentials,
       );
       
-      print('✅ Backend API response received');
-      print('📋 Response data: ${response.data}');
       
       if (response.data['success'] != true) {
         throw Exception(
@@ -121,7 +105,6 @@ class SocialAuthService {
       return AuthResponse.fromJson(response.data['data']);
       
     } on DioException catch (e) {
-      print('❌ API Error: ${e.response?.data}');
       
       if (e.response?.data != null && e.response!.data['message'] != null) {
         throw Exception(e.response!.data['message']);
@@ -142,7 +125,6 @@ class SocialAuthService {
       
       return {};
     } catch (e) {
-      print('❌ Error getting providers: $e');
       return {};
     }
   }
@@ -160,7 +142,6 @@ class SocialAuthService {
       
       return response.data['success'] == true;
     } catch (e) {
-      print('❌ Error linking social account: $e');
       return false;
     }
   }
@@ -171,7 +152,6 @@ class SocialAuthService {
       final response = await _dio.delete('/auth/social/unlink/$provider');
       return response.data['success'] == true;
     } catch (e) {
-      print('❌ Error unlinking social account: $e');
       return false;
     }
   }
@@ -182,15 +162,12 @@ class SocialAuthService {
       // Google Sign-Out
       if (await _googleSignIn.isSignedIn()) {
         await _googleSignIn.signOut();
-        print('✅ Google Sign-Out completed');
       }
       
       
       // Apple Sign-Out (pas de méthode spécifique nécessaire)
       
-      print('✅ All social providers signed out');
     } catch (e) {
-      print('❌ Error during social sign-out: $e');
     }
   }
 }

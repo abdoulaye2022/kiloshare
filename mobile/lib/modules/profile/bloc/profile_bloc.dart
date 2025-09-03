@@ -38,9 +38,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   // Profile Management Handlers
   Future<void> _onGetUserProfile(GetUserProfile event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Récupération du profil utilisateur');
-      }
 
       emit(const ProfileLoading());
       
@@ -57,9 +54,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(const NoProfile());
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur récupération profil: $error');
-      }
       emit(ProfileError(
         message: 'Erreur lors de la récupération du profil',
         error: error,
@@ -69,9 +63,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onCreateUserProfile(CreateUserProfile event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Création du profil');
-      }
 
       emit(const ProfileActionLoading(action: 'create'));
       
@@ -93,9 +84,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       // Automatically load all profile data after creation
       add(const GetUserProfile());
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur création profil: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la création du profil',
         action: 'create',
@@ -106,9 +94,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onUpdateUserProfile(UpdateUserProfile event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Mise à jour du profil');
-      }
 
       emit(const ProfileActionLoading(action: 'update'));
       
@@ -130,9 +115,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       // Refresh profile data
       add(const GetUserProfile());
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur mise à jour profil: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la mise à jour du profil',
         action: 'update',
@@ -143,9 +125,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onUploadAvatar(UploadAvatar event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Upload avatar');
-      }
 
       emit(const ProfileActionLoading(action: 'upload_avatar'));
       
@@ -156,9 +135,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       // Refresh profile to get updated avatar
       add(const GetUserProfile());
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur upload avatar: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors du téléchargement de l\'avatar',
         action: 'upload_avatar',
@@ -170,9 +146,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   // Document Management Handlers
   Future<void> _onUploadDocument(UploadDocument event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Upload document: ${event.documentType}');
-      }
 
       emit(const ProfileActionLoading(action: 'upload_document'));
       
@@ -188,9 +161,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       // Refresh profile data to update verification status
       add(const RefreshAllProfileData());
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur upload document: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors du téléchargement du document',
         action: 'upload_document',
@@ -201,9 +171,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onGetUserDocuments(GetUserDocuments event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Récupération des documents');
-      }
 
       final documents = await _profileService.getUserDocuments();
       
@@ -215,9 +182,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(currentState.copyWith(documents: documents));
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur récupération documents: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la récupération des documents',
         action: 'get_documents',
@@ -228,9 +192,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onDeleteDocument(DeleteDocument event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Suppression document: ${event.documentId}');
-      }
 
       emit(const ProfileActionLoading(action: 'delete_document'));
       
@@ -249,9 +210,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         ));
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur suppression document: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la suppression du document',
         action: 'delete_document',
@@ -263,9 +221,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   // Badge and Verification Handlers
   Future<void> _onGetUserBadges(GetUserBadges event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Récupération des badges');
-      }
 
       final badges = await _profileService.getUserBadges();
       
@@ -277,9 +232,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(currentState.copyWith(badges: badges));
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur récupération badges: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la récupération des badges',
         action: 'get_badges',
@@ -290,9 +242,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onGetVerificationStatus(GetVerificationStatus event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Récupération du statut de vérification');
-      }
 
       final verificationStatus = await _profileService.getVerificationStatus();
       
@@ -304,9 +253,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(currentState.copyWith(verificationStatus: verificationStatus));
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur récupération statut vérification: $error');
-      }
       emit(ProfileActionError(
         message: 'Erreur lors de la récupération du statut de vérification',
         action: 'get_verification_status',
@@ -332,9 +278,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   Future<void> _onRefreshAllProfileData(RefreshAllProfileData event, Emitter<ProfileState> emit) async {
     try {
-      if (kDebugMode) {
-        print('[ProfileBloc] Actualisation complète des données du profil');
-      }
 
       emit(const ProfileLoading());
       
@@ -362,9 +305,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         emit(const NoProfile());
       }
     } catch (error) {
-      if (kDebugMode) {
-        print('[ProfileBloc] Erreur actualisation complète: $error');
-      }
       
       // Try to load partial data
       List<String> errors = [];

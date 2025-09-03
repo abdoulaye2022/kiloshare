@@ -65,7 +65,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur searchTrips: $e');
       rethrow;
     }
   }
@@ -102,7 +101,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur getCitySuggestions: $e');
       return [];
     }
   }
@@ -133,7 +131,6 @@ class SearchService {
         throw Exception(data['message'] ?? 'Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur saveSearchAlert: $e');
       rethrow;
     }
   }
@@ -170,7 +167,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur getRecentSearches: $e');
       return [];
     }
   }
@@ -207,7 +203,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur getUserSearchAlerts: $e');
       return [];
     }
   }
@@ -232,7 +227,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur deleteSearchAlert: $e');
       return false;
     }
   }
@@ -257,7 +251,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur toggleSearchAlert: $e');
       return false;
     }
   }
@@ -289,7 +282,6 @@ class SearchService {
         throw Exception('Erreur de connexion: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erreur getPopularRoutes: $e');
       return [];
     }
   }

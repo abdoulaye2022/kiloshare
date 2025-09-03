@@ -50,44 +50,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onAuthStarted(
       AuthStarted event, Emitter<AuthState> emit) async {
-    print('AuthBloc: _onAuthStarted called');
     try {
       // Check if user is already authenticated
       final token = await _authService.getStoredToken();
-      print('AuthBloc: Token from storage: ${token != null}');
       
       if (token != null && !_authService.isTokenExpired(token)) {
-        print('AuthBloc: Token is valid, checking user data...');
         var user = await _authService.getCurrentUser();
-        print('AuthBloc: Local user data found: ${user != null}');
         
         // Si pas d'utilisateur en local, récupérer depuis l'API
         if (user == null) {
           try {
-            print('AuthBloc: Fetching user from API...');
             user = await _authService.getCurrentUserFromApi();
             // Sauvegarder l'utilisateur récupéré
             await _authService.saveUser(user);
-            print('AuthBloc: User fetched and saved successfully');
           } catch (e) {
-            print('AuthBloc: Failed to fetch user from API: $e');
             // Si échec de récupération, considérer comme non authentifié
             emit(AuthUnauthenticated());
             return;
           }
         }
         
-        print('AuthBloc: Emitting AuthAuthenticated state');
         emit(AuthAuthenticated(
           user: user,
           accessToken: token,
         ));
         return;
       }
-      print('AuthBloc: No valid token found, emitting AuthUnauthenticated');
       emit(AuthUnauthenticated());
     } catch (e) {
-      print('AuthBloc: Error in _onAuthStarted: $e');
       emit(AuthUnauthenticated());
     }
   }

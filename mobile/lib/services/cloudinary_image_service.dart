@@ -78,9 +78,6 @@ class CloudinaryImageService {
     Function(double)? onProgress,
   }) async {
     try {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Upload avatar: ${imageFile.path}');
-      }
 
       // Compresser l'image selon le profil avatar
       final compressedFile = await _compressImage(imageFile, 'avatar');
@@ -111,9 +108,6 @@ class CloudinaryImageService {
       // Nettoyer le fichier temporaire compressé
       await _cleanupTempFile(compressedFile);
 
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Avatar upload successful: ${response.data}');
-      }
 
       if (response.data['success'] == true) {
         return CloudinaryUploadResult.fromJson(response.data['data']);
@@ -122,9 +116,6 @@ class CloudinaryImageService {
       throw CloudinaryException(response.data['message'] ?? 'Upload failed');
 
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Avatar upload error: $e');
-      }
       
       // Ajouter à la queue si erreur réseau
       if (e is DioException && _isNetworkError(e)) {
@@ -152,9 +143,6 @@ class CloudinaryImageService {
     Function(double)? onProgress,
   }) async {
     try {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Upload KYC: $documentType');
-      }
 
       final compressedFile = await _compressImage(imageFile, 'kyc_document');
       
@@ -189,9 +177,6 @@ class CloudinaryImageService {
       throw CloudinaryException(response.data['message'] ?? 'Upload failed');
 
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] KYC upload error: $e');
-      }
       rethrow;
     }
   }
@@ -207,9 +192,6 @@ class CloudinaryImageService {
     Function(double)? onProgress,
   }) async {
     try {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Upload ${imageFiles.length} trip photos');
-      }
 
       // Limiter à 5 photos max
       if (imageFiles.length > 5) {
@@ -269,9 +251,6 @@ class CloudinaryImageService {
       throw CloudinaryException(response.data['message'] ?? 'Upload failed');
 
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Trip photos upload error: $e');
-      }
       rethrow;
     }
   }
@@ -338,9 +317,6 @@ class CloudinaryImageService {
       throw CloudinaryException(response.data['message'] ?? 'Upload failed');
 
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Package photos upload error: $e');
-      }
       rethrow;
     }
   }
@@ -388,9 +364,6 @@ class CloudinaryImageService {
       throw CloudinaryException(response.data['message'] ?? 'Upload failed');
 
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Delivery proof upload error: $e');
-      }
       rethrow;
     }
   }
@@ -415,17 +388,11 @@ class CloudinaryImageService {
       // Pré-compresser si l'image est trop lourde
       final fileSize = await imageFile.length();
       if (fileSize > 2 * 1024 * 1024) { // 2MB
-        if (kDebugMode) {
-          print('[CloudinaryImageService] Pre-compressing large image: ${fileSize ~/ 1024}KB');
-        }
         return await _compressImage(imageFile, imageType);
       }
 
       return imageFile;
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Pick image error: $e');
-      }
       rethrow;
     }
   }
@@ -463,9 +430,6 @@ class CloudinaryImageService {
 
       return imageFiles;
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Pick multiple images error: $e');
-      }
       rethrow;
     }
   }
@@ -487,9 +451,6 @@ class CloudinaryImageService {
 
       return response.data['success'] == true;
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Delete image error: $e');
-      }
       return false;
     }
   }
@@ -513,15 +474,9 @@ class CloudinaryImageService {
             // Ajouter d'autres types selon les besoins
           }
           
-          if (kDebugMode) {
-            print('[CloudinaryImageService] Queue task completed: ${task.type}');
-          }
         } catch (e) {
           // Re-ajouter à la queue si échec persistant
           _uploadQueue.add(task);
-          if (kDebugMode) {
-            print('[CloudinaryImageService] Queue task failed, re-added: ${task.type}');
-          }
         }
       }
     } finally {
@@ -548,9 +503,6 @@ class CloudinaryImageService {
 
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Get usage stats error: $e');
-      }
       return null;
     }
   }
@@ -577,13 +529,6 @@ class CloudinaryImageService {
       throw CloudinaryException('Échec de la compression d\'image');
     }
 
-    if (kDebugMode) {
-      final originalSize = await imageFile.length();
-      final compressedSize = await compressedFile.length();
-      final compressionRatio = (1 - compressedSize / originalSize) * 100;
-      
-      print('[CloudinaryImageService] Image compressed: ${originalSize ~/ 1024}KB → ${compressedSize ~/ 1024}KB (${compressionRatio.toStringAsFixed(1)}% saved)');
-    }
 
     return File(compressedFile.path);
   }
@@ -595,9 +540,6 @@ class CloudinaryImageService {
         await file.delete();
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('[CloudinaryImageService] Cleanup temp file error: $e');
-      }
     }
   }
 
@@ -621,9 +563,6 @@ class CloudinaryImageService {
     // Sauvegarder la queue localement pour persistance
     // TODO: Implémenter la persistance locale de la queue
     
-    if (kDebugMode) {
-      print('[CloudinaryImageService] Task added to upload queue: ${task.type}');
-    }
   }
 }
 

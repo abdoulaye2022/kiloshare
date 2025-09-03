@@ -27,13 +27,6 @@ class NotificationApiService {
       },
     ));
 
-    if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (obj) => print(obj),
-      ));
-    }
 
     return dio;
   }
@@ -56,9 +49,6 @@ class NotificationApiService {
   /// Enregistrer le token FCM
   Future<void> registerFCMToken(String token) async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Registering FCM token: $token');
-      }
 
       final response = await _dio.post(
         '/user/notifications/register-token',
@@ -70,13 +60,7 @@ class NotificationApiService {
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] FCM token registered: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error registering FCM token: $e');
-      }
       rethrow;
     }
   }
@@ -89,9 +73,6 @@ class NotificationApiService {
     String? type,
   }) async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Getting notifications - page: $page, limit: $limit');
-      }
 
       final queryParams = <String, dynamic>{
         'page': page,
@@ -116,9 +97,6 @@ class NotificationApiService {
 
       return [];
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error getting notifications: $e');
-      }
       rethrow;
     }
   }
@@ -126,22 +104,13 @@ class NotificationApiService {
   /// Marquer une notification comme lue
   Future<void> markAsRead(int notificationId) async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Marking notification as read: $notificationId');
-      }
 
       final response = await _dio.put(
         '/user/notifications/$notificationId/read',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] Notification marked as read: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error marking notification as read: $e');
-      }
       rethrow;
     }
   }
@@ -149,22 +118,13 @@ class NotificationApiService {
   /// Marquer toutes les notifications comme lues
   Future<void> markAllAsRead() async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Marking all notifications as read');
-      }
 
       final response = await _dio.put(
         '/user/notifications/read-all',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] All notifications marked as read: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error marking all notifications as read: $e');
-      }
       rethrow;
     }
   }
@@ -172,22 +132,13 @@ class NotificationApiService {
   /// Supprimer une notification
   Future<void> deleteNotification(int notificationId) async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Deleting notification: $notificationId');
-      }
 
       final response = await _dio.delete(
         '/user/notifications/$notificationId',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] Notification deleted: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error deleting notification: $e');
-      }
       rethrow;
     }
   }
@@ -195,9 +146,6 @@ class NotificationApiService {
   /// Obtenir le nombre de notifications non lues
   Future<int> getUnreadCount() async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Getting unread notifications count');
-      }
 
       final response = await _dio.get(
         '/user/notifications/unread-count',
@@ -206,17 +154,11 @@ class NotificationApiService {
 
       if (response.data['success'] == true && response.data['data'] != null) {
         final count = response.data['data']['count'] ?? 0;
-        if (kDebugMode) {
-          print('[NotificationApiService] Unread count: $count');
-        }
         return count;
       }
 
       return 0;
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error getting unread count: $e');
-      }
       return 0;
     }
   }
@@ -233,9 +175,6 @@ class NotificationApiService {
     bool? promotionalUpdates,
   }) async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Updating notification preferences');
-      }
 
       final data = <String, dynamic>{};
       if (pushNotifications != null) data['push_notifications'] = pushNotifications;
@@ -253,13 +192,7 @@ class NotificationApiService {
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] Preferences updated: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error updating preferences: $e');
-      }
       rethrow;
     }
   }
@@ -267,9 +200,6 @@ class NotificationApiService {
   /// Récupérer les préférences de notification
   Future<Map<String, bool>> getNotificationPreferences() async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Getting notification preferences');
-      }
 
       final response = await _dio.get(
         '/user/notifications/preferences',
@@ -292,9 +222,6 @@ class NotificationApiService {
 
       return {};
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error getting preferences: $e');
-      }
       return {};
     }
   }
@@ -302,22 +229,13 @@ class NotificationApiService {
   /// Envoyer une notification de test
   Future<void> sendTestNotification() async {
     try {
-      if (kDebugMode) {
-        print('[NotificationApiService] Sending test notification');
-      }
 
       final response = await _dio.post(
         '/user/notifications/test',
         options: await _getAuthHeaders(),
       );
 
-      if (kDebugMode) {
-        print('[NotificationApiService] Test notification sent: ${response.data}');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('[NotificationApiService] Error sending test notification: $e');
-      }
       rethrow;
     }
   }

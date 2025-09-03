@@ -13,11 +13,15 @@ class BookingService {
   final String _baseUrl = AppConfig.baseUrl;
   final AuthService _authService = AuthService.instance;
 
-  Future<Map<String, String>> _getAuthHeaders() async {
+  Future<Map<String, String>?> _getAuthHeaders() async {
     final token = await _authService.getValidAccessToken();
+    if (token == null) {
+      print('BookingService: No valid token found, unable to make authenticated request');
+      return null;
+    }
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${token ?? ''}',
+      'Authorization': 'Bearer $token',
     };
   }
 
@@ -47,8 +51,6 @@ class BookingService {
         'special_instructions': specialInstructions,
       });
 
-      print('Booking request URL: ${_baseUrl}/bookings');
-      print('Booking request body: $body');
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/bookings'),
@@ -56,8 +58,6 @@ class BookingService {
         body: body,
       );
 
-      print('Booking response status: ${response.statusCode}');
-      print('Booking response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -87,20 +87,24 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
       
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Utilisateur non connecté',
+        };
+      }
+      
       String url = '${_baseUrl}/bookings';
       if (role != null) {
         url += '?role=$role';
       }
 
-      print('Get bookings URL: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
       );
 
-      print('Get bookings response status: ${response.statusCode}');
-      print('Get bookings response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -129,15 +133,12 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Get booking URL: ${_baseUrl}/bookings/$bookingId');
 
       final response = await http.get(
         Uri.parse('${_baseUrl}/bookings/$bookingId'),
         headers: headers,
       );
 
-      print('Get booking response status: ${response.statusCode}');
-      print('Get booking response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -169,7 +170,6 @@ class BookingService {
         if (finalPrice != null) 'final_price': finalPrice,
       });
 
-      print('Accept booking URL: ${_baseUrl}/bookings/$bookingId/accept');
 
       final response = await http.put(
         Uri.parse('${_baseUrl}/bookings/$bookingId/accept'),
@@ -177,8 +177,6 @@ class BookingService {
         body: body,
       );
 
-      print('Accept booking response status: ${response.statusCode}');
-      print('Accept booking response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -208,15 +206,12 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Reject booking URL: ${_baseUrl}/bookings/$bookingId/reject');
 
       final response = await http.put(
         Uri.parse('${_baseUrl}/bookings/$bookingId/reject'),
         headers: headers,
       );
 
-      print('Reject booking response status: ${response.statusCode}');
-      print('Reject booking response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -249,7 +244,6 @@ class BookingService {
         if (message != null) 'message': message,
       });
 
-      print('Add negotiation URL: ${_baseUrl}/bookings/$bookingId/negotiate');
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/bookings/$bookingId/negotiate'),
@@ -257,8 +251,6 @@ class BookingService {
         body: body,
       );
 
-      print('Add negotiation response status: ${response.statusCode}');
-      print('Add negotiation response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -288,15 +280,12 @@ class BookingService {
     try {
       final headers = await _getAuthHeaders();
 
-      print('Mark payment ready URL: ${_baseUrl}/bookings/$bookingId/payment-ready');
 
       final response = await http.put(
         Uri.parse('${_baseUrl}/bookings/$bookingId/payment-ready'),
         headers: headers,
       );
 
-      print('Mark payment ready response status: ${response.statusCode}');
-      print('Mark payment ready response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -330,7 +319,6 @@ class BookingService {
         if (photoType != null) 'photo_type': photoType,
       });
 
-      print('Add package photo URL: ${_baseUrl}/bookings/$bookingId/photos');
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/bookings/$bookingId/photos'),
@@ -338,8 +326,6 @@ class BookingService {
         body: body,
       );
 
-      print('Add package photo response status: ${response.statusCode}');
-      print('Add package photo response body: ${response.body}');
 
       final responseData = json.decode(response.body);
 

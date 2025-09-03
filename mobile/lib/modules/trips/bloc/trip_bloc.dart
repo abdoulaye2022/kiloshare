@@ -393,40 +393,16 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onLoadPublicTrips(LoadPublicTrips event, Emitter<TripState> emit) async {
     emit(const TripLoading());
     try {
-      if (kDebugMode) {
-        print('[TripBloc] ===== DEBUG LOAD PUBLIC TRIPS =====');
-        print('[TripBloc] Event limit: ${event.limit}');
-        print('[TripBloc] Creating public TripService instance...');
-      }
       
       // Create a separate TripService instance for public operations (no auth required)
       final publicTripService = TripService();
       
-      if (kDebugMode) {
-        print('[TripBloc] Calling getPublicTrips with limit: ${event.limit}');
-      }
       
       final trips = await publicTripService.getPublicTrips(limit: event.limit);
       
-      if (kDebugMode) {
-        print('[TripBloc] Successfully loaded ${trips.length} public trips');
-        for (int i = 0; i < trips.length && i < 3; i++) {
-          final trip = trips[i];
-          print('[TripBloc] Trip $i: ${trip.id} - ${trip.departureCity} → ${trip.arrivalCity}');
-        }
-      }
       
       emit(PublicTripsLoaded(trips: trips));
     } catch (error) {
-      if (kDebugMode) {
-        print('[TripBloc] ===== ERROR LOADING PUBLIC TRIPS =====');
-        print('[TripBloc] Error type: ${error.runtimeType}');
-        print('[TripBloc] Error message: ${error.toString()}');
-        if (error is Exception) {
-          print('[TripBloc] Full error: $error');
-        }
-        print('[TripBloc] =====================================');
-      }
       emit(TripError('Failed to load public trips: ${error.toString()}', error: error));
     }
   }
