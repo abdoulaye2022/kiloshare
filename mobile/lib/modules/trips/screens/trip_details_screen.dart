@@ -6,7 +6,6 @@ import '../../../widgets/ellipsis_button.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_status_widget.dart';
 import '../widgets/trip_actions_widget.dart';
-import '../services/trip_state_manager.dart';
 import '../services/favorites_service.dart';
 
 class TripDetailsScreen extends StatefulWidget {
@@ -211,52 +210,40 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   Widget _buildStatusBadge(TripStatus status) {
-    Color color;
     String text;
 
     switch (status) {
       case TripStatus.draft:
-        color = Colors.orange;
         text = 'Brouillon';
         break;
       case TripStatus.pendingApproval:
-        color = Colors.amber;
         text = 'En attente d\'approbation';
         break;
       case TripStatus.active:
-        color = Colors.green;
         text = 'Publié';
         break;
       case TripStatus.rejected:
-        color = Colors.red;
         text = 'Rejeté';
         break;
       case TripStatus.pendingReview:
-        color = Colors.purple;
         text = 'Signalé pour révision';
         break;
       case TripStatus.booked:
-        color = Colors.orange;
         text = 'Réservé';
         break;
       case TripStatus.inProgress:
-        color = Colors.indigo;
         text = 'En cours';
         break;
       case TripStatus.completed:
-        color = Colors.blue;
         text = 'Terminé';
         break;
       case TripStatus.cancelled:
-        color = Colors.grey;
         text = 'Annulé';
         break;
       case TripStatus.paused:
-        color = Colors.yellow;
         text = 'En pause';
         break;
       case TripStatus.expired:
-        color = Colors.brown;
         text = 'Expiré';
         break;
     }

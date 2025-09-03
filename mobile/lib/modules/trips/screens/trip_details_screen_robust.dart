@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
-import '../../auth/blocs/auth/auth_bloc.dart';
-import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/services/auth_service.dart';
 
 class TripDetailsScreenRobust extends StatefulWidget {

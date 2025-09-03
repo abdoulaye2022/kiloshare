@@ -7,9 +7,9 @@ class CreateBookingScreen extends StatefulWidget {
   final Trip trip;
 
   const CreateBookingScreen({
-    Key? key,
+    super.key,
     required this.trip,
-  }) : super(key: key);
+  });
 
   @override
   State<CreateBookingScreen> createState() => _CreateBookingScreenState();

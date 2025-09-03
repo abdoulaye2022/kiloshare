@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../auth/services/social_auth_service.dart';
 
 class LinkedAccountsScreen extends StatefulWidget {
   const LinkedAccountsScreen({super.key});

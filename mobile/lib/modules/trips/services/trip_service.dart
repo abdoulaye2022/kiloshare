@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import '../../../config/app_config.dart';
 import '../models/trip_model.dart';
 import '../../../data/locations_data.dart';

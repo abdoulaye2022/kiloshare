@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../config/app_config.dart';
@@ -50,7 +48,7 @@ class NotificationApiService {
   Future<void> registerFCMToken(String token) async {
     try {
 
-      final response = await _dio.post(
+      await _dio.post(
         '/user/notifications/register-token',
         data: {
           'fcm_token': token,
@@ -105,7 +103,7 @@ class NotificationApiService {
   Future<void> markAsRead(int notificationId) async {
     try {
 
-      final response = await _dio.put(
+      await _dio.put(
         '/user/notifications/$notificationId/read',
         options: await _getAuthHeaders(),
       );
@@ -119,7 +117,7 @@ class NotificationApiService {
   Future<void> markAllAsRead() async {
     try {
 
-      final response = await _dio.put(
+      await _dio.put(
         '/user/notifications/read-all',
         options: await _getAuthHeaders(),
       );
@@ -133,7 +131,7 @@ class NotificationApiService {
   Future<void> deleteNotification(int notificationId) async {
     try {
 
-      final response = await _dio.delete(
+      await _dio.delete(
         '/user/notifications/$notificationId',
         options: await _getAuthHeaders(),
       );
@@ -186,7 +184,7 @@ class NotificationApiService {
       if (messageUpdates != null) data['message_updates'] = messageUpdates;
       if (promotionalUpdates != null) data['promotional_updates'] = promotionalUpdates;
 
-      final response = await _dio.put(
+      await _dio.put(
         '/user/notifications/preferences',
         data: data,
         options: await _getAuthHeaders(),
@@ -230,7 +228,7 @@ class NotificationApiService {
   Future<void> sendTestNotification() async {
     try {
 
-      final response = await _dio.post(
+      await _dio.post(
         '/user/notifications/test',
         options: await _getAuthHeaders(),
       );

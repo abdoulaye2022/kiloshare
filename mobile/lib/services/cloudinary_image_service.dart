@@ -1,7 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -198,8 +196,6 @@ class CloudinaryImageService {
         throw CloudinaryException('Maximum 5 photos par voyage');
       }
 
-      final results = <CloudinaryUploadResult>[];
-      double totalProgress = 0.0;
 
       // Compresser toutes les images
       final compressedFiles = <File>[];

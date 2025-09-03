@@ -78,7 +78,7 @@ class DebugAuthStatus extends StatelessWidget {
     print('=== DEBUG AUTH STORAGE ===');
     print('Access Token: ${token != null ? "${token.length} chars" : "NULL"}');
     print('Refresh Token: ${refreshToken != null ? "${refreshToken.length} chars" : "NULL"}');
-    print('User Data: ${user != null ? "${user.email}" : "NULL"}');
+    print('User Data: ${user != null ? user.email : "NULL"}');
     print('========================');
   }
 

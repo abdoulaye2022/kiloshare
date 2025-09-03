@@ -578,7 +578,7 @@ class _SimpleRegisterPageState extends State<SimpleRegisterPage> {
           decoration: InputDecoration(
             labelText: 'Nom complet',
             hintText: 'Jean Dupont',
-            prefixIcon: Icon(Icons.person_outline),
+            prefixIcon: const Icon(Icons.person_outline),
             filled: true,
             fillColor: theme.colorScheme.surfaceContainerHighest,
             border: OutlineInputBorder(

@@ -169,7 +169,7 @@ class _CloudinaryMonitoringDashboardState extends State<CloudinaryMonitoringDash
               ],
             ),
             const SizedBox(height: 12),
-            ..._alerts.map((alert) => _buildAlertItem(alert)).toList(),
+            ..._alerts.map((alert) => _buildAlertItem(alert)),
           ],
         ),
       ),

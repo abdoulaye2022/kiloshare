@@ -21,7 +21,7 @@ class SocialAuthService {
     try {
       
       // Vérifier si Google Sign-In est disponible
-      final isAvailable = await _googleSignIn.isSignedIn();
+      await _googleSignIn.isSignedIn();
       
       // Déconnecter silencieusement sans lever d'exception
       try {

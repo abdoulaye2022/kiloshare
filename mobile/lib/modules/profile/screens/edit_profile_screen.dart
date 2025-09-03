@@ -7,7 +7,6 @@ import 'dart:io';
 import '../../auth/blocs/auth/auth_bloc.dart';
 import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/blocs/auth/auth_event.dart';
-import '../../auth/models/user_model.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../../../themes/modern_theme.dart';

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 
 // Helper functions for JSON parsing
 double _parseDouble(dynamic value, [double defaultValue = 0.0]) {

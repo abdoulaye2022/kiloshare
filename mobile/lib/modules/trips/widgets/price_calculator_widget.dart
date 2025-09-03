@@ -37,7 +37,7 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   PriceSuggestion? _priceSuggestion;
   MultiTransportPriceSuggestion? _multiTransportSuggestion;
   bool _isLoadingSuggestion = false;
-  String _selectedCurrency = 'CAD';
+  final String _selectedCurrency = 'CAD';
   double? _customPrice;
   bool _useSuggestedPrice = true;
 

@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../models/transport_models.dart';
 import 'create_trip_screen.dart';
-import '../../../widgets/auth_guard.dart';
 import '../../auth/blocs/auth/auth_bloc.dart';
 import '../../auth/blocs/auth/auth_state.dart';
 
@@ -104,7 +103,7 @@ class TripTypeSelectionScreen extends StatelessWidget {
               // Transport options
               ...TransportType.values.map(
                 (transportType) => _buildTransportCard(context, transportType),
-              ).toList(),
+              ),
               
               const SizedBox(height: 32),
               

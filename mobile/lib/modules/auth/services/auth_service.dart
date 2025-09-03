@@ -212,7 +212,7 @@ class AuthService {
       try {
         responseData = jsonDecode(response.data as String);
       } catch (e) {
-        throw FormatException('Invalid JSON response from server');
+        throw const FormatException('Invalid JSON response from server');
       }
       
       
@@ -378,7 +378,7 @@ class AuthService {
   Future<AuthResponse> refreshTokens(String s) async {
     final refreshToken = await getRefreshToken();
     if (refreshToken == null) {
-      throw AuthException('No refresh token available');
+      throw const AuthException('No refresh token available');
     }
 
     try {
@@ -421,7 +421,7 @@ class AuthService {
 
   Future<void> verifyPhone(String code) async {
     final token = await getAccessToken();
-    if (token == null) throw AuthException('Not authenticated');
+    if (token == null) throw const AuthException('Not authenticated');
 
     try {
       final response = await _dio.post('/auth/verify-phone',
@@ -488,7 +488,7 @@ class AuthService {
 
   Future<User> getCurrentUserFromApi() async {
     final token = await getAccessToken();
-    if (token == null) throw AuthException('Not authenticated');
+    if (token == null) throw const AuthException('Not authenticated');
 
     try {
       final response = await _dio.get('/auth/me',
@@ -568,7 +568,7 @@ class AuthService {
     required String newPassword,
   }) async {
     final token = await getValidAccessToken();
-    if (token == null) throw AuthException('Not authenticated');
+    if (token == null) throw const AuthException('Not authenticated');
 
     try {
       final response = await _dio.put(
@@ -597,7 +597,7 @@ class AuthService {
     required String confirmation,
   }) async {
     final token = await getValidAccessToken();
-    if (token == null) throw AuthException('Not authenticated');
+    if (token == null) throw const AuthException('Not authenticated');
 
     try {
       final response = await _dio.delete(
@@ -635,11 +635,11 @@ class AuthService {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
-        return AuthException('Connection timeout. Please check your internet connection.');
+        return const AuthException('Connection timeout. Please check your internet connection.');
       case DioExceptionType.connectionError:
-        return AuthException('Unable to connect to server. Please check your internet connection.');
+        return const AuthException('Unable to connect to server. Please check your internet connection.');
       default:
-        return AuthException('Network error occurred. Please try again.');
+        return const AuthException('Network error occurred. Please try again.');
     }
   }
 }

@@ -25,7 +25,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   final _formKey = GlobalKey<FormState>();
   
   bool _isCodeSent = false;
-  bool _showNameFields = false;
+  final bool _showNameFields = false;
   String _formattedPhone = '';
 
   @override
@@ -50,7 +50,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Code de vérification envoyé'),
+              content: const Text('Code de vérification envoyé'),
               backgroundColor: theme.colorScheme.primary,
             ),
           );

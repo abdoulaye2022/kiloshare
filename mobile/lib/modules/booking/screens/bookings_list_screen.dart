@@ -6,7 +6,7 @@ import '../../auth/services/auth_service.dart';
 import '../../../services/stripe_service.dart';
 
 class BookingsListScreen extends StatefulWidget {
-  const BookingsListScreen({Key? key}) : super(key: key);
+  const BookingsListScreen({super.key});
 
   @override
   State<BookingsListScreen> createState() => _BookingsListScreenState();
@@ -580,7 +580,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
 
           if (rejectResult['success'] == true) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Réservation refusée'),
                 backgroundColor: Colors.orange,
               ),

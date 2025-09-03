@@ -4,7 +4,6 @@ import '../../../services/auth_token_service.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_card_widget.dart';
 import '../widgets/city_autocomplete_field.dart';
-import '../../../widgets/auth_guard.dart';
 import '../../../widgets/ellipsis_button.dart';
 
 class SearchTripsScreen extends StatefulWidget {
@@ -30,17 +29,16 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   bool _ticketVerifiedOnly = false;
   
   List<Trip> _searchResults = [];
-  List<Trip> _filteredResults = [];
   bool _isLoading = false;
   bool _hasSearched = false;
   String? _error;
   
   // Sorting and filtering
-  String _sortBy = 'departure_date';
-  bool _sortAscending = true;
+  // final String _sortBy = 'departure_date';
+  // final bool _sortAscending = true;
   
-  // Recent searches
-  List<Map<String, String>> _recentSearches = [];
+  // Recent searches  
+  // final List<Map<String, String>> _recentSearches = [];
 
   @override
   Widget build(BuildContext context) {
@@ -529,7 +527,6 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
       _verifiedOnly = false;
       _ticketVerifiedOnly = false;
       _searchResults = [];
-      _filteredResults = [];
       _hasSearched = false;
       _error = null;
     });

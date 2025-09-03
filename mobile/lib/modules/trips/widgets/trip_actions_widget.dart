@@ -10,11 +10,11 @@ class TripActionsWidget extends StatefulWidget {
   final Function()? onTripDeleted;
 
   const TripActionsWidget({
-    Key? key,
+    super.key,
     required this.trip,
     this.onTripUpdated,
     this.onTripDeleted,
-  }) : super(key: key);
+  });
 
   @override
   State<TripActionsWidget> createState() => _TripActionsWidgetState();

@@ -25,7 +25,6 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   bool _isLoading = true;
   String? _error;
   bool _isAuthenticated = false;
-  String? _currentUserId;
   bool _isOwner = false;
   bool _hasLoaded = false;
   bool _isFavorite = false;
@@ -96,7 +95,6 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       if (mounted) {
         setState(() {
           _isAuthenticated = isAuth;
-          _currentUserId = userId;
           _trip = trip;
           _isOwner = trip.userId == userId;
           _isFavorite = isFavorite;

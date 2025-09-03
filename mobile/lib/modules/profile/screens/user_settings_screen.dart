@@ -339,14 +339,6 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     );
   }
 
-  String _getInitials(User? user) {
-    if (user == null) return 'U';
-    final firstName = user.firstName ?? '';
-    final lastName = user.lastName ?? '';
-    if (firstName.isEmpty && lastName.isEmpty) return 'U';
-    return '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'.toUpperCase();
-  }
-
   String _getDisplayName(User? user) {
     if (user == null) return 'Utilisateur';
     final firstName = user.firstName ?? '';

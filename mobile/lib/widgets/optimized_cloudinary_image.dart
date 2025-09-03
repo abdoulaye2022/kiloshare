@@ -31,7 +31,7 @@ class OptimizedCloudinaryImage extends StatelessWidget {
   final String? heroTag;
 
   const OptimizedCloudinaryImage({
-    Key? key,
+    super.key,
     required this.imageUrl,
     required this.imageType,
     this.displayMode = ImageDisplayMode.medium,
@@ -45,7 +45,7 @@ class OptimizedCloudinaryImage extends StatelessWidget {
     this.errorWidget,
     this.onTap,
     this.heroTag,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -336,11 +336,11 @@ class FullscreenImageViewer extends StatelessWidget {
   final String? heroTag;
 
   const FullscreenImageViewer({
-    Key? key,
+    super.key,
     required this.imageUrl,
     required this.imageType,
     this.heroTag,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -418,14 +418,14 @@ class CloudinaryImageGallery extends StatefulWidget {
   final bool enableZoom;
 
   const CloudinaryImageGallery({
-    Key? key,
+    super.key,
     required this.imageUrls,
     required this.imageType,
     this.initialIndex = 0,
     this.onPageChanged,
     this.showIndicators = true,
     this.enableZoom = true,
-  }) : super(key: key);
+  });
 
   @override
   State<CloudinaryImageGallery> createState() => _CloudinaryImageGalleryState();
@@ -508,14 +508,14 @@ class CloudinaryAvatar extends StatelessWidget {
   final VoidCallback? onTap;
 
   const CloudinaryAvatar({
-    Key? key,
+    super.key,
     this.imageUrl,
     required this.userName,
     this.radius = 24,
     this.backgroundColor,
     this.textStyle,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

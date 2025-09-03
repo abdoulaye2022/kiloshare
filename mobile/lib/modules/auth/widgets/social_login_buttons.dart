@@ -5,7 +5,6 @@ import 'dart:io';
 
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/auth/auth_event.dart';
-import 'auth_button.dart';
 
 class SocialLoginButtons extends StatelessWidget {
   final bool isLoading;

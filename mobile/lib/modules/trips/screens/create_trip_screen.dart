@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../services/trip_service.dart';
-import '../models/trip_model.dart';
 import '../widgets/city_autocomplete_field.dart';
 import '../widgets/date_time_picker_field.dart';
 import '../widgets/weight_slider_widget.dart';
@@ -12,9 +11,7 @@ import '../widgets/trip_image_picker.dart';
 import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
 import '../services/trip_image_service.dart';
-import '../../auth/services/auth_service.dart';
 import '../../../widgets/ellipsis_button.dart';
-import '../../../widgets/auth_guard.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/blocs/auth/auth_bloc.dart';
@@ -57,7 +54,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final _specialNotesController = TextEditingController();
 
   bool _isLoading = false;
-  PriceSuggestion? _priceSuggestion;
   String? _routeError;
 
   @override
@@ -263,7 +259,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           Row(
             children: List.generate(_totalSteps, (index) {
               final isActive = index <= _currentStep;
-              final isCompleted = index < _currentStep;
 
               return Expanded(
                 child: Container(
