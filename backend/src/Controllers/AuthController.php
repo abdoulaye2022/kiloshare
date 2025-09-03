@@ -7,6 +7,8 @@ namespace KiloShare\Controllers;
 use Firebase\JWT\JWT;
 use KiloShare\Models\User;
 use KiloShare\Models\UserToken;
+use KiloShare\Models\EmailVerification;
+use KiloShare\Services\EmailService;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use Psr\Http\Message\ResponseInterface;
@@ -76,6 +78,28 @@ class AuthController
                 'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
             ]);
 
+            // Créer une vérification d'email et envoyer l'email
+            try {
+                $emailVerification = EmailVerification::createForUser($user->id);
+                $emailService = new EmailService();
+                
+                $userName = $user->first_name ? "{$user->first_name} {$user->last_name}" : $user->email;
+                $emailSent = $emailService->sendEmailVerification(
+                    $user->email,
+                    $userName,
+                    $emailVerification->code
+                );
+                
+                $message = $emailSent 
+                    ? 'User registered successfully. Please check your email to verify your account.'
+                    : 'User registered successfully. Email verification failed to send.';
+                
+            } catch (\Exception $e) {
+                error_log("Email verification failed for user {$user->id}: " . $e->getMessage());
+                error_log("Stack trace: " . $e->getTraceAsString());
+                $message = 'User registered successfully. Email verification service is temporarily unavailable.';
+            }
+
             return Response::created([
                 'user' => [
                     'id' => $user->id,
@@ -88,10 +112,45 @@ class AuthController
                     'is_verified' => $user->is_verified,
                 ],
                 'tokens' => $tokens
-            ], 'User registered successfully');
+            ], $message ?? 'User registered successfully');
 
         } catch (\Exception $e) {
             return Response::serverError('Registration failed: ' . $e->getMessage());
+        }
+    }
+
+    public function verifyEmail(ServerRequestInterface $request): ResponseInterface
+    {
+        $queryParams = $request->getQueryParams();
+        $code = $queryParams['code'] ?? '';
+
+        if (empty($code)) {
+            return Response::error('Verification code is required', [], 400);
+        }
+
+        try {
+            $emailVerification = EmailVerification::findValidByCode($code);
+            
+            if (!$emailVerification) {
+                return Response::error('Invalid or expired verification code', [], 400);
+            }
+
+            // Marquer l'email comme vérifié
+            $emailVerification->markAsVerified();
+            
+            // Mettre à jour l'utilisateur
+            $user = User::find($emailVerification->user_id);
+            if ($user) {
+                $user->update([
+                    'email_verified_at' => Carbon::now(),
+                    'is_verified' => true
+                ]);
+            }
+
+            return Response::success([], 'Email verified successfully');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Email verification failed: ' . $e->getMessage());
         }
     }
 

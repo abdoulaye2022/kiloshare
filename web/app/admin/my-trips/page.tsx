@@ -78,7 +78,6 @@ export default function MyTripsPage() {
         const data = await response.json();
         setTrips(data.trips || []);
       } else {
-        console.error('Failed to fetch my trips');
         // Données de démonstration
         setTrips([
           {

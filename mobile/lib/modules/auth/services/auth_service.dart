@@ -215,17 +215,18 @@ class AuthService {
         throw const FormatException('Invalid JSON response from server');
       }
       
-      
-      final apiResponse = ApiResponse.fromJson(
-        responseData,
-        (json) => AuthResponse.fromJson(json as Map<String, dynamic>),
-      );
-
-      if (!apiResponse.success || apiResponse.data == null) {
-        throw AuthException(apiResponse.message);
+      // Vérifier le succès de la réponse
+      if (responseData['success'] != true) {
+        throw AuthException(responseData['message'] ?? 'Registration failed');
       }
 
-      final authResponse = apiResponse.data!;
+      // Parser directement les données d'auth
+      final authData = responseData['data'] as Map<String, dynamic>?;
+      if (authData == null) {
+        throw const AuthException('No auth data in response');
+      }
+
+      final authResponse = AuthResponse.fromJson(authData);
       await _saveTokens(authResponse.tokens);
       await _saveUser(authResponse.user);
 

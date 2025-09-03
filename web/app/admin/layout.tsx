@@ -38,7 +38,6 @@ export default function AdminLayout({
     // Wait for hydration
     if (!mounted) return;
     
-    console.log('🏠 Admin Layout: pathname =', pathname, 'isAuthenticated =', isAuthenticated, 'isLoading =', isLoading);
     
     // ONLY redirect to login if we're on a protected page and definitely NOT authenticated
     if (pathname !== '/admin/login' && !isAuthenticated && !isLoading) {
@@ -49,13 +48,10 @@ export default function AdminLayout({
         document.cookie.includes('admin_token=')
       );
       
-      console.log('🔍 Layout check: hasToken =', hasToken);
       
       if (!hasToken) {
-        console.log('❌ No token found, redirecting to login');
         router.replace('/admin/login');
       } else {
-        console.log('✅ Token found, checking auth...');
         checkAuth();
       }
     }

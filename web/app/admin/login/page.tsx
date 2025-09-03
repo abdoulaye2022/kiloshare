@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Mail, Lock, Eye, EyeOff, Loader } from 'lucide-react';
 import { useAdminAuthStore } from '../../../stores/adminAuthStore';
-import { testLogin, clearAllAuth, checkAllStorages } from '../../../utils/testAuth';
 import { useClientOnly } from '../../../hooks/useClientOnly';
 import { AUTH_ENDPOINTS, getDefaultHeaders } from '../../../lib/api-config';
 
@@ -25,11 +24,9 @@ export default function AdminLogin() {
     // Only run after hydration
     if (!mounted) return;
     
-    console.log('🔄 Login page effect: isAuthenticated =', isAuthenticated);
     
     // Simple redirect if authenticated
     if (isAuthenticated) {
-      console.log('✅ User is authenticated, redirecting to dashboard');
       setLocalLoading(false);
       router.replace('/admin/dashboard');
     }
@@ -48,16 +45,11 @@ export default function AdminLogin() {
       });
 
       const data = await response.json();
-      console.log('Login response:', { status: response.status, data });
 
       if (response.ok && data.success && data.data?.tokens?.access_token && data.data?.user) {
-        console.log('Login successful, about to call store login');
-        console.log('Token:', data.data.tokens.access_token.substring(0, 20) + '...');
-        console.log('User:', data.data.user);
         
         // Use Zustand store for login with refresh token
         const result = login(data.data.tokens.access_token, data.data.user, data.data.tokens.refresh_token);
-        console.log('Store login called, result:', result);
         
         // Also manually set in storage as backup
         try {
@@ -67,15 +59,12 @@ export default function AdminLogin() {
             localStorage.setItem('admin_refresh_token', data.data.tokens.refresh_token);
             sessionStorage.setItem('admin_refresh_token', data.data.tokens.refresh_token);
           }
-          console.log('Manual storage backup completed');
         } catch (err) {
           console.error('Manual storage failed:', err);
         }
         
         // Redirection will be handled by useEffect when isAuthenticated changes
-        console.log('⏳ Waiting for useEffect to handle redirection...');
       } else {
-        console.log('Login failed:', data);
         setError(data.error || data.message || 'Identifiants invalides');
         setLocalLoading(false);
       }
@@ -93,20 +82,6 @@ export default function AdminLogin() {
     });
   };
 
-  const handleTestLogin = () => {
-    console.log('🧪 Test login triggered');
-    const { token, user } = testLogin();
-    login(token, user);
-  };
-
-  const handleClearAuth = () => {
-    console.log('🧹 Clearing all auth data');
-    clearAllAuth();
-  };
-
-  const handleCheckStorages = () => {
-    checkAllStorages();
-  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
@@ -193,32 +168,6 @@ export default function AdminLogin() {
           </form>
         </div>
 
-        {/* Debug buttons - only in development and after hydration */}
-        {mounted && process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">🐛 Debug Tools</h3>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={handleTestLogin}
-                className="text-xs bg-green-600 text-white px-2 py-1 rounded"
-              >
-                Test Login
-              </button>
-              <button
-                onClick={handleClearAuth}
-                className="text-xs bg-red-600 text-white px-2 py-1 rounded"
-              >
-                Clear Auth
-              </button>
-              <button
-                onClick={handleCheckStorages}
-                className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
-              >
-                Check Storage
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Footer */}
         <div className="text-center mt-6">

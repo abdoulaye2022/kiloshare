@@ -25,10 +25,13 @@ export default function AdminAuthDebug() {
     });
   }, []);
   
-  // Don't render during SSR or in production
-  if (!mounted || process.env.NODE_ENV !== 'development') {
+  // Don't render during SSR or always in production
+  if (!mounted) {
     return null;
   }
+
+  // Never render in any environment (production ready)
+  return null;
 
   return (
     <div className="fixed bottom-4 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg text-xs z-50 max-w-sm">

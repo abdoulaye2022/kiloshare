@@ -50,7 +50,6 @@ export default function AuthDebugPage() {
   };
 
   const handleCheckAuth = async () => {
-    console.log('Manual auth check triggered');
     await checkAuth();
   };
 

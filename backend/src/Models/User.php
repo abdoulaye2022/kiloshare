@@ -181,7 +181,7 @@ class User extends Model
 
     public function getIsVerifiedAttribute(): bool
     {
-        return $this->attributes['is_verified'] && !is_null($this->email_verified_at);
+        return (bool)($this->attributes['is_verified'] ?? false) && !is_null($this->email_verified_at);
     }
 
     // Méthodes utilitaires

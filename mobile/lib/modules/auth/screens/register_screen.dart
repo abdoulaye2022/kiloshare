@@ -297,7 +297,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           suffixIcon: IconButton(
             icon: Icon(
               _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             onPressed: () {
               setState(() {
@@ -310,7 +310,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return 'Le mot de passe est requis';
             }
             if (value.length < 6) {
-              return 'Minimum 6 caractères';
+              return 'Le mot de passe doit contenir au moins 6 caractères';
+            }
+            // Vérifier qu'il contient au moins une lettre
+            if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
+              return 'Le mot de passe doit contenir au moins une lettre';
+            }
+            // Vérifier qu'il contient au moins un chiffre
+            if (!RegExp(r'\d').hasMatch(value)) {
+              return 'Le mot de passe doit contenir au moins un chiffre';
             }
             return null;
           },
@@ -328,7 +336,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           suffixIcon: IconButton(
             icon: Icon(
               _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             onPressed: () {
               setState(() {

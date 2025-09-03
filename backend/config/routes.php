@@ -43,7 +43,7 @@ return function (App $app) {
                 $authGroup->post('/refresh', [AuthController::class, 'refreshToken']);
                 $authGroup->post('/forgot-password', [AuthController::class, 'forgotPassword']);
                 $authGroup->post('/reset-password', [AuthController::class, 'resetPassword']);
-                $authGroup->post('/verify-email', [AuthController::class, 'verifyEmail']);
+                $authGroup->get('/verify-email', [AuthController::class, 'verifyEmail']);
                 $authGroup->post('/resend-verification', [AuthController::class, 'resendEmailVerification']);
                 
                 // Protected auth routes
