@@ -273,6 +273,7 @@ class BookingController
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
+        $data = json_decode($request->getBody()->getContents(), true);
 
         try {
             $booking = Booking::with('trip')->find($id);
@@ -285,12 +286,44 @@ class BookingController
                 return Response::forbidden('You cannot accept this booking');
             }
 
-            $booking->accept();
+            // CRITICAL: Verify Stripe Connect account before acceptance
+            $userStripeAccount = \KiloShare\Models\UserStripeAccount::where('user_id', $user->id)->first();
+            
+            if (!$userStripeAccount) {
+                return Response::error(
+                    'Vous devez configurer votre compte Stripe Connect pour accepter des réservations',
+                    [
+                        'error_code' => 'stripe_account_required',
+                        'action' => 'setup_stripe',
+                        'redirect_url' => '/profile/wallet'
+                    ],
+                    400
+                );
+            }
+
+            if (!$userStripeAccount->canAcceptPayments()) {
+                return Response::error(
+                    'Votre compte Stripe Connect n\'est pas entièrement configuré',
+                    [
+                        'error_code' => 'stripe_account_incomplete', 
+                        'action' => 'complete_stripe_onboarding',
+                        'redirect_url' => '/profile/wallet',
+                        'onboarding_url' => $userStripeAccount->onboarding_url
+                    ],
+                    400
+                );
+            }
+
+            // Handle final price if provided (from negotiation)
+            $finalPrice = isset($data['final_price']) ? (float)$data['final_price'] : null;
+            
+            $booking->accept($finalPrice);
 
             return Response::success([
                 'booking' => [
                     'id' => $booking->id,
                     'status' => $booking->status,
+                    'final_price' => $booking->final_price,
                     'updated_at' => $booking->updated_at,
                 ]
             ], 'Booking accepted successfully');

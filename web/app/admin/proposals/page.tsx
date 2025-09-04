@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useBooking } from '../../hooks/useBooking';
+import { useBooking } from '../../../hooks/useBooking';
 import BookingNegotiationCard from '../../components/BookingNegotiationCard';
 import StripeAccountSetupModal from '../../components/StripeAccountSetupModal';
 import { MapPin, Calendar, Package, DollarSign, MessageCircle, Check, X, RefreshCw } from 'lucide-react';

@@ -184,7 +184,7 @@ class BookingService {
       });
 
 
-      final response = await http.put(
+      final response = await http.post(
         Uri.parse('${_baseUrl}/bookings/$bookingId/accept'),
         headers: headers,
         body: body,
@@ -196,13 +196,30 @@ class BookingService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'booking': responseData['booking'],
+          'booking': responseData['data']['booking'] ?? responseData['booking'],
           'message': responseData['message'],
         };
       } else {
+        // Handle specific Stripe Connect errors
+        String errorMessage = responseData?['message'] ?? 'Erreur lors de l\'acceptation de la réservation';
+        Map<String, dynamic> errorData = responseData?['errors'] ?? {};
+        
+        // Check if it's a Stripe-related error that should redirect to wallet
+        if (errorData['error_code'] == 'stripe_account_required' || 
+            errorData['error_code'] == 'stripe_account_incomplete') {
+          return {
+            'success': false,
+            'error': errorMessage,
+            'stripe_required': true,
+            'redirect_url': errorData['redirect_url'],
+            'onboarding_url': errorData['onboarding_url'],
+            'action': errorData['action'],
+          };
+        }
+        
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de l\'acceptation de la réservation',
+          'error': errorMessage,
         };
       }
     } catch (e) {

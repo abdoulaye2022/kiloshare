@@ -37,18 +37,19 @@ class StripeService {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 201) {
+        final data = responseData['data'] ?? {};
         return {
           'success': true,
-          'account_id': responseData['account_id'],
-          'onboarding_url': responseData['onboarding_url'],
-          'expires_at': responseData['expires_at'],
-          'message': responseData['message'],
-          'next_steps': responseData['next_steps'],
+          'account_id': data['account_id'],
+          'onboarding_url': data['onboarding_url'],
+          'expires_at': data['expires_at'],
+          'message': data['message'],
+          'next_steps': data['next_steps'],
         };
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la création du compte Stripe',
+          'error': responseData['message'] ?? responseData['error'] ?? 'Erreur lors de la création du compte Stripe',
         };
       }
     } catch (e) {
@@ -75,18 +76,19 @@ class StripeService {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200) {
+        final data = responseData['data'] ?? {};
         return {
           'success': true,
-          'has_account': responseData['has_account'] ?? false,
-          'account': responseData['account'],
-          'transaction_ready': responseData['transaction_ready'] ?? false,
-          'onboarding_complete': responseData['onboarding_complete'] ?? false,
-          'message': responseData['message'],
+          'has_account': data['has_account'] ?? false,
+          'account': data['account'],
+          'transaction_ready': data['transaction_ready'] ?? false,
+          'onboarding_complete': data['onboarding_complete'] ?? false,
+          'message': data['message'],
         };
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la vérification du statut Stripe',
+          'error': responseData['message'] ?? responseData['error'] ?? 'Erreur lors de la vérification du statut Stripe',
         };
       }
     } catch (e) {
@@ -105,7 +107,7 @@ class StripeService {
 
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/stripe/account/refresh-link'),
+        Uri.parse('${_baseUrl}/stripe/account/refresh-onboarding'),
         headers: headers,
       );
 
@@ -113,16 +115,17 @@ class StripeService {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200) {
+        final data = responseData['data'] ?? {};
         return {
           'success': true,
-          'onboarding_url': responseData['onboarding_url'],
-          'expires_at': responseData['expires_at'],
-          'message': responseData['message'],
+          'onboarding_url': data['onboarding_url'],
+          'expires_at': data['expires_at'],
+          'message': data['message'],
         };
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la génération du lien d\'onboarding',
+          'error': responseData['message'] ?? responseData['error'] ?? 'Erreur lors de la génération du lien d\'onboarding',
         };
       }
     } catch (e) {

@@ -44,8 +44,13 @@ class Booking extends Model
 
     // Statuts de réservation
     const STATUS_PENDING = 'pending';
-    const STATUS_CONFIRMED = 'confirmed';
-    const STATUS_IN_PROGRESS = 'in_progress';
+    const STATUS_ACCEPTED = 'accepted';  // Changed from confirmed to match database
+    const STATUS_CONFIRMED = 'accepted'; // Alias for backwards compatibility
+    const STATUS_REJECTED = 'rejected';
+    const STATUS_PAYMENT_PENDING = 'payment_pending';
+    const STATUS_PAID = 'paid';
+    const STATUS_IN_TRANSIT = 'in_transit';
+    const STATUS_DELIVERED = 'delivered';
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
     const STATUS_DISPUTED = 'disputed';
@@ -122,13 +127,16 @@ class Booking extends Model
 
     public function canBeCancelledBy(User $user): bool
     {
-        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_CONFIRMED])
-            && ($this->user_id === $user->id || $this->trip->user_id === $user->id);
+        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_ACCEPTED])
+            && ($this->sender_id === $user->id || $this->receiver_id === $user->id);
     }
 
-    public function accept(): void
+    public function accept(?float $finalPrice = null): void
     {
-        $this->status = self::STATUS_CONFIRMED;
+        $this->status = self::STATUS_ACCEPTED;
+        if ($finalPrice !== null) {
+            $this->final_price = $finalPrice;
+        }
         $this->save();
     }
 

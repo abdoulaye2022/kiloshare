@@ -515,12 +515,21 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
             );
             _loadBookings(); // Recharger la liste
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(acceptResult['error'] ?? 'Erreur lors de l\'acceptation'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            // Handle Stripe-specific errors from backend
+            if (acceptResult['stripe_required'] == true) {
+              _showStripeSetupDialog({
+                'has_account': acceptResult['action'] != 'setup_stripe',
+                'onboarding_complete': false,
+                'transaction_ready': false,
+              });
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(acceptResult['error'] ?? 'Erreur lors de l\'acceptation'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         }
       } catch (e) {
@@ -628,6 +637,9 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   void _showStripeSetupDialog(Map<String, dynamic> stripeStatus) {
     final hasAccount = stripeStatus['has_account'] == true;
     final onboardingComplete = stripeStatus['onboarding_complete'] == true;
+    final transactionReady = stripeStatus['transaction_ready'] == true;
+    final account = stripeStatus['account'];
+    final hasRestrictions = account?['has_restrictions'] == true;
 
     String title;
     String content;
@@ -637,14 +649,22 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
       title = 'Compte Stripe requis';
       content = 'Pour accepter des réservations et recevoir des paiements, vous devez configurer votre compte Stripe Connect.\n\nCela vous permet de recevoir vos gains directement sur votre compte bancaire.';
       actionText = 'Configurer maintenant';
+    } else if (hasRestrictions) {
+      title = 'Vérification d\'identité requise';
+      content = 'Votre compte Stripe Connect nécessite une vérification d\'identité pour finaliser la configuration.\n\nCette étape est requise par la réglementation pour sécuriser les transactions financières.';
+      actionText = 'Compléter la vérification';
     } else if (!onboardingComplete) {
       title = 'Configuration Stripe incomplète';
       content = 'Votre compte Stripe Connect n\'est pas entièrement configuré. Terminez la configuration pour pouvoir accepter des réservations.\n\nIl vous manque peut-être des informations personnelles ou bancaires.';
       actionText = 'Terminer la configuration';
-    } else {
+    } else if (!transactionReady) {
       title = 'Compte Stripe en attente';
       content = 'Votre compte Stripe Connect est en cours de vérification. Cette étape peut prendre quelques minutes à quelques jours.\n\nVous pourrez accepter des réservations une fois la vérification terminée.';
       actionText = 'Vérifier le statut';
+    } else {
+      title = 'Statut Stripe';
+      content = 'Votre compte Stripe Connect est configuré et prêt.';
+      actionText = 'Actualiser';
     }
 
     showDialog(

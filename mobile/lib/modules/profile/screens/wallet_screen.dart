@@ -8,10 +8,10 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver {
   final StripeService _stripeService = StripeService.instance;
   
-  StripeAccountInfo? _accountInfo;
+  Map<String, dynamic>? _accountInfo;
   bool _isLoading = true;
   String? _error;
   bool _isProcessingAction = false;
@@ -19,7 +19,24 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadStripeAccountInfo();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Recharger les infos quand l'utilisateur revient dans l'app
+    // Ceci est utile après avoir complété l'onboarding Stripe dans le navigateur
+    if (state == AppLifecycleState.resumed) {
+      _loadStripeAccountInfo();
+    }
   }
 
   Future<void> _loadStripeAccountInfo() async {
@@ -29,7 +46,8 @@ class _WalletScreenState extends State<WalletScreen> {
     });
 
     try {
-      final accountInfo = await _stripeService.getAccountInfo();
+      final result = await _stripeService.getAccountStatus();
+      final accountInfo = result['success'] == true ? result : null;
       setState(() {
         _accountInfo = accountInfo;
         _isLoading = false;
@@ -134,22 +152,38 @@ class _WalletScreenState extends State<WalletScreen> {
     IconData statusIcon;
     String statusText;
 
-    if (accountInfo == null || accountInfo.needsSetup) {
-      statusColor = Colors.grey;
-      statusIcon = Icons.account_balance_wallet;
-      statusText = 'Portefeuille non configuré';
-    } else if (accountInfo.needsOnboarding) {
-      statusColor = Colors.orange;
-      statusIcon = Icons.hourglass_empty;
-      statusText = 'Configuration incomplète';
-    } else if (accountInfo.isFullyConfigured) {
-      statusColor = Colors.green;
-      statusIcon = Icons.check_circle;
-      statusText = 'Portefeuille configuré';
-    } else {
+    if (accountInfo == null) {
       statusColor = Colors.red;
       statusIcon = Icons.error;
-      statusText = 'Statut inconnu';
+      statusText = 'Erreur de chargement';
+    } else {
+      final hasAccount = accountInfo['has_account'] == true;
+      final transactionReady = accountInfo['transaction_ready'] == true;
+      final onboardingComplete = accountInfo['onboarding_complete'] == true;
+      final account = accountInfo['account'];
+      final hasRestrictions = account?['has_restrictions'] == true;
+
+      if (!hasAccount) {
+        statusColor = Colors.grey;
+        statusIcon = Icons.account_balance_wallet;
+        statusText = 'Portefeuille non configuré';
+      } else if (hasRestrictions) {
+        statusColor = Colors.orange;
+        statusIcon = Icons.verified_user;
+        statusText = 'Vérification d\'identité requise';
+      } else if (!onboardingComplete) {
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_empty;
+        statusText = 'Configuration incomplète';
+      } else if (!transactionReady) {
+        statusColor = Colors.blue;
+        statusIcon = Icons.pending;
+        statusText = 'En cours de vérification';
+      } else {
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusText = 'Portefeuille configuré';
+      }
     }
 
     return Card(
@@ -204,11 +238,62 @@ class _WalletScreenState extends State<WalletScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        accountInfo.statusDescription,
+                        accountInfo['message'] ?? 'Aucune information disponible',
                         style: TextStyle(
                           color: statusColor,
                           fontSize: 14,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            // Section spéciale pour la vérification d'identité
+            if (accountInfo != null && 
+                accountInfo['onboarding_complete'] == true && 
+                accountInfo['account']?['has_restrictions'] == true) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Vérification d\'identité requise',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Votre compte Stripe est configuré mais nécessite une vérification d\'identité pour accepter des paiements. Cette étape est requise par Stripe pour assurer la sécurité des transactions.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• Configuration bancaire: ✅ Terminée\n'
+                      '• Vérification d\'identité: ⏳ En attente',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                        height: 1.3,
                       ),
                     ),
                   ],
@@ -313,7 +398,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        if (accountInfo?.needsSetup == true) ...[
+        if (accountInfo != null && accountInfo['has_account'] != true) ...[
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -333,7 +418,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
             ),
           ),
-        ] else if (accountInfo?.needsOnboarding == true) ...[
+        ] else if (accountInfo != null && (accountInfo['onboarding_complete'] != true || accountInfo['account']?['has_restrictions'] == true)) ...[
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -345,7 +430,10 @@ class _WalletScreenState extends State<WalletScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.launch),
-              label: Text(_isProcessingAction ? 'Ouverture...' : 'Terminer la configuration'),
+              label: Text(_isProcessingAction ? 'Ouverture...' : 
+                accountInfo['account']?['has_restrictions'] == true ? 
+                'Compléter la vérification d\'identité' : 
+                'Terminer la configuration'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
@@ -365,7 +453,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
             ),
           ),
-        ] else if (accountInfo?.isFullyConfigured == true) ...[
+        ] else if (accountInfo != null && accountInfo['transaction_ready'] == true) ...[
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -531,7 +619,30 @@ class _WalletScreenState extends State<WalletScreen> {
     });
 
     try {
-      final result = await _stripeService.refreshAccountLink();
+      // Déterminer quelle étape du processus d'onboarding
+      final bool hasRestrictions = _accountInfo?['account']?['has_restrictions'] == true;
+      final bool onboardingComplete = _accountInfo?['onboarding_complete'] == true;
+      
+      Map<String, dynamic> result;
+      
+      if (!onboardingComplete) {
+        // Étape 1: Configuration initiale (informations bancaires)
+        result = await _stripeService.refreshAccountLink();
+      } else if (hasRestrictions) {
+        // Étape 2: Vérification d'identité
+        result = await _stripeService.refreshAccountLink();
+      } else {
+        // Cas où l'account est déjà complet
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Votre compte Stripe est déjà configuré'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
 
       if (result['success'] == true) {
         final onboardingUrl = result['onboarding_url'] as String;
@@ -550,9 +661,16 @@ class _WalletScreenState extends State<WalletScreen> {
           }
         } else {
           if (mounted) {
+            String message;
+            if (!onboardingComplete) {
+              message = 'Configuration bancaire Stripe ouverte dans votre navigateur';
+            } else {
+              message = 'Vérification d\'identité Stripe ouverte dans votre navigateur';
+            }
+            
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Configuration Stripe ouverte dans votre navigateur'),
+              SnackBar(
+                content: Text(message),
                 backgroundColor: Colors.green,
               ),
             );

@@ -14,6 +14,7 @@ use KiloShare\Controllers\FavoriteController;
 use KiloShare\Controllers\MessageController;
 use KiloShare\Controllers\NotificationController;
 use KiloShare\Controllers\SocialAuthController;
+use KiloShare\Controllers\StripeController;
 use KiloShare\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -208,6 +209,16 @@ return function (App $app) {
                 $notifGroup->post('/read-all', [NotificationController::class, 'markAllAsRead']);
                 $notifGroup->delete('/{id}', [NotificationController::class, 'deleteNotification']);
             })->add(new AuthMiddleware());
+
+            // Stripe Connect routes
+            $v1Group->group('/stripe', function (RouteCollectorProxy $stripeGroup) {
+                $stripeGroup->post('/account/create', [StripeController::class, 'createConnectedAccount']);
+                $stripeGroup->get('/account/status', [StripeController::class, 'getAccountStatus']);
+                $stripeGroup->post('/account/refresh-onboarding', [StripeController::class, 'refreshOnboardingLink']);
+            })->add(new AuthMiddleware());
+
+            // Stripe webhook (no auth required)
+            $v1Group->post('/stripe/webhook', [StripeController::class, 'handleWebhook']);
 
             // Legacy routes compatibility (if needed)
             $v1Group->group('/legacy', function (RouteCollectorProxy $legacyGroup) {
