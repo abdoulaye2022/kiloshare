@@ -96,7 +96,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         setState(() {
           _isAuthenticated = isAuth;
           _trip = trip;
-          _isOwner = trip.userId == userId;
+          _isOwner = trip.isOwner ?? (trip.userId == userId);
           _isFavorite = isFavorite;
           _isLoading = false;
           _error = null;
@@ -532,9 +532,9 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _publishTrip(),
-                    icon: const Icon(Icons.publish),
-                    label: const Text('Publier'),
+                    onPressed: () => _submitForReview(),
+                    icon: const Icon(Icons.send),
+                    label: const Text('Soumettre'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -560,24 +560,83 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
             ],
           ],
         );
+
+      case TripStatus.pendingReview:
+      case TripStatus.pendingApproval:
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.hourglass_empty, color: Colors.orange.shade600, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                'En attente de validation',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Votre voyage est en cours de révision par notre équipe.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+              ),
+            ],
+          ),
+        );
         
       case TripStatus.active:
-        return Row(
+        return Column(
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _editTrip(),
-                icon: const Icon(Icons.edit),
-                label: const Text('Modifier'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pauseTrip(),
+                    icon: const Icon(Icons.pause),
+                    label: const Text('Pause'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.orange),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _markAsBooked(),
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Réservé'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _pauseTrip(),
-                icon: const Icon(Icons.pause),
-                label: const Text('Pause'),
-              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _cancelTrip(),
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Annuler'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _markAsExpired(),
+                    icon: const Icon(Icons.schedule),
+                    label: const Text('Expiré'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.grey),
+                  ),
+                ),
+              ],
             ),
           ],
         );
@@ -589,7 +648,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _resumeTrip(),
+                    onPressed: () => _reactivateTrip(),
                     icon: const Icon(Icons.play_arrow),
                     label: const Text('Réactiver'),
                     style: ElevatedButton.styleFrom(
@@ -604,41 +663,24 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                     onPressed: () => _cancelTrip(),
                     icon: const Icon(Icons.cancel),
                     label: const Text('Annuler'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                   ),
                 ),
               ],
             ),
-            if (_canDeleteTrip()) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _deleteTrip(),
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Supprimer'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                  ),
-                ),
-              ),
-            ],
           ],
         );
-        
-      case TripStatus.rejected:
+
+      case TripStatus.booked:
         return Column(
           children: [
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _editTrip(),
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Modifier'),
+                    onPressed: () => _startJourney(),
+                    icon: const Icon(Icons.flight_takeoff),
+                    label: const Text('Commencer'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -647,74 +689,236 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _duplicateTrip(),
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Dupliquer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _cancelTrip(),
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Annuler'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                   ),
                 ),
               ],
             ),
-            if (_canDeleteTrip()) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _deleteTrip(),
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Supprimer'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
+          ],
+        );
+
+      case TripStatus.inProgress:
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.flight_takeoff, color: Colors.blue.shade600, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Voyage en cours',
+                    style: TextStyle(
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Bon voyage ! N\'oubliez pas de confirmer la livraison.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _completeDelivery(),
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Marquer comme livré'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
                 ),
               ),
-            ],
+            ),
           ],
+        );
+        
+      case TripStatus.rejected:
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.cancel, color: Colors.red.shade600, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Voyage rejeté',
+                    style: TextStyle(
+                      color: Colors.red.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Modifiez et soumettez à nouveau.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _backToDraft(),
+                icon: const Icon(Icons.edit),
+                label: const Text('Modifier et remettre en brouillon'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      
+      case TripStatus.completed:
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade600, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                'Voyage terminé',
+                style: TextStyle(
+                  color: Colors.green.shade800,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Félicitations ! Votre voyage s\'est bien déroulé.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+              ),
+            ],
+          ),
         );
       
       case TripStatus.cancelled:
         return Column(
           children: [
-            ElevatedButton.icon(
-              onPressed: () => _duplicateTrip(),
-              icon: const Icon(Icons.copy),
-              label: const Text('Dupliquer'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.cancel, color: Colors.grey.shade600, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Voyage annulé',
+                    style: TextStyle(
+                      color: Colors.grey.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (_canDeleteTrip()) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _deleteTrip(),
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Supprimer'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                  ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _duplicateTrip(),
+                icon: const Icon(Icons.copy),
+                label: const Text('Dupliquer ce voyage'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
                 ),
               ),
-            ],
+            ),
+          ],
+        );
+
+      case TripStatus.expired:
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange.shade600, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Voyage expiré',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _duplicateTrip(),
+                icon: const Icon(Icons.copy),
+                label: const Text('Dupliquer ce voyage'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
           ],
         );
         
       default:
-        return ElevatedButton.icon(
-          onPressed: () => _duplicateTrip(),
-          icon: const Icon(Icons.copy),
-          label: const Text('Dupliquer'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'Statut non reconnu: ${status.value}',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade600),
           ),
         );
     }
@@ -820,16 +1024,86 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     }
   }
 
-  void _pauseTrip() {
-    _showMessage('Annonce mise en pause', Colors.orange);
+  void _pauseTrip() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.pauseTrip(_trip!.id.toString());
+      
+      _showMessage('Annonce mise en pause avec succès !', Colors.orange);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la mise en pause: $e', Colors.red);
+    }
   }
 
-  void _resumeTrip() {
-    _showMessage('Annonce réactivée', Colors.green);
+  void _resumeTrip() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.resumeTrip(_trip!.id.toString());
+      
+      _showMessage('Annonce réactivée avec succès !', Colors.green);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la réactivation: $e', Colors.red);
+    }
   }
 
-  void _cancelTrip() {
-    _showMessage('Annonce annulée', Colors.red);
+  void _cancelTrip() async {
+    if (_trip == null) return;
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler l\'annonce'),
+        content: const Text('Êtes-vous sûr de vouloir annuler cette annonce ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Non'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Oui, annuler'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.cancelTrip(_trip!.id.toString());
+      
+      _showMessage('Annonce annulée avec succès', Colors.orange);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de l\'annulation: $e', Colors.red);
+    }
   }
 
   void _duplicateTrip() async {
@@ -980,6 +1254,170 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       
     } catch (e) {
       _showMessage('Erreur lors de la création de la réservation: $e', Colors.red);
+    }
+  }
+
+  // === NEW STATUS TRANSITION ACTIONS ===
+  
+  void _submitForReview() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.submitForReview(_trip!.id.toString());
+      
+      _showMessage('Voyage soumis pour révision avec succès !', Colors.green);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la soumission: $e', Colors.red);
+    }
+  }
+  
+  void _markAsBooked() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.markAsBooked(_trip!.id.toString());
+      
+      _showMessage('Voyage marqué comme réservé !', Colors.green);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors du marquage: $e', Colors.red);
+    }
+  }
+  
+  void _markAsExpired() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.markAsExpired(_trip!.id.toString());
+      
+      _showMessage('Voyage marqué comme expiré', Colors.orange);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors du marquage: $e', Colors.red);
+    }
+  }
+  
+  void _reactivateTrip() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.reactivateTrip(_trip!.id.toString());
+      
+      _showMessage('Voyage réactivé avec succès !', Colors.green);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la réactivation: $e', Colors.red);
+    }
+  }
+  
+  void _startJourney() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.startJourney(_trip!.id.toString());
+      
+      _showMessage('Voyage commencé ! Bon voyage !', Colors.blue);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors du démarrage: $e', Colors.red);
+    }
+  }
+  
+  void _completeDelivery() async {
+    if (_trip == null) return;
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Terminer la livraison'),
+        content: const Text('Confirmez-vous que la livraison a été effectuée avec succès ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.completeDelivery(_trip!.id.toString());
+      
+      _showMessage('Livraison terminée avec succès ! 🎉', Colors.green);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la finalisation: $e', Colors.red);
+    }
+  }
+  
+  void _backToDraft() async {
+    if (_trip == null) return;
+    
+    try {
+      final tripService = TripService();
+      await tripService.backToDraft(_trip!.id.toString());
+      
+      _showMessage('Voyage remis en brouillon pour modification', Colors.blue);
+      
+      // Refresh trip data
+      setState(() {
+        _hasLoaded = false;
+      });
+      _loadDataOnce();
+      
+    } catch (e) {
+      _showMessage('Erreur lors de la remise en brouillon: $e', Colors.red);
     }
   }
 

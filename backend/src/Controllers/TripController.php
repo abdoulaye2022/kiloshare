@@ -883,4 +883,323 @@ class TripController
             return Response::serverError('Failed to remove image: ' . $e->getMessage());
         }
     }
+
+    public function getUserTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::with(['user', 'images', 'bookings'])
+                       ->where('user_id', $user->id)
+                       ->find($id);
+            
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'uuid' => $trip->uuid,
+                    'user_id' => $trip->user_id,
+                    'title' => $trip->title,
+                    'description' => $trip->description,
+                    'departure_city' => $trip->departure_city,
+                    'departure_country' => $trip->departure_country,
+                    'departure_date' => $trip->departure_date,
+                    'arrival_city' => $trip->arrival_city,
+                    'arrival_country' => $trip->arrival_country,
+                    'arrival_date' => $trip->arrival_date,
+                    'transport_type' => $trip->transport_type,
+                    'max_weight' => $trip->available_weight_kg,
+                    'available_weight' => $trip->available_weight,
+                    'price_per_kg' => $trip->price_per_kg,
+                    'total_reward' => $trip->total_reward,
+                    'currency' => $trip->currency,
+                    'status' => $trip->status,
+                    'is_domestic' => $trip->is_domestic,
+                    'restrictions' => $trip->restrictions,
+                    'special_instructions' => $trip->special_notes,
+                    'route' => $trip->route,
+                    'duration' => $trip->duration,
+                    'is_expired' => $trip->is_expired,
+                    'user' => [
+                        'id' => $trip->user->id,
+                        'uuid' => $trip->user->uuid,
+                        'first_name' => $trip->user->first_name,
+                        'last_name' => $trip->user->last_name,
+                        'profile_picture' => $trip->user->profile_picture,
+                        'is_verified' => $trip->user->is_verified,
+                    ],
+                    'images' => $trip->images,
+                    'bookings_count' => $trip->bookings->count(),
+                    'can_book' => false, // User's own trip, cannot book
+                    'is_owner' => true,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to fetch trip: ' . $e->getMessage());
+        }
+    }
+
+    // === STATUS TRANSITION ACTIONS ===
+
+    public function submitForReview(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->submitForReview();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip submitted for review successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to submit for review: ' . $e->getMessage());
+        }
+    }
+
+    public function approveTripAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        // Only admins can approve trips
+        if ($user->role !== 'admin') {
+            return Response::forbidden('Only administrators can approve trips');
+        }
+        
+        try {
+            $trip = Trip::find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->approve();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'published_at' => $trip->published_at,
+                    'expires_at' => $trip->expires_at,
+                ]
+            ], 'Trip approved successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to approve trip: ' . $e->getMessage());
+        }
+    }
+
+    public function rejectTripAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        $data = json_decode($request->getBody()->getContents(), true);
+        
+        // Only admins can reject trips
+        if ($user->role !== 'admin') {
+            return Response::forbidden('Only administrators can reject trips');
+        }
+        
+        try {
+            $trip = Trip::find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $reason = $data['reason'] ?? null;
+            $trip->reject($reason);
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'rejection_reason' => $trip->rejection_reason,
+                ]
+            ], 'Trip rejected successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to reject trip: ' . $e->getMessage());
+        }
+    }
+
+    public function backToDraft(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->backToDraft();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip moved back to draft successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to move trip back to draft: ' . $e->getMessage());
+        }
+    }
+
+    public function markAsBooked(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->markAsBooked();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip marked as booked successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to mark trip as booked: ' . $e->getMessage());
+        }
+    }
+
+    public function startJourney(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->startJourney();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip journey started successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to start journey: ' . $e->getMessage());
+        }
+    }
+
+    public function completeDelivery(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->completeDelivery();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip delivery completed successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to complete delivery: ' . $e->getMessage());
+        }
+    }
+
+    public function reactivateTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->reactivate();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip reactivated successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to reactivate trip: ' . $e->getMessage());
+        }
+    }
+
+    public function markAsExpiredAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            $trip->markAsExpired();
+            
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'updated_at' => $trip->updated_at,
+                ]
+            ], 'Trip marked as expired successfully');
+        } catch (\Exception $e) {
+            return Response::error('Failed to mark trip as expired: ' . $e->getMessage());
+        }
+    }
+
+    public function getAvailableActions(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::where('user_id', $user->id)->find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+            
+            return Response::success([
+                'actions' => $trip->getAvailableActions(),
+                'status' => $trip->status,
+            ]);
+        } catch (\Exception $e) {
+            return Response::error('Failed to get available actions: ' . $e->getMessage());
+        }
+    }
 }

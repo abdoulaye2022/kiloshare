@@ -95,6 +95,7 @@ class Trip {
   final TripStatus status;
   final int viewCount;
   final int bookingCount;
+  final bool? isOwner;
   
   // Description
   final String? description;
@@ -193,6 +194,7 @@ class Trip {
     this.status = TripStatus.draft,
     this.viewCount = 0,
     this.bookingCount = 0,
+    this.isOwner,
     this.description,
     this.specialNotes,
     required this.createdAt,
@@ -280,7 +282,7 @@ class Trip {
       arrivalCountry: json['arrival_country'] ?? '',
       arrivalAirportCode: json['arrival_airport_code'],
       arrivalDate: _parseDateTime(json['arrival_date']) ?? DateTime.now(),
-      availableWeightKg: _parseDouble(json['available_weight_kg']),
+      availableWeightKg: _parseDouble(json['available_weight']) ?? _parseDouble(json['max_weight']) ?? 0.0,
       pricePerKg: _parseDouble(json['price_per_kg']),
       currency: json['currency'] ?? 'CAD',
       flightNumber: json['flight_number'],
@@ -290,6 +292,7 @@ class Trip {
       status: TripStatus.fromString(json['status'] ?? 'draft'),
       viewCount: _parseInt(json['view_count']),
       bookingCount: _parseInt(json['booking_count']),
+      isOwner: _parseBool(json['is_owner']),
       description: json['description'],
       specialNotes: json['special_notes'],
       createdAt: _parseDateTime(json['created_at']) ?? DateTime.now(),
@@ -395,6 +398,7 @@ class Trip {
       'status': status.value,
       'view_count': viewCount,
       'booking_count': bookingCount,
+      'is_owner': isOwner,
       'description': description,
       'special_notes': specialNotes,
       'created_at': createdAt.toIso8601String(),
@@ -490,6 +494,7 @@ class Trip {
     TripStatus? status,
     int? viewCount,
     int? bookingCount,
+    bool? isOwner,
     String? description,
     String? specialNotes,
     DateTime? createdAt,
@@ -584,6 +589,7 @@ class Trip {
       status: status ?? this.status,
       viewCount: viewCount ?? this.viewCount,
       bookingCount: bookingCount ?? this.bookingCount,
+      isOwner: isOwner ?? this.isOwner,
       description: description ?? this.description,
       specialNotes: specialNotes ?? this.specialNotes,
       createdAt: createdAt ?? this.createdAt,

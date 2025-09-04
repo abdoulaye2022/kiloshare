@@ -72,6 +72,7 @@ class Trip extends Model
     const STATUS_ACTIVE = 'active';
     const STATUS_REJECTED = 'rejected';
     const STATUS_PAUSED = 'paused';
+    const STATUS_BOOKED = 'booked';
     const STATUS_IN_PROGRESS = 'in_progress';
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
@@ -161,11 +162,10 @@ class Trip extends Model
 
     public function getAvailableWeightAttribute(): float
     {
-        // Temporaire : retourner available_weight_kg si pas de colonne weight dans bookings
         try {
             $bookedWeight = $this->bookings()
                 ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
-                ->sum('weight');
+                ->sum('weight_kg');
             return max(0.0, (float)$this->available_weight_kg - (float)$bookedWeight);
         } catch (\Exception $e) {
             // Si erreur SQL, retourner available_weight_kg par défaut
@@ -201,18 +201,22 @@ class Trip extends Model
 
     public function pause(): void
     {
-        if ($this->status === self::STATUS_PUBLISHED) {
-            $this->status = self::STATUS_PAUSED;
-            $this->save();
+        if ($this->status !== self::STATUS_ACTIVE) {
+            throw new \Exception('Only active trips can be paused');
         }
+        $this->status = self::STATUS_PAUSED;
+        $this->paused_at = Carbon::now();
+        $this->save();
     }
 
     public function resume(): void
     {
-        if ($this->status === self::STATUS_PAUSED) {
-            $this->status = self::STATUS_PUBLISHED;
-            $this->save();
+        if ($this->status !== self::STATUS_PAUSED) {
+            throw new \Exception('Only paused trips can be resumed');
         }
+        $this->status = self::STATUS_ACTIVE;
+        $this->paused_at = null;
+        $this->save();
     }
 
     public function cancel(): void
@@ -231,6 +235,173 @@ class Trip extends Model
     {
         $this->status = self::STATUS_EXPIRED;
         $this->save();
+    }
+
+    // === STATE TRANSITION ACTIONS ===
+
+    /**
+     * Submit draft for review (draft → pending_review)
+     */
+    public function submitForReview(): void
+    {
+        if ($this->status !== self::STATUS_DRAFT) {
+            throw new \Exception('Only draft trips can be submitted for review');
+        }
+        $this->status = self::STATUS_PENDING_APPROVAL;
+        $this->save();
+    }
+
+    /**
+     * Approve pending review (pending_review → active)
+     */
+    public function approve(): void
+    {
+        if ($this->status !== self::STATUS_PENDING_APPROVAL) {
+            throw new \Exception('Only trips pending review can be approved');
+        }
+        $this->status = self::STATUS_ACTIVE;
+        $this->published_at = Carbon::now();
+        
+        if (!$this->expires_at) {
+            $this->expires_at = Carbon::now()->addDays(30);
+        }
+        
+        $this->save();
+    }
+
+    /**
+     * Reject pending review (pending_review → rejected)
+     */
+    public function reject(?string $reason = null): void
+    {
+        if ($this->status !== self::STATUS_PENDING_APPROVAL) {
+            throw new \Exception('Only trips pending review can be rejected');
+        }
+        $this->status = self::STATUS_REJECTED;
+        if ($reason) {
+            $this->rejection_reason = $reason;
+        }
+        $this->save();
+    }
+
+    /**
+     * Modify rejected trip back to draft (rejected → draft)
+     */
+    public function backToDraft(): void
+    {
+        if ($this->status !== self::STATUS_REJECTED) {
+            throw new \Exception('Only rejected trips can be sent back to draft');
+        }
+        $this->status = self::STATUS_DRAFT;
+        $this->rejection_reason = null;
+        $this->save();
+    }
+
+    /**
+     * Mark as booked (active → booked)
+     */
+    public function markAsBooked(): void
+    {
+        if ($this->status !== self::STATUS_ACTIVE) {
+            throw new \Exception('Only active trips can be marked as booked');
+        }
+        $this->status = self::STATUS_BOOKED;
+        $this->save();
+    }
+
+    /**
+     * Start trip journey (booked → in_progress)
+     */
+    public function startJourney(): void
+    {
+        if ($this->status !== self::STATUS_BOOKED) {
+            throw new \Exception('Only booked trips can start their journey');
+        }
+        $this->status = self::STATUS_IN_PROGRESS;
+        $this->save();
+    }
+
+    /**
+     * Complete trip delivery (in_progress → completed)
+     */
+    public function completeDelivery(): void
+    {
+        if ($this->status !== self::STATUS_IN_PROGRESS) {
+            throw new \Exception('Only trips in progress can be completed');
+        }
+        $this->status = self::STATUS_COMPLETED;
+        $this->save();
+    }
+
+    /**
+     * Reactivate paused trip (paused → active)
+     */
+    public function reactivate(): void
+    {
+        if ($this->status !== self::STATUS_PAUSED) {
+            throw new \Exception('Only paused trips can be reactivated');
+        }
+        $this->status = self::STATUS_ACTIVE;
+        $this->paused_at = null;
+        $this->save();
+    }
+
+    /**
+     * Get available actions based on current status
+     */
+    public function getAvailableActions(): array
+    {
+        $actions = [];
+
+        switch ($this->status) {
+            case self::STATUS_DRAFT:
+                $actions = ['submit_for_review'];
+                break;
+
+            case self::STATUS_PENDING_APPROVAL:
+                $actions = ['approve', 'reject'];
+                break;
+
+            case self::STATUS_REJECTED:
+                $actions = ['back_to_draft'];
+                break;
+
+            case self::STATUS_ACTIVE:
+                $actions = ['pause', 'cancel', 'mark_as_booked'];
+                // Check if expired
+                if ($this->is_expired) {
+                    $actions[] = 'mark_as_expired';
+                }
+                break;
+
+            case self::STATUS_PAUSED:
+                $actions = ['reactivate'];
+                break;
+
+            case self::STATUS_BOOKED:
+                $actions = ['start_journey', 'cancel'];
+                break;
+
+            case self::STATUS_IN_PROGRESS:
+                $actions = ['complete_delivery'];
+                break;
+
+            case self::STATUS_COMPLETED:
+            case self::STATUS_CANCELLED:
+            case self::STATUS_EXPIRED:
+                $actions = []; // Terminal states
+                break;
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Check if a specific action is allowed
+     */
+    public function canPerformAction(string $action): bool
+    {
+        return in_array($action, $this->getAvailableActions());
     }
 
     // Scopes

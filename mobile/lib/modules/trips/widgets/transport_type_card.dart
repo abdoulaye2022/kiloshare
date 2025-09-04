@@ -172,6 +172,7 @@ class TransportTypeCard extends StatelessWidget {
   IconData _getTransportIcon() {
     switch (transportType) {
       case TransportType.flight:
+      case TransportType.plane:
         return Icons.flight;
       case TransportType.car:
         return Icons.directions_car;
@@ -181,6 +182,7 @@ class TransportTypeCard extends StatelessWidget {
   Color _getTransportColor() {
     switch (transportType) {
       case TransportType.flight:
+      case TransportType.plane:
         return Colors.blue[600]!;
       case TransportType.car:
         return Colors.green[600]!;

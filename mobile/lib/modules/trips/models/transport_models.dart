@@ -1,5 +1,6 @@
 enum TransportType {
   flight('flight', 'Avion', 'Rapide et sécurisé - International et domestique'),
+  plane('plane', 'Avion', 'Rapide et sécurisé - International et domestique'),
   car('car', 'Voiture', 'Flexible et grande capacité - Canada seulement');
 
   const TransportType(this.value, this.displayName, this.description);

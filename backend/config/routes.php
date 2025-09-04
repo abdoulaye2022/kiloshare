@@ -126,10 +126,24 @@ return function (App $app) {
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'removeTripImage']);
+                
+                // === NEW STATUS TRANSITION ACTIONS ===
+                $tripGroup->get('/{id}/actions', [TripController::class, 'getAvailableActions']);
+                $tripGroup->post('/{id}/submit-for-review', [TripController::class, 'submitForReview']);
+                $tripGroup->post('/{id}/approve', [TripController::class, 'approveTripAction']);
+                $tripGroup->post('/{id}/reject', [TripController::class, 'rejectTripAction']);
+                $tripGroup->post('/{id}/back-to-draft', [TripController::class, 'backToDraft']);
+                $tripGroup->post('/{id}/mark-as-booked', [TripController::class, 'markAsBooked']);
+                $tripGroup->post('/{id}/start-journey', [TripController::class, 'startJourney']);
+                $tripGroup->post('/{id}/complete-delivery', [TripController::class, 'completeDelivery']);
+                $tripGroup->post('/{id}/reactivate', [TripController::class, 'reactivateTrip']);
+                $tripGroup->post('/{id}/mark-as-expired', [TripController::class, 'markAsExpiredAction']);
             })->add(new AuthMiddleware());
 
             // User trip management
             $v1Group->get('/user/trips', [TripController::class, 'list'])
+                ->add(new AuthMiddleware());
+            $v1Group->get('/user/trips/{id}', [TripController::class, 'getUserTrip'])
                 ->add(new AuthMiddleware());
 
             // Search routes

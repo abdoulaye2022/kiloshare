@@ -16,6 +16,7 @@ class DestinationValidatorService {
         return _isBothCanada(departureCountry, arrivalCountry);
         
       case TransportType.flight:
+      case TransportType.plane:
         // Flight: at least one destination must be Canada (no foreign to foreign)
         return _includesCanada(departureCountry, arrivalCountry);
     }
@@ -44,6 +45,7 @@ class DestinationValidatorService {
         return LocationsData.countries.where((country) => country['value'] == 'CA').toList();
         
       case TransportType.flight:
+      case TransportType.plane:
         // Flight: all countries (but with Canada restriction)
         return LocationsData.countries;
     }
@@ -63,6 +65,7 @@ class DestinationValidatorService {
         return [];
         
       case TransportType.flight:
+      case TransportType.plane:
         // Flight: cities from any country
         return LocationsData.getCitiesForCountry(countryCode);
     }
@@ -92,6 +95,7 @@ class DestinationValidatorService {
         break;
         
       case TransportType.flight:
+      case TransportType.plane:
         if (!_includesCanada(departureCountry, arrivalCountry)) {
           return 'Les vols doivent inclure le Canada. Au moins une destination (départ ou arrivée) doit être au Canada.';
         }
@@ -108,6 +112,7 @@ class DestinationValidatorService {
         return 'Voyages en voiture : uniquement entre les villes canadiennes';
         
       case TransportType.flight:
+      case TransportType.plane:
         return 'Vols : Canada ↔ International ou Canada ↔ Canada (pas International ↔ International)';
     }
   }

@@ -229,6 +229,7 @@ class MultiTransportService {
   double getWeightLimit(TransportType transportType) {
     switch (transportType) {
       case TransportType.flight:
+      case TransportType.plane:
         return 23.0;
       case TransportType.car:
         return 100.0;
@@ -241,7 +242,7 @@ class MultiTransportService {
   }
 
   bool requiresFlightInfo(TransportType transportType) {
-    return transportType == TransportType.flight;
+    return transportType == TransportType.flight || transportType == TransportType.plane;
   }
 
   bool supportsFlexibleDeparture(TransportType transportType) {
