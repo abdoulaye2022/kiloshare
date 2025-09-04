@@ -38,12 +38,21 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
     try {
       final result = await _bookingService.getBooking(widget.bookingId);
+      print('BookingDetailsScreen received result: $result');
       
       if (result['success'] == true) {
-        setState(() {
-          _booking = BookingModel.fromJson(result['booking']);
-          _isLoading = false;
-        });
+        final bookingData = result['booking'];
+        if (bookingData != null && bookingData is Map<String, dynamic>) {
+          setState(() {
+            _booking = BookingModel.fromJson(bookingData);
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _error = 'Données de réservation invalides ou manquantes';
+            _isLoading = false;
+          });
+        }
       } else {
         setState(() {
           _error = result['error'] ?? 'Erreur lors du chargement de la réservation';

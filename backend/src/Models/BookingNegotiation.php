@@ -6,11 +6,8 @@ namespace KiloShare\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
-
 class BookingNegotiation extends Model
 {
-    use SoftDeletes;
 
     protected $table = 'booking_negotiations';
 
@@ -21,59 +18,50 @@ class BookingNegotiation extends Model
 
     protected $fillable = [
         'booking_id',
-        'user_id',
-        'proposed_price',
+        'proposed_by',
+        'amount',
         'message',
-        'status',
-        'response_message',
+        'is_accepted',
     ];
 
     protected $casts = [
         'booking_id' => 'integer',
-        'user_id' => 'integer',
-        'proposed_price' => 'decimal:2',
+        'proposed_by' => 'integer',
+        'amount' => 'decimal:2',
+        'is_accepted' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
     ];
-
-    protected $dates = ['deleted_at'];
 
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
     }
 
-    public function user(): BelongsTo
+    public function proposedByUser(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'proposed_by');
     }
 
     public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_PENDING);
+        return $query->where('is_accepted', null);
     }
 
     public function scopeAccepted($query)
     {
-        return $query->where('status', self::STATUS_ACCEPTED);
+        return $query->where('is_accepted', true);
     }
 
-    public function accept(string $responseMessage = null): bool
+    public function accept(?string $responseMessage = null): bool
     {
-        $this->status = self::STATUS_ACCEPTED;
-        if ($responseMessage) {
-            $this->response_message = $responseMessage;
-        }
+        $this->is_accepted = true;
         return $this->save();
     }
 
-    public function reject(string $responseMessage = null): bool
+    public function reject(?string $responseMessage = null): bool
     {
-        $this->status = self::STATUS_REJECTED;
-        if ($responseMessage) {
-            $this->response_message = $responseMessage;
-        }
+        $this->is_accepted = false;
         return $this->save();
     }
 }

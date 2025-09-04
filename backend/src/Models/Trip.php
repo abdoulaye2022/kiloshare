@@ -181,7 +181,12 @@ class Trip extends Model
 
     public function canBeBookedBy(User $user): bool
     {
-        return $this->status === self::STATUS_PUBLISHED
+        $bookableStatuses = [
+            self::STATUS_PUBLISHED,
+            self::STATUS_ACTIVE,
+        ];
+        
+        return in_array($this->status, $bookableStatuses)
             && !$this->isExpired
             && $this->user_id !== $user->id
             && $this->available_weight > 0;

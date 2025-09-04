@@ -20,37 +20,24 @@ class Booking extends Model
         'trip_id',
         'uuid',
         'status',
-        'weight',
-        'price_per_kg',
-        'total_price',
-        'currency',
+        'weight_kg',
+        'proposed_price',
         'package_description',
         'pickup_address',
         'delivery_address',
-        'pickup_notes',
-        'delivery_notes',
-        'requested_pickup_date',
-        'requested_delivery_date',
-        'confirmed_pickup_date',
-        'confirmed_delivery_date',
-        'payment_status',
-        'payment_intent_id',
-        'commission_rate',
-        'commission_amount',
-        'traveler_amount',
+        'pickup_date',
+        'delivery_date',
+        'special_instructions',
     ];
 
     protected $casts = [
-        'weight' => 'decimal:2',
-        'price_per_kg' => 'decimal:2',
-        'total_price' => 'decimal:2',
-        'commission_rate' => 'decimal:4',
+        'weight_kg' => 'decimal:2',
+        'proposed_price' => 'decimal:2',
+        'final_price' => 'decimal:2',
+        'commission_rate' => 'decimal:2',
         'commission_amount' => 'decimal:2',
-        'traveler_amount' => 'decimal:2',
-        'requested_pickup_date' => 'datetime',
-        'requested_delivery_date' => 'datetime',
-        'confirmed_pickup_date' => 'datetime',
-        'confirmed_delivery_date' => 'datetime',
+        'pickup_date' => 'datetime',
+        'delivery_date' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -80,12 +67,6 @@ class Booking extends Model
             }
             if (empty($booking->status)) {
                 $booking->status = self::STATUS_PENDING;
-            }
-            if (empty($booking->payment_status)) {
-                $booking->payment_status = self::PAYMENT_PENDING;
-            }
-            if (empty($booking->currency)) {
-                $booking->currency = 'EUR';
             }
         });
     }

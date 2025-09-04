@@ -28,32 +28,29 @@ class BookingService {
   /// Créer une demande de réservation
   Future<Map<String, dynamic>> createBookingRequest({
     required String tripId,
-    required String receiverId,
     required String packageDescription,
-    required double weightKg,
-    required double proposedPrice,
+    required double weight,
     String? dimensionsCm,
     String? pickupAddress,
     String? deliveryAddress,
-    String? specialInstructions,
+    String? pickupNotes,
+    String? deliveryNotes,
   }) async {
     try {
       final headers = await _getAuthHeaders();
       final body = json.encode({
-        'trip_id': tripId,
-        'receiver_id': receiverId,
+        'trip_id': int.parse(tripId),
         'package_description': packageDescription,
-        'weight_kg': weightKg,
-        'proposed_price': proposedPrice,
-        'dimensions_cm': dimensionsCm,
+        'weight': weight,
         'pickup_address': pickupAddress,
         'delivery_address': deliveryAddress,
-        'special_instructions': specialInstructions,
+        'pickup_notes': pickupNotes,
+        'delivery_notes': deliveryNotes,
       });
 
 
       final response = await http.post(
-        Uri.parse('${_baseUrl}/bookings'),
+        Uri.parse('$_baseUrl/bookings'),
         headers: headers,
         body: body,
       );
@@ -64,13 +61,13 @@ class BookingService {
       if (response.statusCode == 201) {
         return {
           'success': true,
-          'booking': responseData['booking'],
+          'booking': responseData['data']['booking'],
           'message': responseData['message'],
         };
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la création de la réservation',
+          'error': responseData['message'] ?? 'Erreur lors de la création de la réservation',
         };
       }
     } catch (e) {
@@ -94,7 +91,7 @@ class BookingService {
         };
       }
       
-      String url = '${_baseUrl}/bookings';
+      String url = '$_baseUrl/bookings';
       if (role != null) {
         url += '?role=$role';
       }
@@ -111,12 +108,12 @@ class BookingService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'bookings': responseData['bookings'] ?? [],
+          'bookings': responseData['data']['bookings'] ?? [],
         };
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la récupération des réservations',
+          'error': responseData['message'] ?? 'Erreur lors de la récupération des réservations',
         };
       }
     } catch (e) {
@@ -141,16 +138,32 @@ class BookingService {
 
 
       final responseData = json.decode(response.body);
+      print('BookingService.getBooking response: $responseData');
 
       if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'booking': responseData['booking'],
-        };
+        // Handle both direct booking response and nested data.booking response
+        dynamic bookingData;
+        if (responseData['booking'] != null) {
+          bookingData = responseData['booking'];
+        } else if (responseData['data'] != null && responseData['data']['booking'] != null) {
+          bookingData = responseData['data']['booking'];
+        }
+        
+        if (bookingData != null) {
+          return {
+            'success': true,
+            'booking': bookingData,
+          };
+        } else {
+          return {
+            'success': false,
+            'error': 'Données de réservation manquantes dans la réponse',
+          };
+        }
       } else {
         return {
           'success': false,
-          'error': responseData['error'] ?? 'Erreur lors de la récupération de la réservation',
+          'error': responseData?['error'] ?? responseData?['message'] ?? 'Erreur lors de la récupération de la réservation',
         };
       }
     } catch (e) {

@@ -281,7 +281,13 @@ class TripController
             }
 
             // Vérifier la visibilité
-            if ($trip->status !== Trip::STATUS_PUBLISHED && (!$user || $trip->user_id !== $user->id)) {
+            $isPubliclyVisible = in_array($trip->status, [
+                Trip::STATUS_PUBLISHED,
+                Trip::STATUS_ACTIVE,
+                Trip::STATUS_IN_PROGRESS
+            ]);
+            
+            if (!$isPubliclyVisible && (!$user || $trip->user_id !== $user->id)) {
                 return Response::forbidden('Trip not available');
             }
 

@@ -33,10 +33,10 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   @override
   void initState() {
     super.initState();
-    // Pré-remplir le prix par kg si disponible
-    if (widget.trip.pricePerKg > 0) {
-      _proposedPriceController.text = (widget.trip.pricePerKg * 5).toStringAsFixed(2); // Exemple pour 5kg
-    }
+    // Écouter les changements de poids pour recalculer le prix
+    _weightController.addListener(() {
+      setState(() {}); // Redessiner l'interface pour mettre à jour le prix
+    });
   }
 
   @override
@@ -86,9 +86,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                     ),
                     const SizedBox(height: 24),
                     
-                    _buildSectionTitle('Prix et négociation'),
-                    const SizedBox(height: 16),
-                    _buildProposedPriceField(),
+                    _buildPriceInfo(),
                     const SizedBox(height: 24),
                     
                     _buildSectionTitle('Adresses (optionnel)'),
@@ -257,6 +255,60 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
+  Widget _buildPriceInfo() {
+    double weight = double.tryParse(_weightController.text) ?? 0.0;
+    double totalPrice = weight * widget.trip.pricePerKg;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Calcul du prix',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue[800],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Prix par kg:', style: TextStyle(color: Colors.blue[700])),
+              Text('${widget.trip.pricePerKg.toStringAsFixed(2)} ${widget.trip.currency}', 
+                   style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue[700])),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Poids:', style: TextStyle(color: Colors.blue[700])),
+              Text('${weight.toStringAsFixed(1)} kg', 
+                   style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue[700])),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Prix total:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+              Text('${totalPrice.toStringAsFixed(2)} ${widget.trip.currency}', 
+                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProposedPriceField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,10 +459,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     try {
       final result = await _bookingService.createBookingRequest(
         tripId: widget.trip.id.toString(),
-        receiverId: widget.trip.userId.toString(),
         packageDescription: _packageDescriptionController.text.trim(),
-        weightKg: double.parse(_weightController.text),
-        proposedPrice: double.parse(_proposedPriceController.text),
+        weight: double.parse(_weightController.text),
         dimensionsCm: _dimensionsController.text.trim().isNotEmpty 
           ? _dimensionsController.text.trim() 
           : null,
@@ -420,7 +470,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         deliveryAddress: _deliveryAddressController.text.trim().isNotEmpty 
           ? _deliveryAddressController.text.trim() 
           : null,
-        specialInstructions: _specialInstructionsController.text.trim().isNotEmpty 
+        pickupNotes: _specialInstructionsController.text.trim().isNotEmpty 
           ? _specialInstructionsController.text.trim() 
           : null,
       );

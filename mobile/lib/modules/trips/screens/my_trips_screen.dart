@@ -186,7 +186,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
               // Tabs
               TabBar(
                 controller: _tabController,
-                isScrollable: true,
+                isScrollable: false,
                 tabs: [
                   Tab(
                     text: 'Mes voyages (${_filteredTrips.length})',

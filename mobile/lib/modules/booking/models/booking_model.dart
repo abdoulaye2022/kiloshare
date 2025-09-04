@@ -54,30 +54,34 @@ class BookingModel {
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
+    final trip = json['trip'] as Map<String, dynamic>?;
+    final sender = json['sender'] as Map<String, dynamic>?;
+    final receiver = json['receiver'] as Map<String, dynamic>?;
+    
     return BookingModel(
       id: json['id'] as int,
-      tripId: json['trip_id'].toString(),
-      senderId: json['sender_id'].toString(),
-      receiverId: json['receiver_id'].toString(),
+      tripId: (trip?['id'] ?? json['trip_id'] ?? 0).toString(),
+      senderId: json['sender_id']?.toString() ?? '0',
+      receiverId: json['receiver_id']?.toString() ?? '0',
       packageDescription: json['package_description'] as String,
       weightKg: double.parse(json['weight_kg'].toString()),
       dimensionsCm: json['dimensions_cm'] as String?,
-      proposedPrice: double.parse(json['proposed_price'].toString()),
+      proposedPrice: json['proposed_price'] != null ? double.parse(json['proposed_price'].toString()) : 0.0,
       finalPrice: json['final_price'] != null ? double.parse(json['final_price'].toString()) : null,
       pickupAddress: json['pickup_address'] as String?,
       deliveryAddress: json['delivery_address'] as String?,
       specialInstructions: json['special_instructions'] as String?,
       status: BookingStatus.fromString(json['status'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      senderName: json['sender_name'] as String?,
-      senderEmail: json['sender_email'] as String?,
-      receiverName: json['receiver_name'] as String?,
-      receiverEmail: json['receiver_email'] as String?,
-      tripTitle: json['trip_title'] as String?,
-      tripDepartureCity: json['departure_city'] as String?,
-      tripArrivalCity: json['arrival_city'] as String?,
-      tripDepartureDate: json['departure_date'] != null ? DateTime.parse(json['departure_date'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.parse(json['created_at'] as String),
+      senderName: sender != null ? '${sender['first_name'] ?? ''} ${sender['last_name'] ?? ''}'.trim() : null,
+      senderEmail: sender?['email'] as String?,
+      receiverName: receiver != null ? '${receiver['first_name'] ?? ''} ${receiver['last_name'] ?? ''}'.trim() : null,
+      receiverEmail: receiver?['email'] as String?,
+      tripTitle: trip?['title'] as String?,
+      tripDepartureCity: trip?['departure_city'] as String?,
+      tripArrivalCity: trip?['arrival_city'] as String?,
+      tripDepartureDate: trip?['departure_date'] != null ? DateTime.parse(trip!['departure_date'] as String) : null,
     );
   }
 

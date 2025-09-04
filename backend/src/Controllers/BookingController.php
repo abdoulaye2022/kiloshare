@@ -22,7 +22,7 @@ class BookingController
         // Validation
         $validator = new Validator();
         $rules = [
-            'trip_id' => Validator::required()->integer(),
+            'trip_id' => Validator::required()->intType(),
             'weight' => Validator::required()->positive(),
             'package_description' => Validator::required()->stringType()->length(5, 500),
             'pickup_address' => Validator::required()->stringType(),
@@ -58,18 +58,15 @@ class BookingController
                 'receiver_id' => $trip->user_id, // Propriétaire du voyage = receiver
                 'trip_id' => $trip->id,
                 'status' => Booking::STATUS_PENDING,
-                'weight' => (float) $data['weight'],
-                'price_per_kg' => $trip->price_per_kg,
-                'total_price' => $totalPrice,
-                'currency' => $trip->currency,
+                'weight_kg' => (float) $data['weight'],
+                'proposed_price' => $totalPrice,
                 'package_description' => $data['package_description'],
                 'pickup_address' => $data['pickup_address'],
                 'delivery_address' => $data['delivery_address'],
-                'pickup_notes' => $data['pickup_notes'] ?? '',
-                'delivery_notes' => $data['delivery_notes'] ?? '',
-                'requested_pickup_date' => isset($data['requested_pickup_date']) 
+                'special_instructions' => ($data['pickup_notes'] ?? '') . ' ' . ($data['delivery_notes'] ?? ''),
+                'pickup_date' => isset($data['requested_pickup_date']) 
                     ? Carbon::parse($data['requested_pickup_date']) : null,
-                'requested_delivery_date' => isset($data['requested_delivery_date']) 
+                'delivery_date' => isset($data['requested_delivery_date']) 
                     ? Carbon::parse($data['requested_delivery_date']) : null,
             ]);
 
@@ -78,9 +75,8 @@ class BookingController
                     'id' => $booking->id,
                     'uuid' => $booking->uuid,
                     'status' => $booking->status,
-                    'weight' => $booking->weight,
-                    'total_price' => $booking->total_price,
-                    'currency' => $booking->currency,
+                    'weight_kg' => $booking->weight_kg,
+                    'proposed_price' => $booking->proposed_price,
                     'created_at' => $booking->created_at,
                 ]
             ], 'Booking request created successfully');
@@ -102,7 +98,7 @@ class BookingController
             $role = $queryParams['role'] ?? null; // 'sender' ou 'receiver'
             
             // Construction de la requête selon le rôle
-            $query = Booking::query()->with(['trip.user']);
+            $query = Booking::query()->with(['trip.user', 'sender', 'receiver']);
             
             if ($role === 'sender') {
                 // L'utilisateur est celui qui envoie le colis (créateur de la réservation)
@@ -141,15 +137,31 @@ class BookingController
                     return [
                         'id' => $booking->id,
                         'uuid' => $booking->uuid,
+                        'sender_id' => $booking->sender_id,
+                        'receiver_id' => $booking->receiver_id,
                         'status' => $booking->status,
-                        'weight' => $booking->weight,
-                        'total_price' => $booking->total_price,
-                        'currency' => $booking->currency,
+                        'weight_kg' => $booking->weight_kg,
+                        'proposed_price' => $booking->proposed_price,
+                        'final_price' => $booking->final_price,
                         'package_description' => $booking->package_description,
                         'pickup_address' => $booking->pickup_address,
                         'delivery_address' => $booking->delivery_address,
-                        'payment_status' => $booking->payment_status,
+                        'special_instructions' => $booking->special_instructions,
                         'created_at' => $booking->created_at,
+                        'sender' => [
+                            'id' => $booking->sender->id,
+                            'first_name' => $booking->sender->first_name,
+                            'last_name' => $booking->sender->last_name,
+                            'email' => $booking->sender->email,
+                            'profile_picture' => $booking->sender->profile_picture,
+                        ],
+                        'receiver' => [
+                            'id' => $booking->receiver->id,
+                            'first_name' => $booking->receiver->first_name,
+                            'last_name' => $booking->receiver->last_name,
+                            'email' => $booking->receiver->email,
+                            'profile_picture' => $booking->receiver->profile_picture,
+                        ],
                         'trip' => [
                             'id' => $booking->trip->id,
                             'title' => $booking->trip->title,
@@ -182,15 +194,15 @@ class BookingController
         $id = $request->getAttribute('id');
 
         try {
-            $booking = Booking::with(['trip.user', 'user', 'negotiations', 'packagePhotos'])
+            $booking = Booking::with(['trip.user', 'sender', 'receiver', 'negotiations'])
                              ->find($id);
 
             if (!$booking) {
                 return Response::notFound('Booking not found');
             }
 
-            // Vérifier les permissions (propriétaire du booking ou du trip)
-            if ($booking->user_id !== $user->id && $booking->trip->user_id !== $user->id) {
+            // Vérifier les permissions (sender ou receiver)
+            if ($booking->sender_id !== $user->id && $booking->receiver_id !== $user->id) {
                 return Response::forbidden('Access denied');
             }
 
@@ -198,68 +210,57 @@ class BookingController
                 'booking' => [
                     'id' => $booking->id,
                     'uuid' => $booking->uuid,
+                    'sender_id' => $booking->sender_id,
+                    'receiver_id' => $booking->receiver_id,
                     'status' => $booking->status,
-                    'weight' => $booking->weight,
-                    'price_per_kg' => $booking->price_per_kg,
-                    'total_price' => $booking->total_price,
-                    'currency' => $booking->currency,
+                    'weight_kg' => $booking->weight_kg,
+                    'proposed_price' => $booking->proposed_price,
+                    'final_price' => $booking->final_price,
                     'package_description' => $booking->package_description,
                     'pickup_address' => $booking->pickup_address,
                     'delivery_address' => $booking->delivery_address,
-                    'pickup_notes' => $booking->pickup_notes,
-                    'delivery_notes' => $booking->delivery_notes,
-                    'requested_pickup_date' => $booking->requested_pickup_date,
-                    'requested_delivery_date' => $booking->requested_delivery_date,
-                    'confirmed_pickup_date' => $booking->confirmed_pickup_date,
-                    'confirmed_delivery_date' => $booking->confirmed_delivery_date,
-                    'payment_status' => $booking->payment_status,
+                    'special_instructions' => $booking->special_instructions,
+                    'pickup_date' => $booking->pickup_date,
+                    'delivery_date' => $booking->delivery_date,
                     'created_at' => $booking->created_at,
                     'updated_at' => $booking->updated_at,
+                    'sender' => [
+                        'id' => $booking->sender->id,
+                        'first_name' => $booking->sender->first_name,
+                        'last_name' => $booking->sender->last_name,
+                        'email' => $booking->sender->email,
+                        'profile_picture' => $booking->sender->profile_picture,
+                    ],
+                    'receiver' => [
+                        'id' => $booking->receiver->id,
+                        'first_name' => $booking->receiver->first_name,
+                        'last_name' => $booking->receiver->last_name,
+                        'email' => $booking->receiver->email,
+                        'profile_picture' => $booking->receiver->profile_picture,
+                    ],
                     'trip' => [
                         'id' => $booking->trip->id,
-                        'uuid' => $booking->trip->uuid,
                         'title' => $booking->trip->title,
                         'departure_city' => $booking->trip->departure_city,
                         'arrival_city' => $booking->trip->arrival_city,
                         'departure_date' => $booking->trip->departure_date,
-                        'arrival_date' => $booking->trip->arrival_date,
-                        'transport_type' => $booking->trip->transport_type,
                         'user' => [
                             'id' => $booking->trip->user->id,
-                            'uuid' => $booking->trip->user->uuid,
                             'first_name' => $booking->trip->user->first_name,
                             'last_name' => $booking->trip->user->last_name,
                             'profile_picture' => $booking->trip->user->profile_picture,
-                            'is_verified' => $booking->trip->user->is_verified,
                         ],
                     ],
-                    'user' => [
-                        'id' => $booking->user->id,
-                        'uuid' => $booking->user->uuid,
-                        'first_name' => $booking->user->first_name,
-                        'last_name' => $booking->user->last_name,
-                        'profile_picture' => $booking->user->profile_picture,
-                        'is_verified' => $booking->user->is_verified,
-                    ],
-                    'negotiations' => $booking->negotiations->map(function ($negotiation) {
+                    'negotiations' => $booking->negotiations ? $booking->negotiations->map(function ($negotiation) {
                         return [
                             'id' => $negotiation->id,
-                            'proposed_price' => $negotiation->proposed_price,
+                            'proposed_by' => $negotiation->proposed_by,
+                            'amount' => $negotiation->amount,
                             'message' => $negotiation->message,
-                            'status' => $negotiation->status,
+                            'is_accepted' => $negotiation->is_accepted,
                             'created_at' => $negotiation->created_at,
                         ];
-                    }),
-                    'package_photos' => $booking->packagePhotos->map(function ($photo) {
-                        return [
-                            'id' => $photo->id,
-                            'url' => $photo->url,
-                            'thumbnail' => $photo->thumbnail,
-                            'created_at' => $photo->created_at,
-                        ];
-                    }),
-                    'can_accept' => $booking->canBeAcceptedBy($user),
-                    'can_cancel' => $booking->canBeCancelledBy($user),
+                    }) : [],
                 ]
             ]);
 

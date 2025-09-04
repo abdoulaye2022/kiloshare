@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
 import '../models/trip_model.dart';
@@ -89,12 +90,17 @@ class FavoritesService {
       );
 
       if (response.data['success'] == true) {
-        final tripsData = response.data['data'] as List;
-        return tripsData.map((tripJson) => Trip.fromJson(tripJson)).toList();
+        final favoritesData = response.data['data']['favorites'] as List;
+        // Extraire les trips depuis la structure favorites -> trip
+        return favoritesData.map((favoriteItem) {
+          final tripData = favoriteItem['trip'];
+          return Trip.fromJson(tripData);
+        }).toList();
       }
 
       return [];
     } catch (e) {
+      debugPrint('FavoritesService: Error loading favorites: $e');
       return [];
     }
   }
