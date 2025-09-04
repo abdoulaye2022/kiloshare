@@ -71,7 +71,6 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
           return city['country'] == 'Canada';
         }).toList();
 
-      case TransportType.flight:
       case TransportType.plane:
         // Flight: all cities (international allowed)
         return allCities;

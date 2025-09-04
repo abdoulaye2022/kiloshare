@@ -15,7 +15,6 @@ class DestinationValidatorService {
         // Car: only within Canada
         return _isBothCanada(departureCountry, arrivalCountry);
         
-      case TransportType.flight:
       case TransportType.plane:
         // Flight: at least one destination must be Canada (no foreign to foreign)
         return _includesCanada(departureCountry, arrivalCountry);
@@ -44,7 +43,6 @@ class DestinationValidatorService {
         // Car: only Canada
         return LocationsData.countries.where((country) => country['value'] == 'CA').toList();
         
-      case TransportType.flight:
       case TransportType.plane:
         // Flight: all countries (but with Canada restriction)
         return LocationsData.countries;
@@ -64,7 +62,6 @@ class DestinationValidatorService {
         }
         return [];
         
-      case TransportType.flight:
       case TransportType.plane:
         // Flight: cities from any country
         return LocationsData.getCitiesForCountry(countryCode);
@@ -94,10 +91,9 @@ class DestinationValidatorService {
         }
         break;
         
-      case TransportType.flight:
       case TransportType.plane:
         if (!_includesCanada(departureCountry, arrivalCountry)) {
-          return 'Les vols doivent inclure le Canada. Au moins une destination (départ ou arrivée) doit être au Canada.';
+          return 'Les vols doivent inclure le Canada. Les trajets comme Paris → Londres ne sont pas autorisés. Exemples valides: Montréal → Paris, Toronto → Londres, Paris → Vancouver.';
         }
         break;
     }
@@ -109,11 +105,10 @@ class DestinationValidatorService {
   static String getTransportRestrictions(TransportType transportType) {
     switch (transportType) {
       case TransportType.car:
-        return 'Voyages en voiture : uniquement entre les villes canadiennes';
+        return '🚗 Voiture (200kg max) : Uniquement entre les villes canadiennes\nExemples: Toronto → Montréal, Vancouver → Calgary';
         
-      case TransportType.flight:
       case TransportType.plane:
-        return 'Vols : Canada ↔ International ou Canada ↔ Canada (pas International ↔ International)';
+        return '✈️ Avion (23kg max) : Canada ↔ International ou Canada ↔ Canada\nValide: Montréal → Paris, Toronto → Londres\nInterdit: Paris → Londres';
     }
   }
 

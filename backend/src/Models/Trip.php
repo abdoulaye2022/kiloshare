@@ -414,6 +414,7 @@ class Trip extends Model
     {
         return $query->whereIn('status', [
             self::STATUS_PUBLISHED,
+            self::STATUS_ACTIVE,
             self::STATUS_IN_PROGRESS
         ]);
     }

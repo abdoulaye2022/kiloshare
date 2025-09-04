@@ -24,7 +24,7 @@ class TripController
             $limit = (int) ($queryParams['limit'] ?? 20);
             $offset = ($page - 1) * $limit;
 
-            $trips = Trip::published()
+            $trips = Trip::active()
                 ->notExpired()
                 ->with(['user', 'images'])
                 ->orderByRelevance()
@@ -32,7 +32,7 @@ class TripController
                 ->take($limit)
                 ->get();
 
-            $total = Trip::published()->notExpired()->count();
+            $total = Trip::active()->notExpired()->count();
 
             return Response::success([
                 'trips' => $trips->map(function ($trip) {
@@ -41,6 +41,7 @@ class TripController
                         'uuid' => $trip->uuid,
                         'title' => $trip->title,
                         'description' => $trip->description,
+                        'status' => $trip->status,
                         'departure_city' => $trip->departure_city,
                         'departure_country' => $trip->departure_country,
                         'departure_date' => $trip->departure_date,

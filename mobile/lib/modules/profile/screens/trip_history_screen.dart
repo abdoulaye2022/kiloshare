@@ -21,8 +21,10 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
 
   // State
   List<Trip> _myTrips = [];
+  List<Trip> _bookedTrips = [];
   List<Trip> _completedTrips = [];
   bool _isLoadingMyTrips = true;
+  bool _isLoadingBooked = true;
   bool _isLoadingCompleted = true;
   String? _error;
 
@@ -41,6 +43,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
 
   Future<void> _loadTripHistory() async {
     _loadMyTrips();
+    _loadBookedTrips();
     _loadCompletedTrips();
   }
 
@@ -51,10 +54,15 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
         _error = null;
       });
 
-      final trips = await _tripService.getUserTrips();
+      final allTrips = await _tripService.getUserTrips();
+      
+      // Filtrer seulement les voyages actifs (publiés)
+      final activeTrips = allTrips.where((trip) => 
+        trip.status == TripStatus.active
+      ).toList();
 
       setState(() {
-        _myTrips = trips;
+        _myTrips = activeTrips;
         _isLoadingMyTrips = false;
       });
     } catch (e) {
@@ -65,16 +73,45 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
     }
   }
 
+  Future<void> _loadBookedTrips() async {
+    try {
+      setState(() {
+        _isLoadingBooked = true;
+      });
+
+      // Récupérer tous les voyages de l'utilisateur
+      final allTrips = await _tripService.getUserTrips();
+      
+      // Filtrer les voyages réservés
+      final bookedTrips = allTrips.where((trip) => 
+        trip.status == TripStatus.booked
+      ).toList();
+
+      setState(() {
+        _bookedTrips = bookedTrips;
+        _isLoadingBooked = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingBooked = false;
+      });
+    }
+  }
+
   Future<void> _loadCompletedTrips() async {
     try {
       setState(() {
         _isLoadingCompleted = true;
       });
 
-      // Filter completed trips from my trips
-      final completedTrips = _myTrips
-          .where((trip) => trip.status == TripStatus.completed)
-          .toList();
+      // Récupérer tous les voyages de l'utilisateur
+      final allTrips = await _tripService.getUserTrips();
+      
+      // Filtrer les voyages terminés et annulés
+      final completedTrips = allTrips.where((trip) => 
+        trip.status == TripStatus.completed ||
+        trip.status == TripStatus.cancelled
+      ).toList();
 
       setState(() {
         _completedTrips = completedTrips;
@@ -121,7 +158,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
               icon: Icon(Icons.bookmark, size: 20),
             ),
             Tab(
-              text: 'Terminés',
+              text: 'Historique',
               icon: Icon(Icons.history, size: 20),
             ),
           ],
@@ -174,12 +211,33 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
   }
 
   Widget _buildBookedTripsTab() {
-    return _buildEmptyState(
-      icon: Icons.bookmark_border,
-      title: 'Aucune réservation',
-      subtitle: 'Vous n\'avez pas encore réservé de voyage',
-      actionLabel: 'Rechercher des voyages',
-      onAction: () => context.go('/trips/search'),
+    if (_isLoadingBooked) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_bookedTrips.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.bookmark_border,
+        title: 'Aucun voyage réservé',
+        subtitle: 'Vous n\'avez pas encore de voyage réservé',
+        actionLabel: 'Rechercher des voyages',
+        onAction: () => context.go('/trips/search'),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshTrips,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _bookedTrips.length,
+        itemBuilder: (context, index) {
+          final trip = _bookedTrips[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildBookedTripCard(trip),
+          );
+        },
+      ),
     );
   }
 
@@ -191,8 +249,8 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
     if (_completedTrips.isEmpty) {
       return _buildEmptyState(
         icon: Icons.history,
-        title: 'Aucun voyage terminé',
-        subtitle: 'Vous n\'avez pas encore de voyages terminés',
+        title: 'Aucun voyage dans l\'historique',
+        subtitle: 'Vous n\'avez pas encore de voyages terminés ou annulés',
       );
     }
 
@@ -321,7 +379,59 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
     );
   }
 
+  Widget _buildBookedTripCard(Trip trip) {
+    return Card(
+      elevation: 2,
+      child: Column(
+        children: [
+          TripCardWidget(
+            trip: trip,
+            onTap: () => context.push('/trips/${trip.id}'),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.1),
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade200),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bookmark, color: Colors.blue, size: 18),
+                const SizedBox(width: 8),
+                const Text(
+                  'Voyage réservé',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => context.push('/trips/${trip.id}'),
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('Voir détails'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCompletedTripCard(Trip trip) {
+    final bool isCancelled = trip.status == TripStatus.cancelled;
+    final Color statusColor = isCancelled ? Colors.red : Colors.green;
+    final IconData statusIcon = isCancelled ? Icons.cancel : Icons.check_circle;
+    final String statusText = isCancelled ? 'Voyage annulé' : 'Voyage terminé';
+    
     return Card(
       elevation: 1,
       child: Column(
@@ -333,39 +443,31 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.05),
+              color: statusColor.withValues(alpha: 0.05),
               border: Border(
                 top: BorderSide(color: Colors.grey.shade200),
               ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                Icon(statusIcon, color: statusColor, size: 18),
                 const SizedBox(width: 8),
-                const Text(
-                  'Voyage terminé',
+                Text(
+                  statusText,
                   style: TextStyle(
-                    color: Colors.green,
+                    color: statusColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
                 const Spacer(),
                 TextButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Fonctionnalité d\'évaluation bientôt disponible'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.star_border, size: 16),
-                  label: const Text('Évaluer'),
+                  onPressed: () => context.push('/trips/${trip.id}'),
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('Voir détails'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.green,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    foregroundColor: statusColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   ),
                 ),
               ],

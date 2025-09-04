@@ -228,11 +228,10 @@ class MultiTransportService {
   // Helper method to get weight limit for a transport type
   double getWeightLimit(TransportType transportType) {
     switch (transportType) {
-      case TransportType.flight:
       case TransportType.plane:
-        return 23.0;
+        return 23.0;  // Limite avion : 23kg bagages
       case TransportType.car:
-        return 100.0;
+        return 200.0; // Limite voiture : 200kg capacité coffre
     }
   }
 
@@ -242,7 +241,7 @@ class MultiTransportService {
   }
 
   bool requiresFlightInfo(TransportType transportType) {
-    return transportType == TransportType.flight || transportType == TransportType.plane;
+    return transportType == TransportType.plane;
   }
 
   bool supportsFlexibleDeparture(TransportType transportType) {

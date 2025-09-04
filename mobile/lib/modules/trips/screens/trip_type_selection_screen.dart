@@ -254,7 +254,6 @@ class TripTypeSelectionScreen extends StatelessWidget {
 
   IconData _getTransportIcon(TransportType transportType) {
     switch (transportType) {
-      case TransportType.flight:
       case TransportType.plane:
         return Icons.flight;
       case TransportType.car:
@@ -264,7 +263,6 @@ class TripTypeSelectionScreen extends StatelessWidget {
 
   Color _getTransportColor(TransportType transportType) {
     switch (transportType) {
-      case TransportType.flight:
       case TransportType.plane:
         return Colors.blue[600]!;
       case TransportType.car:
@@ -274,11 +272,10 @@ class TripTypeSelectionScreen extends StatelessWidget {
 
   double _getWeightLimit(TransportType transportType) {
     switch (transportType) {
-      case TransportType.flight:
       case TransportType.plane:
-        return 23.0;
+        return 23.0;   // Limite avion : 23kg bagages
       case TransportType.car:
-        return 100.0;
+        return 200.0;  // Limite voiture : 200kg capacité coffre
     }
   }
 

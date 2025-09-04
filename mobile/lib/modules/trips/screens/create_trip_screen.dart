@@ -9,6 +9,7 @@ import '../widgets/restricted_items_selector.dart';
 import '../widgets/trip_image_picker.dart';
 import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
+import '../services/multi_transport_service.dart';
 import '../../../services/mock_cloudinary_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -156,6 +157,16 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     }
   }
 
+  double _getMaxWeightForTransport() {
+    final transportType = _tripData['transport_type'];
+    if (transportType != null) {
+      final transport = TransportType.fromString(transportType);
+      final multiTransportService = MultiTransportService();
+      return multiTransportService.getWeightLimit(transport);
+    }
+    return 23.0; // Default to plane limit
+  }
+
   void _validateRoute() {
     final transportType = _tripData['transport_type'];
     final departureCity = _tripData['departure_city'];
@@ -298,7 +309,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       case 2:
         return 'Capacité et prix';
       case 3:
-        return _tripData['transport_type'] == 'flight'
+        return _tripData['transport_type'] == 'plane'
             ? 'Détails du vol'
             : _tripData['transport_type'] == 'car'
                 ? 'Détails du voyage'
@@ -472,7 +483,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               children: [
                 Expanded(
                   child: _buildTransportOption(
-                    transportType: TransportType.flight,
+                    transportType: TransportType.plane,
                     icon: Icons.flight,
                     label: 'Avion',
                     description: 'Vol commercial',
@@ -508,7 +519,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         setState(() {
           _tripData['transport_type'] = transportType.value;
           // Reset airport codes when changing transport type
-          if (transportType != TransportType.flight) {
+          if (transportType != TransportType.plane) {
             _tripData['departure_airport_code'] = null;
             _tripData['arrival_airport_code'] = null;
           }
@@ -664,6 +675,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           const SizedBox(height: 24),
           WeightSliderWidget(
             weight: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
+            maxWeight: _getMaxWeightForTransport(),
             onWeightChanged: (weight) {
               print('DEBUG: Weight changed to: $weight');
               setState(() {
@@ -1229,7 +1241,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         }
 
         // Add flight-specific fields only for flight transport
-        if (_tripData['transport_type'] == 'flight') {
+        if (_tripData['transport_type'] == 'plane') {
           updateData.addAll({
             'departure_airport_code': _tripData['departure_airport_code'],
             'arrival_airport_code': _tripData['arrival_airport_code'],
@@ -1302,12 +1314,12 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           print('DEBUG: departureCity: ${_tripData['departure_city']}');
           print('DEBUG: departureCountry: ${_tripData['departure_country']}');
           print(
-              'DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['departure_airport_code'] : null}');
+              'DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'plane' ? _tripData['departure_airport_code'] : null}');
           print('DEBUG: departureDate: ${_tripData['departure_date']}');
           print('DEBUG: arrivalCity: ${_tripData['arrival_city']}');
           print('DEBUG: arrivalCountry: ${_tripData['arrival_country']}');
           print(
-              'DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'flight' ? _tripData['arrival_airport_code'] : null}');
+              'DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'plane' ? _tripData['arrival_airport_code'] : null}');
           print('DEBUG: arrivalDate: ${_tripData['arrival_date']}');
           print(
               'DEBUG: availableWeightKg: ${(_tripData['available_weight_kg'] ?? 0).toDouble()}');
@@ -1324,13 +1336,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             transportType: _tripData['transport_type'],
             departureCity: _tripData['departure_city'],
             departureCountry: _tripData['departure_country'],
-            departureAirportCode: _tripData['transport_type'] == 'flight'
+            departureAirportCode: _tripData['transport_type'] == 'plane'
                 ? _tripData['departure_airport_code']
                 : null,
             departureDate: _tripData['departure_date'],
             arrivalCity: _tripData['arrival_city'],
             arrivalCountry: _tripData['arrival_country'],
-            arrivalAirportCode: _tripData['transport_type'] == 'flight'
+            arrivalAirportCode: _tripData['transport_type'] == 'plane'
                 ? _tripData['arrival_airport_code']
                 : null,
             arrivalDate: _tripData['arrival_date'],
@@ -1338,11 +1350,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 (_tripData['available_weight_kg'] ?? 0).toDouble(),
             pricePerKg: (_tripData['price_per_kg'] ?? 0).toDouble(),
             currency: _tripData['currency'] ?? 'CAD',
-            flightNumber: _tripData['transport_type'] == 'flight' &&
+            flightNumber: _tripData['transport_type'] == 'plane' &&
                     !_flightNumberController.text.trim().isEmpty
                 ? _flightNumberController.text.trim()
                 : null,
-            airline: _tripData['transport_type'] == 'flight' &&
+            airline: _tripData['transport_type'] == 'plane' &&
                     !_airlineController.text.trim().isEmpty
                 ? _airlineController.text.trim()
                 : null,
