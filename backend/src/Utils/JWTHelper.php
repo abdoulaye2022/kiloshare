@@ -79,7 +79,7 @@ class JWTHelper
     {
         try {
             $config = self::getConfig();
-            $decoded = JWT::decode($token, $config['secret'], [$config['algorithm']]);
+            $decoded = JWT::decode($token, new \Firebase\JWT\Key($config['secret'], $config['algorithm']));
             return (array) $decoded;
         } catch (\Exception $e) {
             return null;

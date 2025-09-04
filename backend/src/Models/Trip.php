@@ -28,14 +28,14 @@ class Trip extends Model
         'arrival_country',
         'arrival_date',
         'transport_type',
-        'max_weight',
+        'available_weight_kg',
         'price_per_kg',
         'total_reward',
         'currency',
         'status',
         'is_domestic',
         'restrictions',
-        'special_instructions',
+        'special_notes',
         'published_at',
         'expires_at',
     ];
@@ -45,7 +45,7 @@ class Trip extends Model
         'arrival_date' => 'datetime',
         'published_at' => 'datetime',
         'expires_at' => 'datetime',
-        'max_weight' => 'decimal:2',
+        'available_weight_kg' => 'decimal:2',
         'price_per_kg' => 'decimal:2',
         'total_reward' => 'decimal:2',
         'is_domestic' => 'boolean',
@@ -161,15 +161,15 @@ class Trip extends Model
 
     public function getAvailableWeightAttribute(): float
     {
-        // Temporaire : retourner max_weight si pas de colonne weight dans bookings
+        // Temporaire : retourner available_weight_kg si pas de colonne weight dans bookings
         try {
             $bookedWeight = $this->bookings()
                 ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
                 ->sum('weight');
-            return max(0, $this->max_weight - $bookedWeight);
+            return max(0.0, (float)$this->available_weight_kg - (float)$bookedWeight);
         } catch (\Exception $e) {
-            // Si erreur SQL, retourner max_weight par défaut
-            return $this->max_weight ?? 0;
+            // Si erreur SQL, retourner available_weight_kg par défaut
+            return (float)($this->available_weight_kg ?? 0);
         }
     }
 
@@ -257,7 +257,7 @@ class Trip extends Model
 
     public function scopeWithAvailableSpace($query)
     {
-        return $query->where('max_weight', '>', 0);
+        return $query->where('available_weight_kg', '>', 0);
     }
 
     public function scopeByRoute($query, string $departure, string $arrival)

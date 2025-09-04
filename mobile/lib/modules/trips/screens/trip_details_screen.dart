@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 import '../../../services/auth_token_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import '../models/trip_model.dart';
+import '../models/trip_image_model.dart';
 import '../widgets/trip_status_widget.dart';
 import '../widgets/trip_actions_widget.dart';
 import '../services/favorites_service.dart';
+import '../../../widgets/optimized_cloudinary_image.dart';
 
 class TripDetailsScreen extends StatefulWidget {
   final String tripId;
@@ -128,6 +130,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTripHeader(),
+          // Trip Images Gallery
+          if (_trip!.hasImages) _buildImageGallery(),
           // Trip Status Widget
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1048,6 +1052,125 @@ Réservez maintenant: https://kiloshare.app/trips/${trip.id}
             child: const Text('Supprimer'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildImageGallery() {
+    final images = _trip!.images!;
+    
+    return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Photos du voyage (${images.length})',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              itemBuilder: (context, index) {
+                final image = images[index];
+                return Container(
+                  width: 160,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: GestureDetector(
+                      onTap: () => _showImageViewer(images, index),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          OptimizedCloudinaryImage(
+                            imageUrl: image.thumbnail ?? image.url,
+                            imageType: 'trip_photo',
+                            width: 160,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          if (image.isPrimary)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).primaryColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Principal',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImageViewer(List<TripImage> images, int initialIndex) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: PageController(initialPage: initialIndex),
+              itemCount: images.length,
+              itemBuilder: (context, index) {
+                final image = images[index];
+                return InteractiveViewer(
+                  child: OptimizedCloudinaryImage(
+                    imageUrl: image.url,
+                    imageType: 'trip_photo',
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black45,
+                  padding: const EdgeInsets.all(8),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

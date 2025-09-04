@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'trip_image_model.dart';
 
 // Helper functions for JSON parsing
 double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
@@ -167,6 +168,7 @@ class Trip {
   final List<String>? restrictedCategories;
   final List<String>? restrictedItems;
   final String? restrictionNotes;
+  final List<TripImage>? images;
 
   const Trip({
     required this.id,
@@ -260,6 +262,7 @@ class Trip {
     this.restrictedCategories,
     this.restrictedItems,
     this.restrictionNotes,
+    this.images,
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
@@ -362,6 +365,9 @@ class Trip {
           ? List<String>.from(json['restricted_items'].where((item) => item != null).map((item) => item.toString()))
           : null,
       restrictionNotes: json['restriction_notes'],
+      images: json['images'] != null && json['images'] is List
+          ? List<TripImage>.from(json['images'].where((item) => item != null).map((item) => TripImage.fromJson(item)))
+          : null,
     );
   }
 
@@ -457,6 +463,7 @@ class Trip {
       if (restrictedCategories != null) 'restricted_categories': restrictedCategories,
       if (restrictedItems != null) 'restricted_items': restrictedItems,
       if (restrictionNotes != null) 'restriction_notes': restrictionNotes,
+      if (images != null) 'images': images!.map((img) => img.toJson()).toList(),
     };
   }
 
@@ -552,6 +559,7 @@ class Trip {
     List<String>? restrictedCategories,
     List<String>? restrictedItems,
     String? restrictionNotes,
+    List<TripImage>? images,
   }) {
     return Trip(
       id: id ?? this.id,
@@ -645,6 +653,7 @@ class Trip {
       restrictedCategories: restrictedCategories ?? this.restrictedCategories,
       restrictedItems: restrictedItems ?? this.restrictedItems,
       restrictionNotes: restrictionNotes ?? this.restrictionNotes,
+      images: images ?? this.images,
     );
   }
 
@@ -681,6 +690,15 @@ class Trip {
       return '${minutes}min';
     }
   }
+
+  // Images helper methods
+  TripImage? get primaryImage => images?.where((img) => img.isPrimary).firstOrNull;
+  
+  TripImage? get firstImage => images?.isNotEmpty == true ? images!.first : null;
+  
+  bool get hasImages => images?.isNotEmpty == true;
+  
+  int get imageCount => images?.length ?? 0;
 }
 
 enum TripStatus {

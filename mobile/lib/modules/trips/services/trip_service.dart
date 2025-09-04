@@ -54,6 +54,7 @@ class TripService {
     List<String>? restrictedCategories,
     List<String>? restrictedItems,
     String? restrictionNotes,
+    List<Map<String, dynamic>>? images,
   }) async {
     try {
       // Récupérer le token d'authentification
@@ -79,7 +80,7 @@ class TripService {
         'arrival_country': arrivalCountry,
         'arrival_airport_code': arrivalAirportCode,
         'arrival_date': arrivalDate.toIso8601String().split('T')[0], // Format YYYY-MM-DD
-        'max_weight': availableWeightKg, // L'API attend max_weight, pas available_weight_kg
+        'available_weight_kg': availableWeightKg, // Corrigé pour correspondre aux règles de validation backend
         'price_per_kg': pricePerKg,
         'currency': currency,
         'flight_number': flightNumber,
@@ -89,6 +90,7 @@ class TripService {
         if (restrictedCategories != null) 'restricted_categories': restrictedCategories,
         if (restrictedItems != null) 'restricted_items': restrictedItems,
         if (restrictionNotes != null) 'restriction_notes': restrictionNotes,
+        if (images != null) 'images': images,
       };
 
 
@@ -112,11 +114,11 @@ class TripService {
       
       if (response.data['success'] == true) {
         // Vérifier la structure de la réponse
-        if (response.data['trip'] == null) {
+        if (response.data['data'] == null || response.data['data']['trip'] == null) {
           throw const TripException('Trip data not found in response');
         }
         
-        final trip = Trip.fromJson(response.data['trip']);
+        final trip = Trip.fromJson(response.data['data']['trip']);
         return trip;
       } else {
         throw TripException(response.data['message'] ?? 'Failed to create trip');
@@ -156,11 +158,12 @@ class TripService {
       }
       
       if (response.data['success'] == true) {
-        if (response.data['trips'] == null) {
+        // Check the correct response structure: data.trips
+        if (response.data['data'] == null || response.data['data']['trips'] == null) {
           return <Trip>[];
         }
         
-        final tripsData = response.data['trips'] as List<dynamic>;
+        final tripsData = response.data['data']['trips'] as List<dynamic>;
         
         return tripsData.map((json) => Trip.fromJson(json)).toList();
       } else {
@@ -707,10 +710,11 @@ class TripService {
         throw const TripException('Authentication token is required. Please log in again.');
       }
 
-      final response = await _dio.get('/trips/drafts',
+      final response = await _dio.get('/user/trips',
         queryParameters: {
           'page': page,
           'limit': limit,
+          'status': 'draft',
         },
         options: Options(
           headers: {
@@ -722,11 +726,12 @@ class TripService {
       );
       
       if (response.data['success'] == true) {
-        if (response.data['trips'] == null) {
+        // Check the correct response structure: data.trips
+        if (response.data['data'] == null || response.data['data']['trips'] == null) {
           return <Trip>[];
         }
         
-        final draftsData = response.data['trips'] as List<dynamic>;
+        final draftsData = response.data['data']['trips'] as List<dynamic>;
         final drafts = draftsData.map((json) => Trip.fromJson(json)).toList();
         return drafts;
       } else {

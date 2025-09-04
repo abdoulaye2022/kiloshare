@@ -59,7 +59,6 @@ return function (App $app) {
                 // Social authentication routes
                 $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
                 $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
-                $authGroup->post('/facebook', [SocialAuthController::class, 'facebookAuth']);
             });
 
             // Admin routes

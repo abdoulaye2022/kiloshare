@@ -7,6 +7,7 @@ import '../../../themes/modern_theme.dart';
 import '../../trips/bloc/trip_bloc.dart';
 import '../../trips/widgets/trip_card_widget.dart';
 import '../../booking/screens/bookings_list_screen.dart';
+import '../../trips/screens/my_trips_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _pages = [
     const _HomePage(),
-    const _SearchPage(),
+    const _MyTripsPage(),
     const _BookingsPage(),
     const _MessagesPage(),
   ];
@@ -45,11 +46,22 @@ class _HomeScreenState extends State<HomeScreen> {
             elevation: 8,
             onTap: (index) {
               // Vérifier l'authentification pour certains onglets
-              if (!isAuthenticated && (index == 2 || index == 3)) {
-                // Réservations (index 2) et Messages (index 3) nécessitent une connexion
-                String message = index == 2
-                    ? 'Connectez-vous pour voir vos voyages et réservations'
-                    : 'Connectez-vous pour accéder à la messagerie';
+              if (!isAuthenticated && (index == 1 || index == 2 || index == 3)) {
+                // Mes voyages (index 1), Réservations (index 2) et Messages (index 3) nécessitent une connexion
+                String message;
+                switch (index) {
+                  case 1:
+                    message = 'Connectez-vous pour voir vos voyages';
+                    break;
+                  case 2:
+                    message = 'Connectez-vous pour voir vos réservations';
+                    break;
+                  case 3:
+                    message = 'Connectez-vous pour accéder à la messagerie';
+                    break;
+                  default:
+                    message = 'Connectez-vous pour accéder à cette section';
+                }
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -73,8 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Accueil',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'Rechercher',
+                icon: Icon(Icons.flight_takeoff),
+                label: 'Mes voyages',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.bookmark),
@@ -674,5 +686,14 @@ class _MessagesPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _MyTripsPage extends StatelessWidget {
+  const _MyTripsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MyTripsScreen();
   }
 }

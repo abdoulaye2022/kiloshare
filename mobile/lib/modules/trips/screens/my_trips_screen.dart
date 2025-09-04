@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../services/auth_token_service.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_card_widget.dart';
 import '../widgets/trip_status_widget.dart';
@@ -36,6 +35,16 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   String _sortBy = 'date';
   bool _sortAscending = false;
   String _searchQuery = '';
+  
+  // Advanced filters
+  String _transportFilter = 'all';
+  DateTimeRange? _dateRange;
+  double _minPrice = 0;
+  double _maxPrice = 100;
+  double _minWeight = 0;
+  double _maxWeight = 50;
+  String _currencyFilter = 'all';
+  bool _showExpiredTrips = true;
 
   @override
   void initState() {
@@ -63,7 +72,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
 
     try {
       print('MyTripsScreen: Calling getUserTrips...');
-      final trips = await AuthTokenService.instance.tripService.getUserTrips();
+      final trips = await _tripService.getUserTrips();
       print('MyTripsScreen: Received ${trips.length} trips');
       
       List<Trip> drafts = [];
@@ -168,6 +177,8 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                     _buildFilterChip('Annulés', 'cancelled'),
                     const SizedBox(width: 8),
                     _buildSortButton(),
+                    const SizedBox(width: 8),
+                    _buildAdvancedFilterButton(),
                   ],
                 ),
               ),
@@ -381,6 +392,11 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       }
     }
 
+    // Apply advanced filters
+    _applyAdvancedFilters(filteredPublished);
+    _applyAdvancedFilters(filteredDrafts);
+    _applyAdvancedFilters(filteredFavorites);
+
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
@@ -415,6 +431,48 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       _filteredTrips = filteredPublished;
       _filteredDrafts = filteredDrafts;
       _filteredFavorites = filteredFavorites;
+    });
+  }
+
+  void _applyAdvancedFilters(List<Trip> trips) {
+    trips.removeWhere((trip) {
+      // Transport type filter
+      if (_transportFilter != 'all' && trip.transportType != _transportFilter) {
+        return true;
+      }
+      
+      // Date range filter
+      if (_dateRange != null) {
+        final departureDate = DateTime(trip.departureDate.year, trip.departureDate.month, trip.departureDate.day);
+        final rangeStart = DateTime(_dateRange!.start.year, _dateRange!.start.month, _dateRange!.start.day);
+        final rangeEnd = DateTime(_dateRange!.end.year, _dateRange!.end.month, _dateRange!.end.day);
+        
+        if (departureDate.isBefore(rangeStart) || departureDate.isAfter(rangeEnd)) {
+          return true;
+        }
+      }
+      
+      // Price range filter
+      if (trip.pricePerKg < _minPrice || trip.pricePerKg > _maxPrice) {
+        return true;
+      }
+      
+      // Weight range filter
+      if (trip.availableWeightKg < _minWeight || trip.availableWeightKg > _maxWeight) {
+        return true;
+      }
+      
+      // Currency filter
+      if (_currencyFilter != 'all' && trip.currency != _currencyFilter) {
+        return true;
+      }
+      
+      // Expired trips filter (simple check - past departure date)
+      if (!_showExpiredTrips && trip.departureDate.isBefore(DateTime.now())) {
+        return true;
+      }
+      
+      return false;
     });
   }
 
@@ -465,6 +523,62 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         selectedColor: Theme.of(context).primaryColor,
       ),
     );
+  }
+
+  Widget _buildAdvancedFilterButton() {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: _showAdvancedFilters,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.grey[300]!),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tune,
+                size: 16,
+                color: _hasAdvancedFilters() ? Colors.white : Colors.grey[700],
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Filtres',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _hasAdvancedFilters() ? Colors.white : Colors.grey[700],
+                ),
+              ),
+              if (_hasAdvancedFilters())
+                Container(
+                  margin: const EdgeInsets.only(left: 4),
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _hasAdvancedFilters() {
+    return _transportFilter != 'all' ||
+           _dateRange != null ||
+           _minPrice > 0 ||
+           _maxPrice < 100 ||
+           _minWeight > 0 ||
+           _maxWeight < 50 ||
+           _currencyFilter != 'all' ||
+           !_showExpiredTrips;
   }
 
   Widget _buildSortButton() {
@@ -520,6 +634,305 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         ),
       ],
     );
+  }
+
+  void _showAdvancedFilters() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _buildAdvancedFiltersModal(),
+    );
+  }
+
+  Widget _buildAdvancedFiltersModal() {
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Filtres avancés',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _resetAdvancedFilters();
+                          });
+                        },
+                        child: const Text('Réinitialiser'),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(),
+              
+              // Filters content
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Transport type filter
+                      _buildFilterSection(
+                        'Type de transport',
+                        _buildTransportFilter(setModalState),
+                      ),
+                      
+                      // Date range filter
+                      _buildFilterSection(
+                        'Période',
+                        _buildDateRangeFilter(setModalState),
+                      ),
+                      
+                      // Price range filter
+                      _buildFilterSection(
+                        'Prix par kg',
+                        _buildPriceRangeFilter(setModalState),
+                      ),
+                      
+                      // Weight range filter
+                      _buildFilterSection(
+                        'Poids disponible',
+                        _buildWeightRangeFilter(setModalState),
+                      ),
+                      
+                      // Currency filter
+                      _buildFilterSection(
+                        'Devise',
+                        _buildCurrencyFilter(setModalState),
+                      ),
+                      
+                      // Show expired trips
+                      _buildFilterSection(
+                        'Options',
+                        _buildOptionsFilter(setModalState),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Apply button
+              const Divider(),
+              SizedBox(
+                width: double.infinity,
+                child: EllipsisButton.elevated(
+                  onPressed: () {
+                    setState(() {
+                      _applyFilters();
+                    });
+                    Navigator.pop(context);
+                  },
+                  text: 'Appliquer les filtres',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterSection(String title, Widget content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransportFilter(StateSetter setModalState) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        _buildModalFilterChip('Tous', 'all', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
+        }),
+        _buildModalFilterChip('Avion', 'flight', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
+        }),
+        _buildModalFilterChip('Voiture', 'car', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
+        }),
+        _buildModalFilterChip('Train', 'train', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
+        }),
+        _buildModalFilterChip('Bus', 'bus', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDateRangeFilter(StateSetter setModalState) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.date_range),
+          title: Text(_dateRange == null 
+            ? 'Sélectionner une période' 
+            : '${_dateRange!.start.day}/${_dateRange!.start.month} - ${_dateRange!.end.day}/${_dateRange!.end.month}'),
+          trailing: _dateRange != null 
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () => setModalState(() => _dateRange = null),
+              )
+            : null,
+          onTap: () async {
+            final range = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+              initialDateRange: _dateRange,
+            );
+            if (range != null) {
+              setModalState(() => _dateRange = range);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriceRangeFilter(StateSetter setModalState) {
+    return Column(
+      children: [
+        RangeSlider(
+          values: RangeValues(_minPrice, _maxPrice),
+          min: 0,
+          max: 100,
+          divisions: 20,
+          labels: RangeLabels(
+            '${_minPrice.round()}€',
+            '${_maxPrice.round()}€',
+          ),
+          onChanged: (values) {
+            setModalState(() {
+              _minPrice = values.start;
+              _maxPrice = values.end;
+            });
+          },
+        ),
+        Text('${_minPrice.round()}€ - ${_maxPrice.round()}€'),
+      ],
+    );
+  }
+
+  Widget _buildWeightRangeFilter(StateSetter setModalState) {
+    return Column(
+      children: [
+        RangeSlider(
+          values: RangeValues(_minWeight, _maxWeight),
+          min: 0,
+          max: 50,
+          divisions: 50,
+          labels: RangeLabels(
+            '${_minWeight.round()}kg',
+            '${_maxWeight.round()}kg',
+          ),
+          onChanged: (values) {
+            setModalState(() {
+              _minWeight = values.start;
+              _maxWeight = values.end;
+            });
+          },
+        ),
+        Text('${_minWeight.round()}kg - ${_maxWeight.round()}kg'),
+      ],
+    );
+  }
+
+  Widget _buildCurrencyFilter(StateSetter setModalState) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        _buildModalFilterChip('Toutes', 'all', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
+        }),
+        _buildModalFilterChip('EUR', 'EUR', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
+        }),
+        _buildModalFilterChip('CAD', 'CAD', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
+        }),
+        _buildModalFilterChip('USD', 'USD', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
+        }),
+      ],
+    );
+  }
+
+  Widget _buildOptionsFilter(StateSetter setModalState) {
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Afficher les voyages expirés'),
+          value: _showExpiredTrips,
+          onChanged: (value) {
+            setModalState(() => _showExpiredTrips = value);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModalFilterChip(
+    String label, 
+    String value, 
+    String currentValue, 
+    StateSetter setModalState,
+    Function(String) onSelected,
+  ) {
+    final isSelected = currentValue == value;
+    return FilterChip(
+      selected: isSelected,
+      label: Text(label),
+      onSelected: (selected) {
+        onSelected(value);
+      },
+      selectedColor: Theme.of(context).primaryColor,
+    );
+  }
+
+  void _resetAdvancedFilters() {
+    _transportFilter = 'all';
+    _dateRange = null;
+    _minPrice = 0;
+    _maxPrice = 100;
+    _minWeight = 0;
+    _maxWeight = 50;
+    _currencyFilter = 'all';
+    _showExpiredTrips = true;
   }
 
   void _handleMenuAction(String action) {

@@ -20,10 +20,7 @@ class SocialAuthController
 
         $validator = new Validator();
         $rules = [
-            'id_token' => Validator::required()->stringType(),
-            'email' => Validator::required()->email(),
-            'name' => Validator::required()->stringType(),
-            'picture' => Validator::optional(Validator::stringType()),
+            'access_token' => Validator::required()->stringType(),
         ];
 
         if (!$validator->validate($data, $rules)) {
@@ -31,12 +28,17 @@ class SocialAuthController
         }
 
         try {
-            // TODO: Vérifier le token Google avec l'API Google
-            // Pour l'instant, on fait confiance au token fourni par Flutter
+            // Récupérer les informations utilisateur depuis Google API
+            $accessToken = $data['access_token'];
+            $userInfo = $this->getUserInfoFromGoogle($accessToken);
+            
+            if (!$userInfo) {
+                return Response::unauthorized('Invalid Google access token');
+            }
 
-            $email = $data['email'];
-            $name = $data['name'];
-            $picture = $data['picture'] ?? null;
+            $email = $userInfo['email'];
+            $name = $userInfo['name'] ?? 'Google User';
+            $picture = $userInfo['picture'] ?? null;
             
             // Diviser le nom complet
             $nameParts = explode(' ', trim($name), 2);
@@ -46,10 +48,12 @@ class SocialAuthController
             // Chercher l'utilisateur existant
             $user = User::where('email', $email)->first();
 
+            $googleUserId = $userInfo['id'] ?? $userInfo['sub'] ?? substr(md5($email), 0, 10);
+
             if ($user) {
                 // Utilisateur existant - mise à jour des infos sociales
                 $user->social_provider = 'google';
-                $user->social_id = $data['id_token']; // Utiliser une partie du token comme ID
+                $user->social_id = $googleUserId;
                 if (!$user->profile_picture && $picture) {
                     $user->profile_picture = $picture;
                 }
@@ -58,40 +62,52 @@ class SocialAuthController
             } else {
                 // Nouvel utilisateur - création
                 $user = User::create([
+                    'uuid' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
                     'email' => $email,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'profile_picture' => $picture,
                     'social_provider' => 'google',
-                    'social_id' => $data['id_token'],
+                    'social_id' => $googleUserId,
                     'email_verified_at' => Carbon::now(), // Les comptes Google sont déjà vérifiés
                     'last_login_at' => Carbon::now(),
                     'status' => 'active',
                     'role' => 'user',
                     'is_verified' => true,
+                    'password_hash' => password_hash(uniqid(), PASSWORD_ARGON2ID), // Mot de passe factice pour SSO
                 ]);
             }
 
             // Générer les tokens JWT
-            $accessToken = JWTHelper::generateAccessToken($user);
-            $refreshToken = JWTHelper::generateRefreshToken($user);
+            $tokens = JWTHelper::generateTokens($user);
 
             return Response::success([
-                'access_token' => $accessToken,
-                'refresh_token' => $refreshToken,
-                'token_type' => 'Bearer',
-                'expires_in' => 3600,
                 'user' => [
                     'id' => $user->id,
                     'uuid' => $user->uuid,
                     'email' => $user->email,
+                    'phone' => $user->phone,
                     'first_name' => $user->first_name,
                     'last_name' => $user->last_name,
                     'full_name' => $user->full_name,
                     'profile_picture' => $user->profile_picture,
                     'is_verified' => $user->is_verified,
+                    'email_verified_at' => $user->email_verified_at,
+                    'phone_verified_at' => $user->phone_verified_at,
+                    'status' => $user->status,
+                    'last_login_at' => $user->last_login_at,
                     'role' => $user->role,
+                    'trust_score' => 0,
+                    'completed_trips' => 0,
+                    'total_trips' => 0,
                     'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ],
+                'tokens' => [
+                    'access_token' => $tokens['access_token'],
+                    'refresh_token' => $tokens['refresh_token'],
+                    'token_type' => $tokens['token_type'],
+                    'expires_in' => $tokens['expires_in'],
                 ]
             ], 'Google authentication successful');
 
@@ -151,6 +167,7 @@ class SocialAuthController
                 $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
 
                 $user = User::create([
+                    'uuid' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
                     'email' => $email,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
@@ -161,29 +178,40 @@ class SocialAuthController
                     'status' => 'active',
                     'role' => 'user',
                     'is_verified' => true,
+                    'password_hash' => password_hash(uniqid(), PASSWORD_ARGON2ID), // Mot de passe factice pour SSO
                 ]);
             }
 
             // Générer les tokens JWT
-            $accessToken = JWTHelper::generateAccessToken($user);
-            $refreshToken = JWTHelper::generateRefreshToken($user);
+            $tokens = JWTHelper::generateTokens($user);
 
             return Response::success([
-                'access_token' => $accessToken,
-                'refresh_token' => $refreshToken,
-                'token_type' => 'Bearer',
-                'expires_in' => 3600,
                 'user' => [
                     'id' => $user->id,
                     'uuid' => $user->uuid,
                     'email' => $user->email,
+                    'phone' => $user->phone,
                     'first_name' => $user->first_name,
                     'last_name' => $user->last_name,
                     'full_name' => $user->full_name,
                     'profile_picture' => $user->profile_picture,
                     'is_verified' => $user->is_verified,
+                    'email_verified_at' => $user->email_verified_at,
+                    'phone_verified_at' => $user->phone_verified_at,
+                    'status' => $user->status,
+                    'last_login_at' => $user->last_login_at,
                     'role' => $user->role,
+                    'trust_score' => 0,
+                    'completed_trips' => 0,
+                    'total_trips' => 0,
                     'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ],
+                'tokens' => [
+                    'access_token' => $tokens['access_token'],
+                    'refresh_token' => $tokens['refresh_token'],
+                    'token_type' => $tokens['token_type'],
+                    'expires_in' => $tokens['expires_in'],
                 ]
             ], 'Apple authentication successful');
 
@@ -192,94 +220,39 @@ class SocialAuthController
         }
     }
 
-    public function facebookAuth(ServerRequestInterface $request): ResponseInterface
+
+    /**
+     * Récupérer les informations utilisateur depuis Google API
+     */
+    private function getUserInfoFromGoogle(string $accessToken): ?array
     {
-        $data = json_decode($request->getBody()->getContents(), true);
-
-        $validator = new Validator();
-        $rules = [
-            'access_token' => Validator::required()->stringType(),
-            'email' => Validator::required()->email(),
-            'name' => Validator::required()->stringType(),
-            'id' => Validator::required()->stringType(),
-            'picture' => Validator::optional(Validator::stringType()),
-        ];
-
-        if (!$validator->validate($data, $rules)) {
-            return Response::validationError($validator->getErrors());
-        }
-
         try {
-            // TODO: Vérifier le token Facebook avec l'API Facebook
-
-            $email = $data['email'];
-            $name = $data['name'];
-            $facebookId = $data['id'];
-            $picture = $data['picture'] ?? null;
+            $url = "https://www.googleapis.com/oauth2/v2/userinfo?access_token=" . urlencode($accessToken);
             
-            $nameParts = explode(' ', trim($name), 2);
-            $firstName = $nameParts[0];
-            $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
-
-            // Chercher l'utilisateur existant
-            $user = User::where('email', $email)
-                       ->orWhere(function($query) use ($facebookId) {
-                           $query->where('social_provider', 'facebook')
-                                 ->where('social_id', $facebookId);
-                       })
-                       ->first();
-
-            if ($user) {
-                // Utilisateur existant
-                $user->social_provider = 'facebook';
-                $user->social_id = $facebookId;
-                if (!$user->profile_picture && $picture) {
-                    $user->profile_picture = $picture;
-                }
-                $user->last_login_at = Carbon::now();
-                $user->save();
-            } else {
-                // Nouvel utilisateur
-                $user = User::create([
-                    'email' => $email,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'profile_picture' => $picture,
-                    'social_provider' => 'facebook',
-                    'social_id' => $facebookId,
-                    'email_verified_at' => Carbon::now(),
-                    'last_login_at' => Carbon::now(),
-                    'status' => 'active',
-                    'role' => 'user',
-                    'is_verified' => true,
-                ]);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode !== 200 || !$response) {
+                return null;
             }
-
-            // Générer les tokens JWT
-            $accessToken = JWTHelper::generateAccessToken($user);
-            $refreshToken = JWTHelper::generateRefreshToken($user);
-
-            return Response::success([
-                'access_token' => $accessToken,
-                'refresh_token' => $refreshToken,
-                'token_type' => 'Bearer',
-                'expires_in' => 3600,
-                'user' => [
-                    'id' => $user->id,
-                    'uuid' => $user->uuid,
-                    'email' => $user->email,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'full_name' => $user->full_name,
-                    'profile_picture' => $user->profile_picture,
-                    'is_verified' => $user->is_verified,
-                    'role' => $user->role,
-                    'created_at' => $user->created_at,
-                ]
-            ], 'Facebook authentication successful');
-
+            
+            $userInfo = json_decode($response, true);
+            
+            if (!$userInfo || !isset($userInfo['email'])) {
+                return null;
+            }
+            
+            return $userInfo;
+            
         } catch (\Exception $e) {
-            return Response::serverError('Facebook authentication failed: ' . $e->getMessage());
+            return null;
         }
     }
 }

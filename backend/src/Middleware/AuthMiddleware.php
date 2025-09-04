@@ -50,7 +50,34 @@ class AuthMiddleware implements MiddlewareInterface
             }
 
             // Récupérer l'utilisateur
-            $user = User::find($decoded->user->id);
+            $userId = null;
+            
+            // Check if we have a user object in the token (from AuthController)
+            if (isset($decoded->user) && isset($decoded->user->id)) {
+                $userId = $decoded->user->id;
+            } 
+            // Fallback to user_id or sub for other token types (JWTHelper)
+            else if (isset($decoded->user_id)) {
+                $userId = $decoded->user_id;
+            }
+            else if (isset($decoded->sub)) {
+                // If sub is UUID, try to find user by UUID, otherwise use it as ID
+                $user = User::where('uuid', $decoded->sub)->first();
+                if ($user) {
+                    $userId = $user->id;
+                } else {
+                    $userId = $decoded->sub;
+                }
+            }
+            
+            if (!$userId) {
+                return Response::unauthorized('Invalid token: missing user ID');
+            }
+            
+            // If we don't already have the user object, fetch it
+            if (!isset($user)) {
+                $user = User::find($userId);
+            }
             if (!$user) {
                 return Response::unauthorized('User not found');
             }

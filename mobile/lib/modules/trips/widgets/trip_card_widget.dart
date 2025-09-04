@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/trip_model.dart';
+import '../../../widgets/optimized_cloudinary_image.dart';
 
 class TripCardWidget extends StatelessWidget {
   final Trip trip;
@@ -24,18 +25,40 @@ class TripCardWidget extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with route and status
-              _buildHeader(context),
-              
-              const SizedBox(height: 12),
-              
-              // Main info
-              _buildMainInfo(context),
+        child: Row(
+          children: [
+            // Image à gauche (si disponible)
+            if (trip.hasImages && trip.primaryImage != null)
+              Container(
+                width: 80,
+                height: 120,
+                margin: const EdgeInsets.only(right: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: OptimizedCloudinaryImage(
+                    imageUrl: trip.primaryImage!.thumbnail ?? trip.primaryImage!.url,
+                    imageType: 'trip_photo',
+                    width: 80,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            
+            // Contenu principal à droite
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with route and status
+                    _buildHeader(context),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Main info
+                    _buildMainInfo(context),
               
               if (!isCompact) ...[
                 const SizedBox(height: 12),
@@ -50,11 +73,14 @@ class TripCardWidget extends StatelessWidget {
                 
                 const SizedBox(height: 8),
                 
-                // Footer with additional info
-                _buildFooter(context),
-              ],
-            ],
-          ),
+                      // Footer with additional info
+                      _buildFooter(context),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

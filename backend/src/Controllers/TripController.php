@@ -6,8 +6,10 @@ namespace KiloShare\Controllers;
 
 use KiloShare\Models\Trip;
 use KiloShare\Models\User;
+use KiloShare\Models\TripImage;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
+use KiloShare\Services\CloudinaryService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -46,7 +48,7 @@ class TripController
                         'arrival_country' => $trip->arrival_country,
                         'arrival_date' => $trip->arrival_date,
                         'transport_type' => $trip->transport_type,
-                        'max_weight' => $trip->max_weight,
+                        'max_weight' => $trip->available_weight_kg,
                         'available_weight' => $trip->available_weight,
                         'price_per_kg' => $trip->price_per_kg,
                         'currency' => $trip->currency,
@@ -108,7 +110,7 @@ class TripController
             }
 
             if (!empty($queryParams['min_weight'])) {
-                $query->where('max_weight', '>=', (float) $queryParams['min_weight']);
+                $query->where('available_weight_kg', '>=', (float) $queryParams['min_weight']);
             }
 
             if (!empty($queryParams['max_price'])) {
@@ -165,30 +167,57 @@ class TripController
         $user = $request->getAttribute('user');
         $data = json_decode($request->getBody()->getContents(), true);
 
+        // Debug logging
+        error_log("=== TRIP CREATE DEBUG ===");
+        error_log("User ID: " . ($user ? $user->id : 'NULL'));
+        error_log("Raw request body: " . $request->getBody()->getContents());
+        $request->getBody()->rewind(); // Reset stream
+        $data = json_decode($request->getBody()->getContents(), true);
+        error_log("Parsed data: " . json_encode($data, JSON_PRETTY_PRINT));
+        error_log("Data keys: " . implode(', ', array_keys($data ?? [])));
+        
         // Validation
         $validator = new Validator();
         $rules = [
-            'title' => Validator::required()->stringType()->length(3, 255),
-            'description' => Validator::optional(Validator::stringType()),
+            'transport_type' => Validator::required()->stringType(),
             'departure_city' => Validator::required()->stringType(),
             'departure_country' => Validator::required()->stringType(),
             'departure_date' => Validator::required()->date(),
             'arrival_city' => Validator::required()->stringType(),
             'arrival_country' => Validator::required()->stringType(),
             'arrival_date' => Validator::required()->date(),
-            'transport_type' => Validator::required()->in(['plane', 'train', 'bus', 'car']),
-            'max_weight' => Validator::required()->positive(),
+            'available_weight_kg' => Validator::required()->positive(),
             'price_per_kg' => Validator::required()->positive(),
+            'currency' => Validator::required()->stringType(),
+            'description' => Validator::optional(Validator::stringType()),
+            'special_notes' => Validator::optional(Validator::stringType()),
+            'flight_number' => Validator::optional(Validator::stringType()),
+            'airline' => Validator::optional(Validator::stringType()),
+            'images' => Validator::optional(Validator::array()),
         ];
 
         if (!$validator->validate($data, $rules)) {
+            error_log("Validation FAILED:");
+            error_log("Validation errors: " . json_encode($validator->getErrors(), JSON_PRETTY_PRINT));
             return Response::validationError($validator->getErrors());
         }
-
+        
         try {
+            // Générer un titre automatique si non fourni
+            $title = $data['title'] ?? "{$data['departure_city']} → {$data['arrival_city']}";
+            
+            // Mapper transport type de Flutter vers DB
+            $transportTypeMap = [
+                'flight' => 'plane',
+                'train' => 'train', 
+                'bus' => 'bus',
+                'car' => 'car'
+            ];
+            $transportType = $transportTypeMap[$data['transport_type']] ?? 'plane';
+            
             $trip = Trip::create([
                 'user_id' => $user->id,
-                'title' => $data['title'],
+                'title' => $title,
                 'description' => $data['description'] ?? '',
                 'departure_city' => $data['departure_city'],
                 'departure_country' => $data['departure_country'],
@@ -196,15 +225,26 @@ class TripController
                 'arrival_city' => $data['arrival_city'],
                 'arrival_country' => $data['arrival_country'],
                 'arrival_date' => Carbon::parse($data['arrival_date']),
-                'transport_type' => $data['transport_type'],
-                'max_weight' => (float) $data['max_weight'],
+                'transport_type' => $transportType,
+                'available_weight_kg' => (float) $data['available_weight_kg'],
                 'price_per_kg' => (float) $data['price_per_kg'],
-                'currency' => $data['currency'] ?? 'EUR',
+                'currency' => $data['currency'],
                 'is_domestic' => $data['departure_country'] === $data['arrival_country'],
-                'restrictions' => $data['restrictions'] ?? [],
-                'special_instructions' => $data['special_instructions'] ?? '',
+                'restrictions' => [],
+                'special_notes' => $data['special_notes'] ?? '',
                 'status' => Trip::STATUS_DRAFT,
             ]);
+
+            // Gérer les images si présentes (URLs Cloudinary)
+            $images = [];
+            if (!empty($data['images']) && is_array($data['images'])) {
+                try {
+                    $images = $this->handleTripImageUrls($data['images'], $trip);
+                } catch (\Exception $e) {
+                    error_log("Image processing failed during trip creation: " . $e->getMessage());
+                    // Continuer même si le traitement d'images échoue
+                }
+            }
 
             return Response::created([
                 'trip' => [
@@ -216,10 +256,12 @@ class TripController
                     'arrival_city' => $trip->arrival_city,
                     'departure_date' => $trip->departure_date,
                     'created_at' => $trip->created_at,
+                    'images' => $images,
                 ]
             ], 'Trip created successfully');
 
         } catch (\Exception $e) {
+            error_log("TRIP CREATION ERROR: " . $e->getMessage());
             return Response::serverError('Failed to create trip: ' . $e->getMessage());
         }
     }
@@ -260,7 +302,7 @@ class TripController
                     'arrival_country' => $trip->arrival_country,
                     'arrival_date' => $trip->arrival_date,
                     'transport_type' => $trip->transport_type,
-                    'max_weight' => $trip->max_weight,
+                    'max_weight' => $trip->available_weight_kg,
                     'available_weight' => $trip->available_weight,
                     'price_per_kg' => $trip->price_per_kg,
                     'total_reward' => $trip->total_reward,
@@ -268,7 +310,7 @@ class TripController
                     'status' => $trip->status,
                     'is_domestic' => $trip->is_domestic,
                     'restrictions' => $trip->restrictions,
-                    'special_instructions' => $trip->special_instructions,
+                    'special_instructions' => $trip->special_notes,
                     'route' => $trip->route,
                     'duration' => $trip->duration,
                     'is_expired' => $trip->is_expired,
@@ -371,8 +413,8 @@ class TripController
             $allowedFields = [
                 'title', 'description', 'departure_city', 'departure_country',
                 'departure_date', 'arrival_city', 'arrival_country', 'arrival_date',
-                'transport_type', 'max_weight', 'price_per_kg', 'restrictions',
-                'special_instructions'
+                'transport_type', 'available_weight_kg', 'price_per_kg', 'restrictions',
+                'special_notes'
             ];
 
             $updateData = array_intersect_key($data, array_flip($allowedFields));
@@ -633,5 +675,212 @@ class TripController
         
         // Facteur par défaut
         return 1.0;
+    }
+
+    /**
+     * Gérer l'upload d'images pour un trip
+     */
+    private function handleTripImageUpload($uploadedFiles, Trip $trip): array
+    {
+        $images = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
+        $uploadedImages = [];
+        $cloudinaryService = new CloudinaryService();
+        $currentImageCount = $trip->images()->count();
+
+        foreach ($images as $index => $uploadedFile) {
+            if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+                continue;
+            }
+
+            // Vérifier le type MIME
+            $mimeType = $uploadedFile->getClientMediaType();
+            if (!in_array($mimeType, ['image/jpeg', 'image/png', 'image/jpg'])) {
+                continue;
+            }
+
+            // Limite de 5 images par trip
+            if ($currentImageCount + count($uploadedImages) >= 5) {
+                break;
+            }
+
+            // Générer un nom unique et déplacer temporairement
+            $filename = 'trip_' . $trip->id . '_' . $index . '_' . time() . '.jpg';
+            $tempPath = sys_get_temp_dir() . '/' . $filename;
+            $uploadedFile->moveTo($tempPath);
+
+            try {
+                // Upload vers Cloudinary
+                $cloudinaryResult = $cloudinaryService->uploadTripImage($tempPath, $trip->id, $index);
+
+                // Créer l'enregistrement en base
+                $tripImage = TripImage::create([
+                    'trip_id' => $trip->id,
+                    'image_path' => $cloudinaryResult['public_id'],
+                    'url' => $cloudinaryResult['url'],
+                    'thumbnail' => $cloudinaryResult['thumbnail'],
+                    'is_primary' => ($currentImageCount + count($uploadedImages)) === 0,
+                    'order' => $currentImageCount + count($uploadedImages) + 1,
+                    'file_size' => $cloudinaryResult['file_size'],
+                    'width' => $cloudinaryResult['width'] ?? null,
+                    'height' => $cloudinaryResult['height'] ?? null,
+                    'mime_type' => $mimeType,
+                ]);
+
+                $uploadedImages[] = [
+                    'id' => $tripImage->id,
+                    'url' => $tripImage->url,
+                    'thumbnail' => $tripImage->thumbnail,
+                    'medium' => $cloudinaryResult['medium'] ?? null,
+                    'is_primary' => $tripImage->is_primary,
+                    'order' => $tripImage->order,
+                ];
+
+            } catch (\Exception $e) {
+                error_log("Cloudinary upload failed for trip image: " . $e->getMessage());
+                continue;
+            } finally {
+                // Nettoyer le fichier temporaire
+                if (file_exists($tempPath)) {
+                    unlink($tempPath);
+                }
+            }
+        }
+
+        return $uploadedImages;
+    }
+
+    /**
+     * Traiter les URLs d'images Cloudinary pour un trip
+     */
+    private function handleTripImageUrls(array $imageUrls, Trip $trip): array
+    {
+        $processedImages = [];
+        $currentImageCount = $trip->images()->count();
+
+        foreach ($imageUrls as $index => $imageData) {
+            // Limite de 5 images par trip
+            if ($currentImageCount + count($processedImages) >= 5) {
+                break;
+            }
+
+            // Valider que l'URL est bien fournie
+            if (empty($imageData['url'])) {
+                continue;
+            }
+
+            try {
+                // Créer l'enregistrement en base avec les données Cloudinary
+                $tripImage = TripImage::create([
+                    'trip_id' => $trip->id,
+                    'image_path' => $imageData['public_id'] ?? '',
+                    'url' => $imageData['url'],
+                    'thumbnail' => $imageData['thumbnail'] ?? null,
+                    'is_primary' => ($currentImageCount + count($processedImages)) === 0,
+                    'order' => $currentImageCount + count($processedImages) + 1,
+                    'file_size' => $imageData['file_size'] ?? null,
+                    'width' => $imageData['width'] ?? null,
+                    'height' => $imageData['height'] ?? null,
+                    'mime_type' => $imageData['format'] ? "image/{$imageData['format']}" : 'image/jpeg',
+                ]);
+
+                $processedImages[] = [
+                    'id' => $tripImage->id,
+                    'url' => $tripImage->url,
+                    'thumbnail' => $tripImage->thumbnail,
+                    'is_primary' => $tripImage->is_primary,
+                    'order' => $tripImage->order,
+                ];
+
+            } catch (\Exception $e) {
+                error_log("Failed to save trip image: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        return $processedImages;
+    }
+
+    public function addTripImage(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $tripId = (int) $request->getAttribute('id');
+        
+        error_log("=== ADD TRIP IMAGE DEBUG ===");
+        error_log("Trip ID: " . $tripId);
+        error_log("User ID: " . ($user ? $user->id : 'NULL'));
+
+        try {
+            $trip = Trip::find($tripId);
+
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+
+            if (!$trip->isOwner($user)) {
+                return Response::forbidden('You can only add images to your own trips');
+            }
+
+            // Vérifier le nombre d'images existantes (max 5)
+            $currentImageCount = $trip->images()->count();
+            if ($currentImageCount >= 5) {
+                return Response::error('Maximum 5 images allowed per trip');
+            }
+
+            $uploadedFiles = $request->getUploadedFiles();
+            error_log("Uploaded files: " . json_encode(array_keys($uploadedFiles)));
+            
+            if (empty($uploadedFiles['images'])) {
+                error_log("ERROR: No images in uploaded files");
+                return Response::badRequest('No images uploaded');
+            }
+
+            $uploadedImages = $this->handleTripImageUpload($uploadedFiles['images'], $trip);
+
+            if (empty($uploadedImages)) {
+                return Response::error('No valid images were uploaded');
+            }
+
+            return Response::success([
+                'images' => $uploadedImages
+            ], 'Images uploaded successfully');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to upload images: ' . $e->getMessage());
+        }
+    }
+
+    public function removeTripImage(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $tripId = (int) $request->getAttribute('id');
+        $imageId = (int) $request->getAttribute('imageId');
+
+        try {
+            $trip = Trip::find($tripId);
+            if (!$trip || !$trip->isOwner($user)) {
+                return Response::notFound('Trip not found');
+            }
+
+            $image = TripImage::where('trip_id', $tripId)->find($imageId);
+            if (!$image) {
+                return Response::notFound('Image not found');
+            }
+
+            // Supprimer l'image de Cloudinary
+            $cloudinaryService = new CloudinaryService();
+            try {
+                $cloudinaryService->deleteImage($image->image_path);
+            } catch (\Exception $e) {
+                error_log("Failed to delete image from Cloudinary: " . $e->getMessage());
+                // Continuer quand même pour supprimer l'enregistrement local
+            }
+
+            $image->delete();
+
+            return Response::success([], 'Image removed successfully');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to remove image: ' . $e->getMessage());
+        }
     }
 }

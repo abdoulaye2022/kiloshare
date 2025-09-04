@@ -18,7 +18,7 @@ import '../modules/profile/screens/edit_profile_screen.dart';
 import '../modules/profile/screens/trip_history_screen.dart';
 import '../modules/trips/screens/trip_type_selection_screen.dart';
 import '../modules/trips/screens/create_trip_screen.dart';
-import '../modules/trips/screens/my_trips_screen_bloc.dart';
+import '../modules/trips/screens/my_trips_screen.dart';
 import '../modules/trips/screens/trip_details_final.dart';
 import '../modules/trips/screens/search_trips_screen.dart';
 import '../modules/booking/screens/bookings_list_screen.dart';
@@ -134,7 +134,7 @@ GoRouter createRouter() {
       GoRoute(
         path: '/trips/my-trips',
         name: 'my-trips',
-        builder: (context, state) => const MyTripsScreenBloc(),
+        builder: (context, state) => const MyTripsScreen(),
       ),
       GoRoute(
         path: '/trips/search',

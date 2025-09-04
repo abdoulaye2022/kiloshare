@@ -11,11 +11,9 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
   // État des comptes liés (en réalité, ces données viendraient de l'API)
   bool _googleLinked = false;
   bool _appleLinked = true;
-  bool _facebookLinked = false;
 
   String? _googleEmail;
   String? _appleEmail;
-  String? _facebookEmail;
 
   bool _isLoading = false;
 
@@ -30,7 +28,6 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     setState(() {
       _googleLinked = false;
       _appleLinked = true;
-      _facebookLinked = false;
       _appleEmail = 'user@icloud.com';
     });
   }
@@ -120,15 +117,6 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
             isLinked: _appleLinked,
             email: _appleEmail,
             onToggle: () => _toggleAppleAccount(),
-          ),
-          const Divider(height: 1),
-          _buildAccountTile(
-            provider: 'Facebook',
-            icon: Icons.facebook,
-            color: Colors.blue[800]!,
-            isLinked: _facebookLinked,
-            email: _facebookEmail,
-            onToggle: () => _toggleFacebookAccount(),
           ),
         ],
       ),
@@ -245,13 +233,6 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     }
   }
 
-  Future<void> _toggleFacebookAccount() async {
-    if (_facebookLinked) {
-      await _unlinkFacebookAccount();
-    } else {
-      await _linkFacebookAccount();
-    }
-  }
 
   Future<void> _linkGoogleAccount() async {
     setState(() {
@@ -405,79 +386,4 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     }
   }
 
-  Future<void> _linkFacebookAccount() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // TODO: Implémenter la liaison Facebook via l'API
-      await Future.delayed(const Duration(seconds: 2)); // Simulation
-
-      setState(() {
-        _facebookLinked = true;
-        _facebookEmail = 'user@facebook.com';
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte Facebook lié avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la liaison : $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _unlinkFacebookAccount() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // TODO: Implémenter la déliaison Facebook via l'API
-      await Future.delayed(const Duration(seconds: 1)); // Simulation
-
-      setState(() {
-        _facebookLinked = false;
-        _facebookEmail = null;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte Facebook délié'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la déliaison : $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 }

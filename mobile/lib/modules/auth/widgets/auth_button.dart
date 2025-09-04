@@ -141,7 +141,6 @@ class SocialButton extends StatelessWidget {
   IconData _getIconFromPath(String path) {
     // Simple mapping for common social icons
     if (path.contains('google')) return Icons.g_mobiledata;
-    if (path.contains('facebook')) return Icons.facebook;
     if (path.contains('apple')) return Icons.apple;
     return Icons.login;
   }

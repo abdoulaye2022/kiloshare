@@ -268,15 +268,6 @@ class _SimpleLoginPageState extends State<SimpleLoginPage> {
         SizedBox(height: 12.h),
         
         _buildSocialLogin(
-          'Continuer avec Facebook',
-          Icons.facebook,
-          const Color(0xFF1877F2),
-          () => _handleFacebookLogin(),
-        ),
-        
-        SizedBox(height: 12.h),
-        
-        _buildSocialLogin(
           'Continuer avec Apple',
           Icons.apple,
           Colors.black,
@@ -450,10 +441,6 @@ class _SimpleLoginPageState extends State<SimpleLoginPage> {
     // TODO: Implémenter Google Sign In
   }
 
-  Future<void> _handleFacebookLogin() async {
-    _showMessage('Connexion Facebook en développement 🚧');
-    // TODO: Implémenter Facebook Login
-  }
 
   Future<void> _handleAppleLogin() async {
     _showMessage('Connexion Apple en développement 🚧');
