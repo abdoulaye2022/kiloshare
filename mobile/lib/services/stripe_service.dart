@@ -14,11 +14,15 @@ class StripeService {
   final String _baseUrl = AppConfig.baseUrl;
   final AuthService _authService = AuthService.instance;
 
-  Future<Map<String, String>> _getAuthHeaders() async {
+  Future<Map<String, String>?> _getAuthHeaders() async {
     final token = await _authService.getValidAccessToken();
+    if (token == null) {
+      print('StripeService: No valid token found, unable to make authenticated request');
+      return null;
+    }
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${token ?? ''}',
+      'Authorization': 'Bearer $token',
     };
   }
 
@@ -26,7 +30,12 @@ class StripeService {
   Future<Map<String, dynamic>> createConnectedAccount() async {
     try {
       final headers = await _getAuthHeaders();
-
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentication required',
+        };
+      }
 
       final response = await http.post(
         Uri.parse('${_baseUrl}/stripe/account/create'),
@@ -179,6 +188,146 @@ class StripeService {
     } catch (e) {
       print('Erreur lors de la récupération des infos compte Stripe: $e');
       return null;
+    }
+  }
+
+  /// Créer un Payment Intent pour une réservation
+  Future<Map<String, dynamic>> createPaymentIntent(int bookingId) async {
+    try {
+      print('StripeService.createPaymentIntent - booking ID received: $bookingId');
+      
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentication required',
+        };
+      }
+
+      final body = json.encode({
+        'booking_id': bookingId,
+      });
+      
+      print('StripeService.createPaymentIntent - body to send: $body');
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/stripe/payment/create-intent'),
+        headers: headers,
+        body: body,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          'client_secret': responseData['data']['client_secret'],
+          'payment_intent_id': responseData['data']['payment_intent_id'],
+          'amount': responseData['data']['amount'],
+          'commission_amount': responseData['data']['commission_amount'],
+          'net_amount': responseData['data']['net_amount'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la création du Payment Intent',
+        };
+      }
+    } catch (e) {
+      print('Erreur StripeService.createPaymentIntent: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion lors de la création du paiement',
+      };
+    }
+  }
+
+  /// Confirmer le paiement après succès Stripe
+  Future<Map<String, dynamic>> confirmPayment({
+    required String paymentIntentId,
+    required int bookingId,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentication required',
+        };
+      }
+
+      final body = json.encode({
+        'payment_intent_id': paymentIntentId,
+        'booking_id': bookingId,
+      });
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/stripe/payment/confirm'),
+        headers: headers,
+        body: body,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          'transaction_id': responseData['data']['transaction_id'],
+          'escrow_amount': responseData['data']['escrow_amount'],
+          'commission_amount': responseData['data']['commission_amount'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la confirmation du paiement',
+        };
+      }
+    } catch (e) {
+      print('Erreur StripeService.confirmPayment: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion lors de la confirmation du paiement',
+      };
+    }
+  }
+
+  /// Libérer les fonds de l'escrow (après livraison)
+  Future<Map<String, dynamic>> releaseEscrow(int bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentication required',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/stripe/escrow/$bookingId/release'),
+        headers: headers,
+        body: json.encode({}),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          'amount_released': responseData['data']['amount_released'],
+          'released_to_traveler': responseData['data']['released_to_traveler'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la libération des fonds',
+        };
+      }
+    } catch (e) {
+      print('Erreur StripeService.releaseEscrow: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion lors de la libération des fonds',
+      };
     }
   }
 }

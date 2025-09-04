@@ -194,7 +194,7 @@ class BookingController
         $id = $request->getAttribute('id');
 
         try {
-            $booking = Booking::with(['trip.user', 'sender', 'receiver', 'negotiations'])
+            $booking = Booking::with(['trip.user', 'sender', 'receiver', 'negotiation'])
                              ->find($id);
 
             if (!$booking) {
@@ -251,16 +251,18 @@ class BookingController
                             'profile_picture' => $booking->trip->user->profile_picture,
                         ],
                     ],
-                    'negotiations' => $booking->negotiations ? $booking->negotiations->map(function ($negotiation) {
-                        return [
-                            'id' => $negotiation->id,
-                            'proposed_by' => $negotiation->proposed_by,
-                            'amount' => $negotiation->amount,
-                            'message' => $negotiation->message,
-                            'is_accepted' => $negotiation->is_accepted,
-                            'created_at' => $negotiation->created_at,
-                        ];
-                    }) : [],
+                    'negotiation' => $booking->negotiation ? [
+                        'id' => $booking->negotiation->id,
+                        'status' => $booking->negotiation->status,
+                        'proposed_price' => $booking->negotiation->proposed_price,
+                        'proposed_weight' => $booking->negotiation->proposed_weight,
+                        'package_description' => $booking->negotiation->package_description,
+                        'pickup_address' => $booking->negotiation->pickup_address,
+                        'delivery_address' => $booking->negotiation->delivery_address,
+                        'counter_offer_price' => $booking->negotiation->counter_offer_price,
+                        'counter_offer_message' => $booking->negotiation->counter_offer_message,
+                        'created_at' => $booking->negotiation->created_at,
+                    ] : null,
                 ]
             ]);
 

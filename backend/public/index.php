@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+// Configuration PHP pour éviter les erreurs dans les réponses JSON
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 use DI\Container;
 use DI\Bridge\Slim\Bridge as SlimAppFactory;
 use KiloShare\Utils\Database;

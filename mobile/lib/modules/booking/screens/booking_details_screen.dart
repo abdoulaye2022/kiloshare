@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/booking_service.dart';
 import '../models/booking_model.dart';
+import '../../../services/stripe_service.dart';
+import '../../auth/services/auth_service.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   final String bookingId;
@@ -17,15 +19,31 @@ class BookingDetailsScreen extends StatefulWidget {
 
 class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   final BookingService _bookingService = BookingService.instance;
+  final AuthService _authService = AuthService.instance;
   
   BookingModel? _booking;
   bool _isLoading = true;
   String? _error;
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadBookingDetails();
+  }
+  
+  Future<void> _loadCurrentUser() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      if (user != null) {
+        setState(() {
+          _currentUserId = user.id;
+        });
+      }
+    } catch (e) {
+      print('Erreur lors du chargement de l\'utilisateur: $e');
+    }
   }
 
   Future<void> _loadBookingDetails() async {
@@ -614,9 +632,20 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Widget _buildActionButtons() {
-    if (!_booking!.isPending) {
-      return const SizedBox.shrink();
+    // Boutons pour réservations en attente (voyageur)
+    if (_booking!.isPending && _isReceiver) {
+      return _buildPendingReceiverActions();
     }
+    
+    // Bouton de paiement pour réservations acceptées (expéditeur)
+    if (_booking!.isAccepted && _isSender) {
+      return _buildPaymentActions();
+    }
+    
+    return const SizedBox.shrink();
+  }
+  
+  Widget _buildPendingReceiverActions() {
 
     return Column(
       children: [
@@ -679,6 +708,102 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildPaymentActions() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.payment, color: Colors.blue.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Réservation acceptée !',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Procédez au paiement pour confirmer votre réservation',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Montant à payer',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        Text(
+                          '${_booking!.finalPrice?.toStringAsFixed(2) ?? _booking!.proposedPrice.toStringAsFixed(2)} CAD',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Commission: 15%',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _initiatePayment(),
+            icon: const Icon(Icons.credit_card),
+            label: const Text('Payer maintenant'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -778,8 +903,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   bool get _isReceiver {
-    // TODO: Compare with current user ID
-    return true; // Pour l'instant, on assume que l'utilisateur peut être le receiver
+    if (_currentUserId == null || _booking == null) return false;
+    return _currentUserId.toString() == _booking!.receiverId;
+  }
+  
+  bool get _isSender {
+    if (_currentUserId == null || _booking == null) return false;
+    return _currentUserId.toString() == _booking!.senderId;
   }
 
   String _getStatusDescription(BookingStatus status) {
@@ -891,6 +1021,72 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         _hideLoader();
         _showErrorSnackBar('Erreur: $e');
       }
+    }
+  }
+
+  Future<void> _initiatePayment() async {
+    _showLoader();
+
+    try {
+      if (_booking == null) {
+        _hideLoader();
+        _showErrorSnackBar('Erreur: Aucune réservation chargée');
+        return;
+      }
+
+      print('BookingDetailsScreen._initiatePayment - booking ID: ${_booking!.id}');
+      
+      if (_booking!.id <= 0) {
+        _hideLoader();
+        _showErrorSnackBar('Erreur: ID de réservation invalide (${_booking!.id})');
+        return;
+      }
+
+      // Créer le Payment Intent via Stripe
+      final stripeService = StripeService.instance;
+      final paymentResult = await stripeService.createPaymentIntent(_booking!.id);
+
+      _hideLoader();
+
+      if (paymentResult['success'] == true && mounted) {
+        // Montrer les détails du paiement et continuer avec Stripe
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => _PaymentConfirmationDialog(
+            amount: double.tryParse(paymentResult['amount'].toString()) ?? 0.0,
+            commissionAmount: double.tryParse(paymentResult['commission_amount'].toString()) ?? 0.0,
+            netAmount: double.tryParse(paymentResult['net_amount'].toString()) ?? 0.0,
+          ),
+        );
+
+        if (confirmed == true) {
+          // Ici on intégrerait le SDK Stripe Flutter pour le paiement
+          // Pour l'instant, on simule un paiement réussi
+          _showSuccessSnackBar('Paiement initié avec succès!');
+          
+          // TODO: Intégrer le SDK Stripe Flutter
+          // final paymentSheet = await Stripe.instance.initPaymentSheet(
+          //   paymentSheetParameters: SetupPaymentSheetParameters(
+          //     paymentIntentClientSecret: paymentResult['client_secret'],
+          //     merchantDisplayName: 'KiloShare',
+          //   ),
+          // );
+          
+          // if (paymentSheet.error == null) {
+          //   await Stripe.instance.presentPaymentSheet();
+          //   // Confirmer le paiement côté serveur
+          //   await stripeService.confirmPayment(
+          //     paymentIntentId: paymentResult['payment_intent_id'],
+          //     bookingId: _booking!.id,
+          //   );
+          // }
+        }
+      } else {
+        _showErrorSnackBar(paymentResult['error'] ?? 'Erreur lors de l\'initialisation du paiement');
+      }
+    } catch (e) {
+      _hideLoader();
+      _showErrorSnackBar('Erreur: $e');
     }
   }
 
@@ -1207,6 +1403,101 @@ class _NegotiateDialogState extends State<_NegotiateDialog> {
             foregroundColor: Colors.white,
           ),
           child: const Text('Proposer'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentConfirmationDialog extends StatelessWidget {
+  final double amount;
+  final double commissionAmount;
+  final double netAmount;
+
+  const _PaymentConfirmationDialog({
+    required this.amount,
+    required this.commissionAmount,
+    required this.netAmount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirmer le paiement'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Détails du paiement :',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          _buildPaymentRow('Montant total', '${amount.toStringAsFixed(2)} CAD', isTotal: true),
+          const SizedBox(height: 8),
+          _buildPaymentRow('Commission KiloShare (15%)', '-${commissionAmount.toStringAsFixed(2)} CAD'),
+          const SizedBox(height: 8),
+          _buildPaymentRow('Montant pour le voyageur', '${netAmount.toStringAsFixed(2)} CAD'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Les fonds seront retenus en escrow jusqu\'à la livraison confirmée.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Confirmer le paiement'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentRow(String label, String value, {bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
+            fontSize: isTotal ? 16 : 14,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: isTotal ? 16 : 14,
+            color: isTotal ? Colors.blue.shade800 : null,
+          ),
         ),
       ],
     );

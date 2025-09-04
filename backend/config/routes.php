@@ -8,6 +8,7 @@ use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\AdminController;
 use KiloShare\Controllers\TripController;
 use KiloShare\Controllers\BookingController;
+use KiloShare\Controllers\BookingNegotiationController;
 use KiloShare\Controllers\SearchController;
 use KiloShare\Controllers\UserProfileController;
 use KiloShare\Controllers\FavoriteController;
@@ -172,6 +173,17 @@ return function (App $app) {
                 $bookingGroup->post('/{id}/photos', [BookingController::class, 'addPackagePhoto']);
             })->add(new AuthMiddleware());
 
+            // Booking negotiation routes
+            $v1Group->group('/negotiations', function (RouteCollectorProxy $negotiationGroup) {
+                $negotiationGroup->post('', [BookingNegotiationController::class, 'createNegotiation']);
+                $negotiationGroup->get('/my', [BookingNegotiationController::class, 'getMyNegotiations']);
+                $negotiationGroup->get('/trip/{trip_id}', [BookingNegotiationController::class, 'getNegotiationsForTrip']);
+                $negotiationGroup->post('/{negotiation_id}/accept', [BookingNegotiationController::class, 'acceptNegotiation']);
+                $negotiationGroup->post('/{negotiation_id}/reject', [BookingNegotiationController::class, 'rejectNegotiation']);
+                $negotiationGroup->post('/{negotiation_id}/counter', [BookingNegotiationController::class, 'counterPropose']);
+                $negotiationGroup->post('/{negotiation_id}/message', [BookingNegotiationController::class, 'addMessage']);
+            })->add(new AuthMiddleware());
+
             // User profile routes
             $v1Group->group('/user', function (RouteCollectorProxy $userGroup) {
                 $userGroup->get('/profile', [UserProfileController::class, 'getProfile']);
@@ -215,6 +227,11 @@ return function (App $app) {
                 $stripeGroup->post('/account/create', [StripeController::class, 'createConnectedAccount']);
                 $stripeGroup->get('/account/status', [StripeController::class, 'getAccountStatus']);
                 $stripeGroup->post('/account/refresh-onboarding', [StripeController::class, 'refreshOnboardingLink']);
+                
+                // Payment routes
+                $stripeGroup->post('/payment/create-intent', [StripeController::class, 'createPaymentIntent']);
+                $stripeGroup->post('/payment/confirm', [StripeController::class, 'confirmPayment']);
+                $stripeGroup->post('/escrow/{booking_id}/release', [StripeController::class, 'releaseEscrow']);
             })->add(new AuthMiddleware());
 
             // Stripe webhook (no auth required)

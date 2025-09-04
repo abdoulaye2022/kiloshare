@@ -8,10 +8,15 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use KiloShare\Models\User;
 use KiloShare\Models\UserStripeAccount;
+use KiloShare\Models\Booking;
+use KiloShare\Models\EscrowAccount;
+use KiloShare\Models\Transaction;
 use KiloShare\Utils\Response;
 use Stripe\Stripe;
 use Stripe\Account;
 use Stripe\AccountLink;
+use Stripe\PaymentIntent;
+use Stripe\PaymentMethod;
 use Exception;
 
 class StripeController
@@ -339,6 +344,257 @@ class StripeController
         if ($userStripeAccount) {
             $userStripeAccount->status = 'rejected';
             $userStripeAccount->save();
+        }
+    }
+
+    /**
+     * Créer un Payment Intent pour une réservation
+     */
+    public function createPaymentIntent(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $user = $request->getAttribute('user');
+            
+            // Lire le body JSON correctement
+            $rawBody = $request->getBody()->getContents();
+            $data = json_decode($rawBody, true);
+            
+            // Debug temporaire
+            error_log("StripeController.createPaymentIntent - Raw body: " . $rawBody);
+            error_log("StripeController.createPaymentIntent - Parsed data: " . json_encode($data));
+            
+            // Fallback si le JSON parsing échoue
+            if ($data === null) {
+                $data = $request->getParsedBody() ?: [];
+                error_log("StripeController.createPaymentIntent - Fallback to getParsedBody: " . json_encode($data));
+            }
+            
+            $bookingId = $data['booking_id'] ?? null;
+
+            // Validation plus stricte
+            if (!$bookingId || $bookingId === 0 || $bookingId === '0' || empty($bookingId)) {
+                error_log("StripeController.createPaymentIntent - BookingId is missing, null, zero or empty: " . var_export($bookingId, true));
+                return Response::error('Booking ID requis et doit être valide', [], 400);
+            }
+
+            // S'assurer que c'est un entier
+            $bookingId = (int) $bookingId;
+            if ($bookingId <= 0) {
+                error_log("StripeController.createPaymentIntent - BookingId must be positive integer: " . $bookingId);
+                return Response::error('Booking ID doit être un entier positif', [], 400);
+            }
+
+            // Récupérer la réservation
+            $booking = Booking::with(['trip.user', 'sender', 'receiver'])
+                ->where('id', $bookingId)
+                ->first();
+
+            if (!$booking) {
+                return Response::error('Réservation non trouvée', [], 404);
+            }
+
+            // Vérifier que l'utilisateur est l'expéditeur
+            if ($booking->sender_id !== $user->id) {
+                return Response::error('Non autorisé - vous devez être l\'expéditeur', [], 403);
+            }
+
+            // Vérifier que la réservation est confirmée mais pas encore payée
+            if ($booking->status !== Booking::STATUS_CONFIRMED) {
+                return Response::error('La réservation doit être confirmée pour procéder au paiement', [], 400);
+            }
+
+            if ($booking->payment_status === 'paid') {
+                return Response::error('Cette réservation a déjà été payée', [], 400);
+            }
+
+            // Vérifier que le voyageur a un compte Stripe actif
+            $receiverStripeAccount = UserStripeAccount::where('user_id', $booking->receiver_id)->first();
+            if (!$receiverStripeAccount || !$receiverStripeAccount->canAcceptPayments()) {
+                return Response::error('Le voyageur doit configurer son compte Stripe pour recevoir les paiements', [], 400);
+            }
+
+            // Calculer les montants
+            $finalPrice = $booking->final_price ?? $booking->proposed_price;
+            $commissionRate = $booking->commission_rate ?? 15.00;
+            $commissionAmount = ($finalPrice * $commissionRate) / 100;
+            $amount = (int)($finalPrice * 100); // Montant en centimes pour Stripe
+
+            Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
+
+            // Créer le Payment Intent
+            $paymentIntent = PaymentIntent::create([
+                'amount' => $amount,
+                'currency' => 'cad',
+                'automatic_payment_methods' => ['enabled' => true],
+                'metadata' => [
+                    'booking_id' => $booking->id,
+                    'sender_id' => $booking->sender_id,
+                    'receiver_id' => $booking->receiver_id,
+                    'trip_id' => $booking->trip_id,
+                    'commission_amount' => $commissionAmount,
+                ],
+                'description' => "KiloShare - Transport de {$booking->package_description} de {$booking->trip->departure_city} à {$booking->trip->arrival_city}",
+            ]);
+
+            // Mettre à jour la réservation
+            $booking->update([
+                'payment_status' => 'pending',
+                'commission_amount' => $commissionAmount
+            ]);
+
+            return Response::success([
+                'client_secret' => $paymentIntent->client_secret,
+                'payment_intent_id' => $paymentIntent->id,
+                'amount' => $finalPrice,
+                'commission_amount' => $commissionAmount,
+                'net_amount' => $finalPrice - $commissionAmount
+            ], 'Payment Intent créé avec succès');
+
+        } catch (Exception $e) {
+            error_log("Erreur création Payment Intent: " . $e->getMessage());
+            return Response::error('Erreur lors de la création du paiement', [], 500);
+        }
+    }
+
+    /**
+     * Confirmer le paiement et créer l'escrow
+     */
+    public function confirmPayment(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $data = $request->getParsedBody();
+            $paymentIntentId = $data['payment_intent_id'] ?? null;
+            $bookingId = $data['booking_id'] ?? null;
+
+            if (!$paymentIntentId || !$bookingId) {
+                return Response::error('Payment Intent ID et Booking ID requis', [], 400);
+            }
+
+            Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
+
+            // Récupérer le Payment Intent depuis Stripe
+            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+            
+            if ($paymentIntent->status !== 'succeeded') {
+                return Response::error('Le paiement n\'a pas abouti', [], 400);
+            }
+
+            // Récupérer la réservation
+            $booking = Booking::with(['trip', 'sender', 'receiver'])
+                ->where('id', $bookingId)
+                ->first();
+
+            if (!$booking) {
+                return Response::error('Réservation non trouvée', [], 404);
+            }
+
+            // Vérifier que l'utilisateur est l'expéditeur
+            if ($booking->sender_id !== $user->id) {
+                return Response::error('Non autorisé', [], 403);
+            }
+
+            // Créer la transaction
+            $transaction = Transaction::create([
+                'user_id' => $booking->sender_id,
+                'booking_id' => $booking->id,
+                'amount' => $paymentIntent->amount / 100, // Convertir en dollars
+                'currency' => $paymentIntent->currency,
+                'stripe_payment_intent_id' => $paymentIntentId,
+                'status' => 'completed',
+                'type' => 'payment'
+            ]);
+
+            // Créer l'escrow account
+            $escrowAmount = $paymentIntent->amount / 100 - $booking->commission_amount;
+            EscrowAccount::create([
+                'transaction_id' => $transaction->id,
+                'amount_held' => $escrowAmount,
+                'hold_reason' => 'delivery_confirmation',
+                'status' => 'holding'
+            ]);
+
+            // Mettre à jour la réservation
+            $booking->update([
+                'payment_status' => 'paid',
+                'status' => Booking::STATUS_PAID
+            ]);
+
+            // Mettre à jour le voyage
+            $booking->trip->update([
+                'status' => 'booked'
+            ]);
+
+            return Response::success('Paiement confirmé et fonds mis en escrow', [
+                'transaction_id' => $transaction->id,
+                'escrow_amount' => $escrowAmount,
+                'commission_amount' => $booking->commission_amount
+            ]);
+
+        } catch (Exception $e) {
+            error_log("Erreur confirmation paiement: " . $e->getMessage());
+            return Response::error('Erreur lors de la confirmation du paiement', [], 500);
+        }
+    }
+
+    /**
+     * Libérer les fonds de l'escrow (après livraison)
+     */
+    public function releaseEscrow(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $user = $request->getAttribute('user');
+            $bookingId = $request->getAttribute('booking_id');
+
+            // Récupérer la réservation
+            $booking = Booking::with(['trip.user', 'escrowAccount.transaction'])
+                ->where('id', $bookingId)
+                ->first();
+
+            if (!$booking) {
+                return Response::error('Réservation non trouvée', [], 404);
+            }
+
+            // Vérifier les permissions (expéditeur ou admin)
+            if ($booking->sender_id !== $user->id && !$user->is_admin) {
+                return Response::error('Non autorisé', [], 403);
+            }
+
+            // Vérifier que la livraison est confirmée
+            if ($booking->status !== Booking::STATUS_DELIVERED) {
+                return Response::error('La livraison doit être confirmée avant la libération des fonds', [], 400);
+            }
+
+            // Récupérer l'escrow account
+            $escrowAccount = EscrowAccount::where('transaction_id', $booking->escrowAccount->transaction->id)
+                ->where('status', 'holding')
+                ->first();
+
+            if (!$escrowAccount) {
+                return Response::error('Aucun escrow actif trouvé pour cette réservation', [], 404);
+            }
+
+            // Libérer les fonds (ici on marque comme libéré, l'intégration Stripe Connect se ferait séparément)
+            $escrowAccount->update([
+                'status' => 'fully_released',
+                'amount_released' => $escrowAccount->amount_held,
+                'released_at' => now(),
+                'release_notes' => 'Livraison confirmée - fonds libérés automatiquement'
+            ]);
+
+            // Mettre à jour la réservation
+            $booking->update([
+                'status' => Booking::STATUS_COMPLETED
+            ]);
+
+            return Response::success('Fonds libérés avec succès', [
+                'amount_released' => $escrowAccount->amount_held,
+                'released_to_traveler' => $booking->receiver_id
+            ]);
+
+        } catch (Exception $e) {
+            error_log("Erreur libération escrow: " . $e->getMessage());
+            return Response::error('Erreur lors de la libération des fonds', [], 500);
         }
     }
 }

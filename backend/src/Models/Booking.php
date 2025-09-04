@@ -18,10 +18,13 @@ class Booking extends Model
         'sender_id', // Utilisateur qui envoie le colis
         'receiver_id', // Propriétaire du voyage (qui reçoit le colis)
         'trip_id',
+        'booking_negotiation_id', // Référence vers la négociation
         'uuid',
         'status',
+        'payment_status',
         'weight_kg',
         'proposed_price',
+        'final_price',
         'package_description',
         'pickup_address',
         'delivery_address',
@@ -50,6 +53,7 @@ class Booking extends Model
     const STATUS_PAYMENT_PENDING = 'payment_pending';
     const STATUS_PAID = 'paid';
     const STATUS_IN_TRANSIT = 'in_transit';
+    const STATUS_IN_PROGRESS = 'in_progress';
     const STATUS_DELIVERED = 'delivered';
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
@@ -98,9 +102,9 @@ class Booking extends Model
         return $this->belongsTo(Trip::class);
     }
 
-    public function negotiations(): HasMany
+    public function negotiation(): BelongsTo
     {
-        return $this->hasMany(BookingNegotiation::class);
+        return $this->belongsTo(BookingNegotiation::class, 'booking_negotiation_id');
     }
 
     public function packagePhotos(): HasMany
