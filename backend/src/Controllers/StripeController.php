@@ -463,21 +463,44 @@ class StripeController
     {
         try {
             $user = $request->getAttribute('user');
-            $data = $request->getParsedBody();
+            
+            // Lire le body JSON correctement
+            $rawBody = $request->getBody()->getContents();
+            $data = json_decode($rawBody, true);
+            
+            // Debug: Log received data
+            error_log('StripeController.confirmPayment - Raw body: ' . $rawBody);
+            error_log('StripeController.confirmPayment - Parsed data: ' . json_encode($data));
+            
+            // Fallback si le JSON parsing échoue
+            if ($data === null) {
+                $data = $request->getParsedBody() ?: [];
+                error_log('StripeController.confirmPayment - Fallback to getParsedBody: ' . json_encode($data));
+            }
+            
             $paymentIntentId = $data['payment_intent_id'] ?? null;
             $bookingId = $data['booking_id'] ?? null;
 
             if (!$paymentIntentId || !$bookingId) {
+                error_log("StripeController.confirmPayment - Missing params: payment_intent_id=$paymentIntentId, booking_id=$bookingId");
                 return Response::error('Payment Intent ID et Booking ID requis', [], 400);
             }
 
             Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
 
             // Récupérer le Payment Intent depuis Stripe
-            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
-            
-            if ($paymentIntent->status !== 'succeeded') {
-                return Response::error('Le paiement n\'a pas abouti', [], 400);
+            try {
+                $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+                
+                if ($paymentIntent->status !== 'succeeded') {
+                    error_log("StripeController.confirmPayment - Payment status: " . $paymentIntent->status);
+                    return Response::error('Le paiement n\'a pas abouti', [], 400);
+                }
+                
+                error_log("StripeController.confirmPayment - PaymentIntent retrieved successfully: " . $paymentIntentId);
+            } catch (\Exception $e) {
+                error_log("StripeController.confirmPayment - Error retrieving PaymentIntent: " . $e->getMessage());
+                return Response::error('Erreur lors de la récupération du Payment Intent: ' . $e->getMessage(), [], 500);
             }
 
             // Récupérer la réservation
@@ -505,8 +528,21 @@ class StripeController
                 'type' => 'payment'
             ]);
 
+            // Calculer ou récupérer la commission
+            $commissionAmount = $booking->commission_amount;
+            if ($commissionAmount === null) {
+                // Calculer la commission si elle n'est pas définie (15% par défaut)
+                $commissionRate = $booking->commission_rate ?? 15.00;
+                $totalAmount = $paymentIntent->amount / 100;
+                $commissionAmount = $totalAmount * ($commissionRate / 100);
+                
+                // Mettre à jour la réservation avec le montant de commission calculé
+                $booking->commission_amount = $commissionAmount;
+                $booking->save();
+            }
+
             // Créer l'escrow account
-            $escrowAmount = $paymentIntent->amount / 100 - $booking->commission_amount;
+            $escrowAmount = ($paymentIntent->amount / 100) - $commissionAmount;
             EscrowAccount::create([
                 'transaction_id' => $transaction->id,
                 'amount_held' => $escrowAmount,

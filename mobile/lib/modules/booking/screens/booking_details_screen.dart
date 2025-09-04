@@ -1060,20 +1060,54 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         );
 
         if (confirmed == true) {
-          // Version temporaire - Simulation du paiement
+          // Initialiser et présenter la feuille de paiement Stripe
           _showLoader();
           
           try {
-            // Simuler un délai de traitement
-            await Future.delayed(const Duration(seconds: 2));
+            final clientSecret = paymentResult['client_secret'];
+            final paymentIntentId = paymentResult['payment_intent_id'];
+            final amount = double.tryParse(paymentResult['amount'].toString()) ?? 0.0;
+            
+            // 1. Initialiser la feuille de paiement
+            final initResult = await stripeService.initializePaymentSheet(
+              clientSecret: clientSecret,
+              amount: amount,
+              currency: 'cad',
+              customerEmail: _booking?.senderEmail,
+            );
             
             _hideLoader();
             
-            // Simuler un paiement réussi
-            _showSuccessSnackBar('Paiement simulé avec succès ! Configurez vos vraies clés Stripe pour utiliser les vrais paiements.');
-            
-            // Recharger les détails pour mettre à jour l'interface
-            await _loadBookingDetails();
+            if (initResult['success'] == true) {
+              // 2. Présenter la feuille de paiement
+              final paymentSheetResult = await stripeService.presentPaymentSheet(
+                clientSecret: clientSecret,
+                paymentIntentId: paymentIntentId,
+              );
+              
+              if (paymentSheetResult['success'] == true) {
+                // 3. Confirmer le paiement côté serveur
+                _showLoader();
+                final confirmResult = await stripeService.confirmPayment(
+                  paymentIntentId: paymentIntentId,
+                  bookingId: _booking!.id,
+                );
+                _hideLoader();
+                
+                if (confirmResult['success'] == true) {
+                  _showSuccessSnackBar('Paiement effectué avec succès !');
+                  // Recharger les détails pour mettre à jour l'interface
+                  await _loadBookingDetails();
+                } else {
+                  _showErrorSnackBar(confirmResult['error'] ?? 'Erreur lors de la confirmation du paiement');
+                }
+              } else {
+                // L'utilisateur a annulé ou le paiement a échoué
+                _showErrorSnackBar(paymentSheetResult['error'] ?? 'Paiement annulé ou échoué');
+              }
+            } else {
+              _showErrorSnackBar(initResult['error'] ?? 'Erreur lors de l\'initialisation du paiement');
+            }
             
           } catch (e) {
             _hideLoader();
