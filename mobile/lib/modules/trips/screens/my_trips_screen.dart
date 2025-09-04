@@ -40,9 +40,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   String _transportFilter = 'all';
   DateTimeRange? _dateRange;
   double _minPrice = 0;
-  double _maxPrice = 100;
+  double _maxPrice = 1000;
   double _minWeight = 0;
-  double _maxWeight = 50;
+  double _maxWeight = 1000;
   String _currencyFilter = 'all';
   bool _showExpiredTrips = true;
 
@@ -50,6 +50,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    
+    // Ajouter un listener pour synchroniser les données quand on change d'onglet
+    _tabController.addListener(_onTabChanged);
+    
     // Initialize filtered lists
     _filteredTrips = [];
     _filteredDrafts = [];
@@ -129,6 +133,72 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     }
   }
 
+  // Listener pour les changements d'onglet
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) return; // Éviter les appels multiples
+    
+    print('MyTripsScreen: Tab changed to index ${_tabController.index}');
+    
+    switch (_tabController.index) {
+      case 0: // Onglet Voyages
+        _syncTripsData();
+        break;
+      case 1: // Onglet Brouillons
+        _syncDraftsData();
+        break;
+      case 2: // Onglet Favoris
+        _syncFavoritesData();
+        break;
+    }
+  }
+
+  // Synchroniser les données de l'onglet Voyages
+  Future<void> _syncTripsData() async {
+    print('MyTripsScreen: Synchronizing trips data...');
+    try {
+      final trips = await _tripService.getUserTrips();
+      setState(() {
+        _allTrips = trips;
+        _myTrips = trips.where((trip) => trip.status != TripStatus.draft).toList();
+        _applyFilters();
+      });
+      print('MyTripsScreen: Trips data synchronized - ${_myTrips.length} trips');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing trips data: $e');
+    }
+  }
+
+  // Synchroniser les données de l'onglet Brouillons
+  Future<void> _syncDraftsData() async {
+    print('MyTripsScreen: Synchronizing drafts data...');
+    try {
+      final trips = await _tripService.getUserTrips();
+      setState(() {
+        _allTrips = trips;
+        _drafts = trips.where((trip) => trip.status == TripStatus.draft).toList();
+        _applyFilters();
+      });
+      print('MyTripsScreen: Drafts data synchronized - ${_drafts.length} drafts');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing drafts data: $e');
+    }
+  }
+
+  // Synchroniser les données de l'onglet Favoris
+  Future<void> _syncFavoritesData() async {
+    print('MyTripsScreen: Synchronizing favorites data...');
+    try {
+      final favoriteTrips = await FavoritesService.instance.getFavoriteTrips();
+      setState(() {
+        _favorites = favoriteTrips;
+        _applyFilters();
+      });
+      print('MyTripsScreen: Favorites data synchronized - ${_favorites.length} favorites');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing favorites data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -189,7 +259,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                 isScrollable: false,
                 tabs: [
                   Tab(
-                    text: 'Mes voyages (${_filteredTrips.length})',
+                    text: 'Voyages (${_filteredTrips.length})',
                     icon: const Icon(Icons.flight_takeoff),
                   ),
                   Tab(
@@ -319,10 +389,19 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          EllipsisButton.elevated(
-            onPressed: () => context.push('/trips/create'),
-            icon: const Icon(Icons.add),
-            text: 'Créer un voyage',
+          SizedBox(
+            width: 220,
+            child: ElevatedButton.icon(
+              onPressed: () => context.push('/trips/create'),
+              icon: const Icon(Icons.add),
+              label: const Text('Créer un voyage'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -355,10 +434,19 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          EllipsisButton.elevated(
-            onPressed: _loadTrips,
-            icon: const Icon(Icons.refresh),
-            text: 'Réessayer',
+          SizedBox(
+            width: 150,
+            child: ElevatedButton.icon(
+              onPressed: _loadTrips,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -574,9 +662,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     return _transportFilter != 'all' ||
            _dateRange != null ||
            _minPrice > 0 ||
-           _maxPrice < 100 ||
+           _maxPrice < 1000 ||
            _minWeight > 0 ||
-           _maxWeight < 50 ||
+           _maxWeight < 1000 ||
            _currencyFilter != 'all' ||
            !_showExpiredTrips;
   }
@@ -830,7 +918,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         RangeSlider(
           values: RangeValues(_minPrice, _maxPrice),
           min: 0,
-          max: 100,
+          max: 1000,
           divisions: 20,
           labels: RangeLabels(
             '${_minPrice.round()}€',
@@ -854,7 +942,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         RangeSlider(
           values: RangeValues(_minWeight, _maxWeight),
           min: 0,
-          max: 50,
+          max: 1000,
           divisions: 50,
           labels: RangeLabels(
             '${_minWeight.round()}kg',
@@ -928,9 +1016,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     _transportFilter = 'all';
     _dateRange = null;
     _minPrice = 0;
-    _maxPrice = 100;
+    _maxPrice = 1000;
     _minWeight = 0;
-    _maxWeight = 50;
+    _maxWeight = 1000;
     _currencyFilter = 'all';
     _showExpiredTrips = true;
   }

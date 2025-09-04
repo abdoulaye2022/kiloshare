@@ -1060,26 +1060,25 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         );
 
         if (confirmed == true) {
-          // Ici on intégrerait le SDK Stripe Flutter pour le paiement
-          // Pour l'instant, on simule un paiement réussi
-          _showSuccessSnackBar('Paiement initié avec succès!');
+          // Version temporaire - Simulation du paiement
+          _showLoader();
           
-          // TODO: Intégrer le SDK Stripe Flutter
-          // final paymentSheet = await Stripe.instance.initPaymentSheet(
-          //   paymentSheetParameters: SetupPaymentSheetParameters(
-          //     paymentIntentClientSecret: paymentResult['client_secret'],
-          //     merchantDisplayName: 'KiloShare',
-          //   ),
-          // );
-          
-          // if (paymentSheet.error == null) {
-          //   await Stripe.instance.presentPaymentSheet();
-          //   // Confirmer le paiement côté serveur
-          //   await stripeService.confirmPayment(
-          //     paymentIntentId: paymentResult['payment_intent_id'],
-          //     bookingId: _booking!.id,
-          //   );
-          // }
+          try {
+            // Simuler un délai de traitement
+            await Future.delayed(const Duration(seconds: 2));
+            
+            _hideLoader();
+            
+            // Simuler un paiement réussi
+            _showSuccessSnackBar('Paiement simulé avec succès ! Configurez vos vraies clés Stripe pour utiliser les vrais paiements.');
+            
+            // Recharger les détails pour mettre à jour l'interface
+            await _loadBookingDetails();
+            
+          } catch (e) {
+            _hideLoader();
+            _showErrorSnackBar('Erreur lors du paiement: $e');
+          }
         }
       } else {
         _showErrorSnackBar(paymentResult['error'] ?? 'Erreur lors de l\'initialisation du paiement');

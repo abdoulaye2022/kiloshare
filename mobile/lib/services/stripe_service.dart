@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import '../config/app_config.dart';
 import '../modules/auth/services/auth_service.dart';
 
@@ -327,6 +329,95 @@ class StripeService {
       return {
         'success': false,
         'error': 'Erreur de connexion lors de la libération des fonds',
+      };
+    }
+  }
+
+  /// Présenter la feuille de paiement Stripe
+  Future<Map<String, dynamic>> presentPaymentSheet({
+    required String clientSecret,
+    required String paymentIntentId,
+  }) async {
+    try {
+      // Présenter la feuille de paiement Stripe
+      await Stripe.instance.presentPaymentSheet();
+
+      return {
+        'success': true,
+        'message': 'Paiement effectué avec succès',
+        'payment_intent_id': paymentIntentId,
+      };
+    } on StripeException catch (e) {
+      print('Erreur StripeService.presentPaymentSheet: ${e.error}');
+      
+      // Gérer les différents types d'erreurs Stripe
+      String errorMessage;
+      switch (e.error.code) {
+        case FailureCode.Canceled:
+          errorMessage = 'Paiement annulé';
+          break;
+        case FailureCode.Failed:
+          errorMessage = 'Paiement échoué';
+          break;
+        case FailureCode.Unknown:
+        default:
+          errorMessage = e.error.localizedMessage ?? 'Erreur de paiement inconnue';
+          break;
+      }
+
+      return {
+        'success': false,
+        'error': errorMessage,
+        'stripe_error': e.error.code.toString(),
+      };
+    } catch (e) {
+      print('Erreur StripeService.presentPaymentSheet: $e');
+      return {
+        'success': false,
+        'error': 'Erreur lors de la confirmation du paiement',
+      };
+    }
+  }
+
+  /// Initialiser la feuille de paiement Stripe
+  Future<Map<String, dynamic>> initializePaymentSheet({
+    required String clientSecret,
+    required double amount,
+    required String currency,
+    String? customerEmail,
+  }) async {
+    try {
+      // Configuration des options de paiement
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          style: ThemeMode.system,
+          merchantDisplayName: 'KiloShare',
+          customerEphemeralKeySecret: null,
+          customerId: null,
+          billingDetails: customerEmail != null ? BillingDetails(
+            email: customerEmail,
+          ) : null,
+          allowsDelayedPaymentMethods: true,
+          applePay: const PaymentSheetApplePay(
+            merchantCountryCode: 'CA',
+          ),
+          googlePay: const PaymentSheetGooglePay(
+            merchantCountryCode: 'CA',
+            testEnv: true, // À changer en false en production
+          ),
+        ),
+      );
+
+      return {
+        'success': true,
+        'message': 'Feuille de paiement initialisée',
+      };
+    } catch (e) {
+      print('Erreur StripeService.initializePaymentSheet: $e');
+      return {
+        'success': false,
+        'error': 'Erreur lors de l\'initialisation de la feuille de paiement',
       };
     }
   }

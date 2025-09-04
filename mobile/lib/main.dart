@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'config/app_config.dart';
 import 'config/theme.dart';
@@ -22,6 +23,11 @@ void main() async {
   } catch (e) {
     debugPrint('Warning: Could not load .env file: $e');
   }
+  
+  // Initialize Stripe
+  Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? 'pk_test_51QCa7tIy2Vxy9uKgPuZ7Qr5nCzYfCsKxJx5FjBjVKSzLSLOd8t3cKYKxYxGSs8A3fKXJ8qQ2mNsXK4zJ9y8FqJ00dJxYlJvF';
+  Stripe.merchantIdentifier = 'merchant.com.kiloshare.app';
+  await Stripe.instance.applySettings();
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
