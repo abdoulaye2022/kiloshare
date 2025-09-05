@@ -133,14 +133,21 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
             });
 
-            // Public trips (no auth required)
+            // Public trips (no auth required) - Routes statiques d'abord
             $v1Group->get('/trips', [TripController::class, 'getPublicTrips']);
             $v1Group->get('/trips/price-suggestion', [TripController::class, 'getPriceSuggestion']);
+            
+            // Protected trip routes statiques (doivent venir AVANT /trips/{id})
+            $v1Group->get('/trips/cancellation-history', [TripController::class, 'getCancellationHistory'])->add(new AuthMiddleware());
+            
+            // Route dynamique publique APRÈS toutes les routes statiques
             $v1Group->get('/trips/{id}', [TripController::class, 'getPublicTripDetails']);
 
-            // Protected trip routes
+            // Autres routes protégées
             $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
                 $tripGroup->post('', [TripController::class, 'create']);
+                
+                // Routes dynamiques avec {id}
                 $tripGroup->put('/{id}', [TripController::class, 'update']);
                 $tripGroup->delete('/{id}', [TripController::class, 'delete']);
                 $tripGroup->post('/{id}/publish', [TripController::class, 'publishTrip']);
@@ -149,7 +156,6 @@ return function (App $app) {
                 // Nouvelles routes d'annulation strictes
                 $tripGroup->get('/{id}/cancellation-check', [TripController::class, 'checkTripCancellation']);
                 $tripGroup->post('/{id}/cancel', [TripController::class, 'cancelTrip']);
-                $tripGroup->get('/cancellation-history', [TripController::class, 'getCancellationHistory']);
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->post('/{id}/cloudinary-images', [TripController::class, 'addCloudinaryImages']);
@@ -194,6 +200,11 @@ return function (App $app) {
             $v1Group->group('/bookings', function (RouteCollectorProxy $bookingGroup) {
                 $bookingGroup->post('', [BookingController::class, 'createBookingRequest']);
                 $bookingGroup->get('', [BookingController::class, 'getUserBookings']);
+                
+                // Routes statiques AVANT les routes dynamiques (FastRoute requirement)
+                $bookingGroup->get('/cancellation-history', [BookingController::class, 'getCancellationHistory']);
+                
+                // Routes dynamiques avec {id}
                 $bookingGroup->get('/{id}', [BookingController::class, 'getBooking']);
                 $bookingGroup->post('/{id}/accept', [BookingController::class, 'acceptBooking']);
                 $bookingGroup->post('/{id}/reject', [BookingController::class, 'rejectBooking']);
@@ -205,7 +216,6 @@ return function (App $app) {
                 $bookingGroup->get('/{id}/cancellation-check', [BookingController::class, 'checkBookingCancellation']);
                 $bookingGroup->post('/{id}/cancel', [BookingController::class, 'cancelBooking']);
                 $bookingGroup->post('/{id}/no-show', [BookingController::class, 'markAsNoShow']);
-                $bookingGroup->get('/cancellation-history', [BookingController::class, 'getCancellationHistory']);
             })->add(new AuthMiddleware());
 
             // Booking negotiation routes

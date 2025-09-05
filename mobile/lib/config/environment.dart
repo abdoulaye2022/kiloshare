@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Configuration des variables d'environnement pour l'application mobile
@@ -13,7 +14,7 @@ class Environment {
   
   // URL Cloudinary construite dynamiquement
   static String get cloudinaryUploadUrl => 
-    'https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/image/upload';
+    'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload';
   
   // Configuration Firebase
   static String get firebaseApiKey => dotenv.env['FIREBASE_API_KEY'] ?? '';
@@ -65,14 +66,14 @@ class Environment {
   /// Affiche la configuration actuelle (sans les secrets)
   static void printConfig() {
     if (isDebug) {
-      print('=== Configuration Environment ===');
-      print('API URL: $apiUrl');
-      print('Cloudinary Cloud Name: $cloudinaryCloudName');
-      print('Cloudinary API Key: ${cloudinaryApiKey.isEmpty ? "Non défini" : "${cloudinaryApiKey.substring(0, 6)}..."}');
-      print('Cloudinary Upload Preset: $cloudinaryUploadPreset');
-      print('Firebase Project ID: $firebaseProjectId');
-      print('Debug Mode: $isDebug');
-      print('===================================');
+      debugPrint('=== Configuration Environment ===');
+      debugPrint('API URL: $apiUrl');
+      debugPrint('Cloudinary Cloud Name: $cloudinaryCloudName');
+      debugPrint('Cloudinary API Key: ${cloudinaryApiKey.isEmpty ? "Non défini" : "${cloudinaryApiKey.substring(0, 6)}..."}');
+      debugPrint('Cloudinary Upload Preset: $cloudinaryUploadPreset');
+      debugPrint('Firebase Project ID: $firebaseProjectId');
+      debugPrint('Debug Mode: $isDebug');
+      debugPrint('===================================');
     }
   }
 }
