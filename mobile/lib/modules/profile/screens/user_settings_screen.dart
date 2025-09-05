@@ -9,6 +9,7 @@ import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/models/user_model.dart';
 import '../../../themes/modern_theme.dart';
 import '../../../utils/debug_storage_cleaner.dart';
+import '../../../services/logout_service.dart';
 import '../../../widgets/optimized_cloudinary_image.dart';
 
 class UserSettingsScreen extends StatefulWidget {
@@ -592,6 +593,14 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
             titleColor: Colors.blue[700],
             onTap: () => _showClearStorageDialog(context),
           ),
+          const Divider(height: 1),
+          _buildSettingsItem(
+            icon: Icons.logout_outlined,
+            title: 'Test déconnexion complète',
+            subtitle: 'Tester le nettoyage des états persistés',
+            titleColor: Colors.orange[700],
+            onTap: () => _showLogoutTestDialog(context),
+          ),
         ],
       ),
     );
@@ -800,6 +809,79 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     );
   }
 
+  void _showLogoutTestDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('🧪 Test de Déconnexion Complète'),
+        content: const Text(
+          'Ceci va tester le nettoyage complet de tous les états persistés '
+          'comme lors d\'une vraie déconnexion, mais à des fins de test.\n\n'
+          'Tous les tokens, données cachées et préférences seront supprimés.\n\n'
+          'Voulez-vous continuer ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              
+              // Afficher un loader
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Test de déconnexion en cours...'),
+                      ],
+                    ),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+              
+              try {
+                // Effectuer le test de déconnexion complète
+                await LogoutService.performCompleteLogout();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Test de déconnexion complète réussi !'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  
+                  // Déclencher la déconnexion dans l'interface
+                  context.read<AuthBloc>().add(AuthLogoutRequested());
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Erreur lors du test: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Tester'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_card_widget.dart';
 import '../widgets/trip_status_widget.dart';
+import '../services/trip_state_manager.dart';
 import '../services/my_trips_state_manager.dart';
 import '../../../widgets/ellipsis_button.dart';
 
@@ -16,63 +17,185 @@ class MyTripsScreen extends StatefulWidget {
 class _MyTripsScreenState extends State<MyTripsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late MyTripsStateManager _stateManager;
+  final TripService _tripService = TripService();
   
+  List<Trip> _allTrips = [];
+  List<Trip> _myTrips = [];
+  List<Trip> _drafts = [];
+  List<Trip> _favorites = [];
+  List<Trip> _filteredTrips = [];
+  List<Trip> _filteredDrafts = [];
+  List<Trip> _filteredFavorites = [];
+  bool _isLoading = false;
+  String? _error;
+  
+  // Filtering and sorting
+  String _statusFilter = 'all';
+  String _sortBy = 'date';
+  bool _sortAscending = false;
+  String _searchQuery = '';
+  
+  // Advanced filters
+  String _transportFilter = 'all';
+  DateTimeRange? _dateRange;
+  double _minPrice = 0;
+  double _maxPrice = 1000;
+  double _minWeight = 0;
+  double _maxWeight = 1000;
+  String _currencyFilter = 'all';
+  bool _showExpiredTrips = true;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _stateManager = MyTripsStateManager.instance;
     
-    // Écouter les changements du gestionnaire d'état
-    _stateManager.addListener(_onStateChanged);
-    
-    // Ajouter un listener pour les changements d'onglet
+    // Ajouter un listener pour synchroniser les données quand on change d'onglet
     _tabController.addListener(_onTabChanged);
     
-    // Charger les données initiales
-    _loadInitialData();
+    // Initialize filtered lists
+    _filteredTrips = [];
+    _filteredDrafts = [];
+    _filteredFavorites = [];
+    _loadTrips();
   }
 
   @override
   void dispose() {
-    _stateManager.removeListener(_onStateChanged);
     _tabController.dispose();
     super.dispose();
   }
 
-  void _onStateChanged() {
-    if (mounted) {
-      setState(() {});
+  Future<void> _loadTrips() async {
+    print('MyTripsScreen: Starting to load trips...');
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      print('MyTripsScreen: Calling getUserTrips...');
+      final trips = await _tripService.getUserTrips();
+      print('MyTripsScreen: Received ${trips.length} trips');
+      
+      List<Trip> drafts = [];
+      List<Trip> favorites = [];
+      
+      try {
+        drafts = await _tripService.getDrafts();
+        print('MyTripsScreen: Received ${drafts.length} drafts');
+      } catch (e) {
+        print('MyTripsScreen: Failed to load drafts: $e');
+        // Fallback: filter drafts from main trips list
+        drafts = trips.where((trip) => trip.status == TripStatus.draft).toList();
+      }
+      
+      try {
+        favorites = await FavoritesService.instance.getFavoriteTrips();
+        print('MyTripsScreen: Received ${favorites.length} favorites');
+      } catch (e) {
+        print('MyTripsScreen: Failed to load favorites: $e');
+        // Fallback: empty list for now
+        favorites = [];
+      }
+      
+      setState(() {
+        // All trips from getUserTrips (should only be user's own trips, excluding favorites)
+        _allTrips = trips;
+        
+        // Published trips: user's own published trips (drafts are excluded by API)
+        _myTrips = trips;
+        
+        // Drafts: from dedicated endpoint (user's own draft trips)
+        _drafts = drafts;
+        
+        // Favorites: from dedicated endpoint (other users' trips that this user favorited)  
+        _favorites = favorites;
+        
+        print('MyTripsScreen: All user trips: ${trips.length}');
+        print('MyTripsScreen: Published trips: ${_myTrips.length}');
+        print('MyTripsScreen: Drafts: ${_drafts.length}');
+        print('MyTripsScreen: Favorites: ${_favorites.length}');
+        print('MyTripsScreen: All trips statuses: ${trips.map((t) => '${t.id}:${t.status.value}').join(', ')}');
+        print('MyTripsScreen: Draft IDs: ${_drafts.map((t) => t.id).join(', ')}');
+        print('MyTripsScreen: Favorite IDs: ${_favorites.map((t) => t.id).join(', ')}');
+        
+        _applyFilters();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('MyTripsScreen: Error loading trips: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
+  // Listener pour les changements d'onglet
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging) return;
+    if (!_tabController.indexIsChanging) return; // Éviter les appels multiples
     
-    final tabIndex = _tabController.index;
-    debugPrint('MyTripsScreen: Tab changed to index $tabIndex');
+    print('MyTripsScreen: Tab changed to index ${_tabController.index}');
     
-    // Charger les données de l'onglet actuel si nécessaire
-    switch (tabIndex) {
-      case 0:
-        _stateManager.loadTripsData();
+    switch (_tabController.index) {
+      case 0: // Onglet Voyages
+        _syncTripsData();
         break;
-      case 1:
-        _stateManager.loadDraftsData();
+      case 1: // Onglet Brouillons
+        _syncDraftsData();
         break;
-      case 2:
-        _stateManager.loadFavoritesData();
+      case 2: // Onglet Favoris
+        _syncFavoritesData();
         break;
     }
   }
 
-  Future<void> _loadInitialData() async {
-    await _stateManager.loadAllData();
+  // Synchroniser les données de l'onglet Voyages
+  Future<void> _syncTripsData() async {
+    print('MyTripsScreen: Synchronizing trips data...');
+    try {
+      final trips = await _tripService.getUserTrips();
+      setState(() {
+        _allTrips = trips;
+        _myTrips = trips.where((trip) => trip.status != TripStatus.draft).toList();
+        _applyFilters();
+      });
+      print('MyTripsScreen: Trips data synchronized - ${_myTrips.length} trips');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing trips data: $e');
+    }
   }
 
-  Future<void> _onRefresh() async {
-    await _stateManager.refreshTab(_tabController.index);
+  // Synchroniser les données de l'onglet Brouillons
+  Future<void> _syncDraftsData() async {
+    print('MyTripsScreen: Synchronizing drafts data...');
+    try {
+      final trips = await _tripService.getUserTrips();
+      setState(() {
+        _allTrips = trips;
+        _drafts = trips.where((trip) => trip.status == TripStatus.draft).toList();
+        _applyFilters();
+      });
+      print('MyTripsScreen: Drafts data synchronized - ${_drafts.length} drafts');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing drafts data: $e');
+    }
+  }
+
+  // Synchroniser les données de l'onglet Favoris
+  Future<void> _syncFavoritesData() async {
+    print('MyTripsScreen: Synchronizing favorites data...');
+    try {
+      final favoriteTrips = await FavoritesService.instance.getFavoriteTrips();
+      setState(() {
+        _favorites = favoriteTrips;
+        _applyFilters();
+      });
+      print('MyTripsScreen: Favorites data synchronized - ${_favorites.length} favorites');
+    } catch (e) {
+      print('MyTripsScreen: Error synchronizing favorites data: $e');
+    }
   }
 
   @override
@@ -100,7 +223,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                   onChanged: (value) {
-                    _stateManager.updateFilters(searchQuery: value);
+                    setState(() {
+                      _searchQuery = value;
+                      _applyFilters();
+                    });
                   },
                 ),
               ),
@@ -132,15 +258,15 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                 isScrollable: false,
                 tabs: [
                   Tab(
-                    text: 'Voyages (${_stateManager.filteredTrips.length})',
+                    text: 'Voyages (${_filteredTrips.length})',
                     icon: const Icon(Icons.flight_takeoff),
                   ),
                   Tab(
-                    text: 'Brouillons (${_stateManager.filteredDrafts.length})',
+                    text: 'Brouillons (${_filteredDrafts.length})',
                     icon: const Icon(Icons.drafts),
                   ),
                   Tab(
-                    text: 'Favoris (${_stateManager.filteredFavorites.length})',
+                    text: 'Favoris (${_filteredFavorites.length})',
                     icon: const Icon(Icons.favorite),
                   ),
                 ],
@@ -180,27 +306,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildTripsTab(
-            _stateManager.filteredTrips,
-            'Aucun voyage publié',
-            _stateManager.isLoadingTrips,
-            _stateManager.errorTrips,
-            showActions: true,
-          ),
-          _buildTripsTab(
-            _stateManager.filteredDrafts,
-            'Aucun brouillon',
-            _stateManager.isLoadingDrafts,
-            _stateManager.errorDrafts,
-            showActions: true,
-          ),
-          _buildTripsTab(
-            _stateManager.filteredFavorites,
-            'Aucun voyage favori',
-            _stateManager.isLoadingFavorites,
-            _stateManager.errorFavorites,
-            showActions: false,
-          ),
+          _buildTripsTab(_filteredTrips, 'Aucun voyage publié', showActions: true),
+          _buildTripsTab(_filteredDrafts, 'Aucun brouillon', showActions: true),
+          _buildTripsTab(_filteredFavorites, 'Aucun voyage favori', showActions: false),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -211,15 +319,15 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     );
   }
 
-  Widget _buildTripsTab(List<Trip> trips, String emptyMessage, bool isLoading, String? error, {bool showActions = true}) {
-    if (isLoading) {
+  Widget _buildTripsTab(List<Trip> trips, String emptyMessage, {bool showActions = true}) {
+    if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    if (error != null) {
-      return _buildErrorState(error);
+    if (_error != null) {
+      return _buildErrorState();
     }
 
     if (trips.isEmpty) {
@@ -227,7 +335,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _onRefresh,
+      onRefresh: _loadTrips,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: trips.length,
@@ -243,7 +351,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
               const SizedBox(height: 8),
               TripStatusWidget(
                 trip: trip,
-                showDetails: false,
+                showDetails: false, // Less details in list view
                 showMetrics: true,
               ),
               const SizedBox(height: 16),
@@ -299,7 +407,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     );
   }
 
-  Widget _buildErrorState(String error) {
+  Widget _buildErrorState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -318,7 +426,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            error,
+            _error!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Colors.grey[600],
             ),
@@ -328,7 +436,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
           SizedBox(
             width: 150,
             child: ElevatedButton.icon(
-              onPressed: () => _stateManager.refreshTab(_tabController.index),
+              onPressed: _loadTrips,
               icon: const Icon(Icons.refresh),
               label: const Text('Réessayer'),
               style: ElevatedButton.styleFrom(
@@ -344,8 +452,142 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     );
   }
 
+  void _applyFilters() {
+    List<Trip> filteredPublished = List.from(_myTrips);
+    List<Trip> filteredDrafts = List.from(_drafts);
+    List<Trip> filteredFavorites = List.from(_favorites);
+
+    // Apply status filter
+    if (_statusFilter != 'all') {
+      switch (_statusFilter) {
+        case 'active':
+          filteredPublished = filteredPublished.where((trip) => trip.status == TripStatus.active).toList();
+          break;
+        case 'paused':
+          filteredPublished = filteredPublished.where((trip) => trip.status == TripStatus.paused).toList();
+          break;
+        case 'pending':
+          filteredPublished = filteredPublished.where((trip) => 
+            trip.status == TripStatus.pendingApproval || trip.status == TripStatus.pendingReview).toList();
+          break;
+        case 'completed':
+          filteredPublished = filteredPublished.where((trip) => trip.status == TripStatus.completed).toList();
+          break;
+        case 'cancelled':
+          filteredPublished = filteredPublished.where((trip) => trip.status == TripStatus.cancelled).toList();
+          break;
+      }
+    }
+
+    // Apply advanced filters
+    _applyAdvancedFilters(filteredPublished);
+    _applyAdvancedFilters(filteredDrafts);
+    _applyAdvancedFilters(filteredFavorites);
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filteredPublished = filteredPublished.where((trip) => 
+        trip.departureCity.toLowerCase().contains(query) ||
+        trip.arrivalCity.toLowerCase().contains(query) ||
+        (trip.flightNumber?.toLowerCase().contains(query) ?? false) ||
+        (trip.airline?.toLowerCase().contains(query) ?? false)
+      ).toList();
+      
+      filteredDrafts = filteredDrafts.where((trip) => 
+        trip.departureCity.toLowerCase().contains(query) ||
+        trip.arrivalCity.toLowerCase().contains(query) ||
+        (trip.flightNumber?.toLowerCase().contains(query) ?? false) ||
+        (trip.airline?.toLowerCase().contains(query) ?? false)
+      ).toList();
+      
+      filteredFavorites = filteredFavorites.where((trip) => 
+        trip.departureCity.toLowerCase().contains(query) ||
+        trip.arrivalCity.toLowerCase().contains(query) ||
+        (trip.flightNumber?.toLowerCase().contains(query) ?? false) ||
+        (trip.airline?.toLowerCase().contains(query) ?? false)
+      ).toList();
+    }
+
+    // Apply sorting
+    _applySorting(filteredPublished);
+    _applySorting(filteredDrafts);
+    _applySorting(filteredFavorites);
+
+    setState(() {
+      _filteredTrips = filteredPublished;
+      _filteredDrafts = filteredDrafts;
+      _filteredFavorites = filteredFavorites;
+    });
+  }
+
+  void _applyAdvancedFilters(List<Trip> trips) {
+    trips.removeWhere((trip) {
+      // Transport type filter
+      if (_transportFilter != 'all' && trip.transportType != _transportFilter) {
+        return true;
+      }
+      
+      // Date range filter
+      if (_dateRange != null) {
+        final departureDate = DateTime(trip.departureDate.year, trip.departureDate.month, trip.departureDate.day);
+        final rangeStart = DateTime(_dateRange!.start.year, _dateRange!.start.month, _dateRange!.start.day);
+        final rangeEnd = DateTime(_dateRange!.end.year, _dateRange!.end.month, _dateRange!.end.day);
+        
+        if (departureDate.isBefore(rangeStart) || departureDate.isAfter(rangeEnd)) {
+          return true;
+        }
+      }
+      
+      // Price range filter
+      if (trip.pricePerKg < _minPrice || trip.pricePerKg > _maxPrice) {
+        return true;
+      }
+      
+      // Weight range filter
+      if (trip.availableWeightKg < _minWeight || trip.availableWeightKg > _maxWeight) {
+        return true;
+      }
+      
+      // Currency filter
+      if (_currencyFilter != 'all' && trip.currency != _currencyFilter) {
+        return true;
+      }
+      
+      // Expired trips filter (simple check - past departure date)
+      if (!_showExpiredTrips && trip.departureDate.isBefore(DateTime.now())) {
+        return true;
+      }
+      
+      return false;
+    });
+  }
+
+  void _applySorting(List<Trip> trips) {
+    trips.sort((a, b) {
+      int comparison = 0;
+      
+      switch (_sortBy) {
+        case 'date':
+          comparison = a.departureDate.compareTo(b.departureDate);
+          break;
+        case 'destination':
+          comparison = a.arrivalCity.compareTo(b.arrivalCity);
+          break;
+        case 'price':
+          comparison = a.pricePerKg.compareTo(b.pricePerKg);
+          break;
+        case 'capacity':
+          comparison = a.availableWeightKg.compareTo(b.availableWeightKg);
+          break;
+      }
+      
+      return _sortAscending ? comparison : -comparison;
+    });
+  }
+
   Widget _buildFilterChip(String label, String filterKey) {
-    final isSelected = _stateManager.statusFilter == filterKey;
+    final isSelected = _statusFilter == filterKey;
     
     return Container(
       margin: const EdgeInsets.only(right: 8),
@@ -359,7 +601,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
           ),
         ),
         onSelected: (selected) {
-          _stateManager.updateFilters(statusFilter: filterKey);
+          setState(() {
+            _statusFilter = filterKey;
+            _applyFilters();
+          });
         },
         backgroundColor: Colors.white,
         selectedColor: Theme.of(context).primaryColor,
@@ -375,9 +620,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: _stateManager.hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.white,
+            color: _hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _stateManager.hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.grey[300]!),
+            border: Border.all(color: _hasAdvancedFilters() ? Theme.of(context).primaryColor : Colors.grey[300]!),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -385,17 +630,17 @@ class _MyTripsScreenState extends State<MyTripsScreen>
               Icon(
                 Icons.tune,
                 size: 16,
-                color: _stateManager.hasAdvancedFilters() ? Colors.white : Colors.grey[700],
+                color: _hasAdvancedFilters() ? Colors.white : Colors.grey[700],
               ),
               const SizedBox(width: 4),
               Text(
                 'Filtres',
                 style: TextStyle(
                   fontSize: 12,
-                  color: _stateManager.hasAdvancedFilters() ? Colors.white : Colors.grey[700],
+                  color: _hasAdvancedFilters() ? Colors.white : Colors.grey[700],
                 ),
               ),
-              if (_stateManager.hasAdvancedFilters())
+              if (_hasAdvancedFilters())
                 Container(
                   margin: const EdgeInsets.only(left: 4),
                   width: 6,
@@ -410,6 +655,17 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         ),
       ),
     );
+  }
+
+  bool _hasAdvancedFilters() {
+    return _transportFilter != 'all' ||
+           _dateRange != null ||
+           _minPrice > 0 ||
+           _maxPrice < 1000 ||
+           _minWeight > 0 ||
+           _maxWeight < 1000 ||
+           _currencyFilter != 'all' ||
+           !_showExpiredTrips;
   }
 
   Widget _buildSortButton() {
@@ -428,7 +684,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             const SizedBox(width: 4),
             Text('Trier', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
             Icon(
-              _stateManager.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
               size: 12,
               color: Colors.grey[600],
             ),
@@ -436,11 +692,15 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         ),
       ),
       onSelected: (value) {
-        if (value == _stateManager.sortBy) {
-          _stateManager.updateFilters(sortAscending: !_stateManager.sortAscending);
-        } else {
-          _stateManager.updateFilters(sortBy: value, sortAscending: true);
-        }
+        setState(() {
+          if (value == _sortBy) {
+            _sortAscending = !_sortAscending;
+          } else {
+            _sortBy = value;
+            _sortAscending = true;
+          }
+          _applyFilters();
+        });
       },
       itemBuilder: (context) => [
         const PopupMenuItem(
@@ -495,8 +755,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                     children: [
                       TextButton(
                         onPressed: () {
-                          _stateManager.resetAdvancedFilters();
-                          setModalState(() {});
+                          setModalState(() {
+                            _resetAdvancedFilters();
+                          });
                         },
                         child: const Text('Réinitialiser'),
                       ),
@@ -562,6 +823,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                 width: double.infinity,
                 child: EllipsisButton.elevated(
                   onPressed: () {
+                    setState(() {
+                      _applyFilters();
+                    });
                     Navigator.pop(context);
                   },
                   text: 'Appliquer les filtres',
@@ -598,20 +862,20 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     return Wrap(
       spacing: 8,
       children: [
-        _buildModalFilterChip('Tous', 'all', _stateManager.transportFilter, setModalState, (value) {
-          _stateManager.updateFilters(transportFilter: value);
+        _buildModalFilterChip('Tous', 'all', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
         }),
-        _buildModalFilterChip('Avion', 'flight', _stateManager.transportFilter, setModalState, (value) {
-          _stateManager.updateFilters(transportFilter: value);
+        _buildModalFilterChip('Avion', 'flight', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
         }),
-        _buildModalFilterChip('Voiture', 'car', _stateManager.transportFilter, setModalState, (value) {
-          _stateManager.updateFilters(transportFilter: value);
+        _buildModalFilterChip('Voiture', 'car', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
         }),
-        _buildModalFilterChip('Train', 'train', _stateManager.transportFilter, setModalState, (value) {
-          _stateManager.updateFilters(transportFilter: value);
+        _buildModalFilterChip('Train', 'train', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
         }),
-        _buildModalFilterChip('Bus', 'bus', _stateManager.transportFilter, setModalState, (value) {
-          _stateManager.updateFilters(transportFilter: value);
+        _buildModalFilterChip('Bus', 'bus', _transportFilter, setModalState, (value) {
+          setModalState(() => _transportFilter = value);
         }),
       ],
     );
@@ -622,16 +886,13 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       children: [
         ListTile(
           leading: const Icon(Icons.date_range),
-          title: Text(_stateManager.dateRange == null 
+          title: Text(_dateRange == null 
             ? 'Sélectionner une période' 
-            : '${_stateManager.dateRange!.start.day}/${_stateManager.dateRange!.start.month} - ${_stateManager.dateRange!.end.day}/${_stateManager.dateRange!.end.month}'),
-          trailing: _stateManager.dateRange != null 
+            : '${_dateRange!.start.day}/${_dateRange!.start.month} - ${_dateRange!.end.day}/${_dateRange!.end.month}'),
+          trailing: _dateRange != null 
             ? IconButton(
                 icon: const Icon(Icons.clear),
-                onPressed: () {
-                  _stateManager.updateFilters(dateRange: null);
-                  setModalState(() {});
-                },
+                onPressed: () => setModalState(() => _dateRange = null),
               )
             : null,
           onTap: () async {
@@ -639,11 +900,10 @@ class _MyTripsScreenState extends State<MyTripsScreen>
               context: context,
               firstDate: DateTime.now(),
               lastDate: DateTime.now().add(const Duration(days: 365)),
-              initialDateRange: _stateManager.dateRange,
+              initialDateRange: _dateRange,
             );
             if (range != null) {
-              _stateManager.updateFilters(dateRange: range);
-              setModalState(() {});
+              setModalState(() => _dateRange = range);
             }
           },
         ),
@@ -655,23 +915,22 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     return Column(
       children: [
         RangeSlider(
-          values: RangeValues(_stateManager.minPrice, _stateManager.maxPrice),
+          values: RangeValues(_minPrice, _maxPrice),
           min: 0,
           max: 1000,
           divisions: 20,
           labels: RangeLabels(
-            '${_stateManager.minPrice.round()}€',
-            '${_stateManager.maxPrice.round()}€',
+            '${_minPrice.round()}€',
+            '${_maxPrice.round()}€',
           ),
           onChanged: (values) {
-            _stateManager.updateFilters(
-              minPrice: values.start,
-              maxPrice: values.end,
-            );
-            setModalState(() {});
+            setModalState(() {
+              _minPrice = values.start;
+              _maxPrice = values.end;
+            });
           },
         ),
-        Text('${_stateManager.minPrice.round()}€ - ${_stateManager.maxPrice.round()}€'),
+        Text('${_minPrice.round()}€ - ${_maxPrice.round()}€'),
       ],
     );
   }
@@ -680,23 +939,22 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     return Column(
       children: [
         RangeSlider(
-          values: RangeValues(_stateManager.minWeight, _stateManager.maxWeight),
+          values: RangeValues(_minWeight, _maxWeight),
           min: 0,
           max: 1000,
           divisions: 50,
           labels: RangeLabels(
-            '${_stateManager.minWeight.round()}kg',
-            '${_stateManager.maxWeight.round()}kg',
+            '${_minWeight.round()}kg',
+            '${_maxWeight.round()}kg',
           ),
           onChanged: (values) {
-            _stateManager.updateFilters(
-              minWeight: values.start,
-              maxWeight: values.end,
-            );
-            setModalState(() {});
+            setModalState(() {
+              _minWeight = values.start;
+              _maxWeight = values.end;
+            });
           },
         ),
-        Text('${_stateManager.minWeight.round()}kg - ${_stateManager.maxWeight.round()}kg'),
+        Text('${_minWeight.round()}kg - ${_maxWeight.round()}kg'),
       ],
     );
   }
@@ -705,17 +963,17 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     return Wrap(
       spacing: 8,
       children: [
-        _buildModalFilterChip('Toutes', 'all', _stateManager.currencyFilter, setModalState, (value) {
-          _stateManager.updateFilters(currencyFilter: value);
+        _buildModalFilterChip('Toutes', 'all', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
         }),
-        _buildModalFilterChip('EUR', 'EUR', _stateManager.currencyFilter, setModalState, (value) {
-          _stateManager.updateFilters(currencyFilter: value);
+        _buildModalFilterChip('EUR', 'EUR', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
         }),
-        _buildModalFilterChip('CAD', 'CAD', _stateManager.currencyFilter, setModalState, (value) {
-          _stateManager.updateFilters(currencyFilter: value);
+        _buildModalFilterChip('CAD', 'CAD', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
         }),
-        _buildModalFilterChip('USD', 'USD', _stateManager.currencyFilter, setModalState, (value) {
-          _stateManager.updateFilters(currencyFilter: value);
+        _buildModalFilterChip('USD', 'USD', _currencyFilter, setModalState, (value) {
+          setModalState(() => _currencyFilter = value);
         }),
       ],
     );
@@ -726,10 +984,9 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       children: [
         SwitchListTile(
           title: const Text('Afficher les voyages expirés'),
-          value: _stateManager.showExpiredTrips,
+          value: _showExpiredTrips,
           onChanged: (value) {
-            _stateManager.updateFilters(showExpiredTrips: value);
-            setModalState(() {});
+            setModalState(() => _showExpiredTrips = value);
           },
         ),
       ],
@@ -749,10 +1006,20 @@ class _MyTripsScreenState extends State<MyTripsScreen>
       label: Text(label),
       onSelected: (selected) {
         onSelected(value);
-        setModalState(() {});
       },
       selectedColor: Theme.of(context).primaryColor,
     );
+  }
+
+  void _resetAdvancedFilters() {
+    _transportFilter = 'all';
+    _dateRange = null;
+    _minPrice = 0;
+    _maxPrice = 1000;
+    _minWeight = 0;
+    _maxWeight = 1000;
+    _currencyFilter = 'all';
+    _showExpiredTrips = true;
   }
 
   void _handleMenuAction(String action) {
@@ -767,8 +1034,6 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   }
 
   void _showStatistics() {
-    final stats = _stateManager.getStatistics();
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -784,23 +1049,24 @@ class _MyTripsScreenState extends State<MyTripsScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatRow('Total voyages', stats['totalTrips'].toString()),
-              _buildStatRow('Voyages publiés', stats['publishedTrips'].toString()),
-              _buildStatRow('Brouillons', stats['drafts'].toString()),
-              _buildStatRow('Favoris', stats['favorites'].toString()),
+              _buildStatRow('Total voyages', _allTrips.length.toString()),
+              _buildStatRow('Voyages publiés', _myTrips.length.toString()),
+              _buildStatRow('Brouillons', _drafts.length.toString()),
+              _buildStatRow('Favoris', _favorites.length.toString()),
+              _buildStatRow('Nécessitent attention', _getTripsNeedingAttention().toString()),
               const Divider(),
               _buildStatRow(
                 'Revenus potentiels',
-                '${stats['totalEarnings'].toStringAsFixed(0)} CAD',
+                '${_allTrips.fold(0.0, (sum, trip) => sum + trip.totalEarningsPotential).toStringAsFixed(0)} CAD',
               ),
               _buildStatRow(
                 'Capacité totale',
-                '${stats['totalCapacity'].toStringAsFixed(1)} kg',
+                '${_allTrips.fold(0.0, (sum, trip) => sum + trip.availableWeightKg).toStringAsFixed(1)} kg',
               ),
               const Divider(),
               _buildStatRow(
                 'Voyage le plus populaire',
-                stats['mostPopularTrip'].toString(),
+                _getMostPopularTrip(),
               ),
             ],
           ),
@@ -826,6 +1092,20 @@ class _MyTripsScreenState extends State<MyTripsScreen>
         ],
       ),
     );
+  }
+
+  String _getMostPopularTrip() {
+    if (_allTrips.isEmpty) return 'Aucun voyage';
+    
+    final mostPopular = _allTrips.reduce((a, b) => 
+      a.viewCount > b.viewCount ? a : b
+    );
+    
+    return '${mostPopular.routeDisplay} (${mostPopular.viewCount} vues)';
+  }
+  
+  int _getTripsNeedingAttention() {
+    return _allTrips.where((trip) => TripStateManager.requiresAttention(trip)).length;
   }
 
   void _exportTrips() {

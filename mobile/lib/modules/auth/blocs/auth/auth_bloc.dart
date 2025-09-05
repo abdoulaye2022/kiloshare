@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kiloshare/modules/auth/services/auth_service.dart';
 import '../../services/phone_auth_service.dart';
 import '../../../../services/auth_token_service.dart';
+import '../../../../services/logout_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -282,10 +283,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     try {
-      await _authService.logout();
+      // Utiliser le service centralisé de déconnexion pour vider tous les états persistés
+      await LogoutService.performCompleteLogout();
       emit(AuthUnauthenticated());
     } catch (e) {
-      emit(AuthUnauthenticated()); // Logout anyway
+      // Même en cas d'erreur, émettre l'état non authentifié
+      // Le nettoyage local forcé a probablement eu lieu
+      emit(AuthUnauthenticated());
     }
   }
 
