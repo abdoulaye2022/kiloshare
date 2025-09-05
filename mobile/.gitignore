@@ -43,3 +43,27 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment Variables & Secrets
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+!.env.example
+
+# Sensitive configuration files
+google-services.json
+GoogleService-Info.plist
+firebase_options_secret.dart
+*secret*.md
+*key*.md
+*token*.md
+*api*.md
+credentials.json
+service-account.json
+
+# Generated environment files
+lib/firebase_options_generated.dart

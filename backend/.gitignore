@@ -1,0 +1,49 @@
+# Environment Variables
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+!.env.example
+
+# Composer
+/vendor/
+composer.lock
+
+# Cache & Logs
+/storage/logs/*.log
+/storage/cache/*
+/storage/tmp/*
+*.log
+*.log.*
+
+# Database
+*.sql.backup
+*.db.backup
+*.dump
+
+# Secrets & Configuration
+*secret*.md
+*key*.md
+*token*.md
+*api*.md
+*auth*.md
+credentials.json
+service-account.json
+config_secrets.php
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PHP
+*.tmp
+.phpunit.cache

@@ -9,6 +9,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'config/app_config.dart';
 import 'config/theme.dart';
 import 'config/router.dart';
+import 'config/environment.dart';
 import 'modules/auth/blocs/bloc.dart';
 import 'modules/auth/services/auth_service.dart';
 import 'modules/auth/services/phone_auth_service.dart';
@@ -17,15 +18,16 @@ import 'package:dio/dio.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables
+  // Initialize environment configuration
   try {
-    await dotenv.load(fileName: ".env");
+    await Environment.initialize();
+    Environment.printConfig();
   } catch (e) {
-    debugPrint('Warning: Could not load .env file: $e');
+    debugPrint('Error loading environment: $e');
   }
   
   // Initialize Stripe
-  Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? 'pk_test_51QCa7tIy2Vxy9uKgPuZ7Qr5nCzYfCsKxJx5FjBjVKSzLSLOd8t3cKYKxYxGSs8A3fKXJ8qQ2mNsXK4zJ9y8FqJ00dJxYlJvF';
+  Stripe.publishableKey = Environment.stripePublishableKey;
   Stripe.merchantIdentifier = 'merchant.com.kiloshare.app';
   await Stripe.instance.applySettings();
   

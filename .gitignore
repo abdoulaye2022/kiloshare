@@ -1,11 +1,18 @@
 # Composer
 /api/v1/vendor/
 
-# Local Configuration
+# Local Configuration & Environment Variables
 /api/v1/.env
 .env
 .env.*
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
 !.env.example
+!.env.sample
+!.env.template
 
 # Fichiers avec clés secrètes
 *secret*.md
@@ -31,12 +38,21 @@ env.example.bak
 backend/vendor/
 backend/.env
 backend/.env.*
+backend/.env.local
+backend/.env.development
+backend/.env.production
+backend/.env.staging
+backend/.env.test
 backend/*secret*.md
 backend/*key*.md
 
 # Web (Next.js)
 web/.env
 web/.env.*
+web/.env.local
+web/.env.development.local
+web/.env.production.local
+web/.env.test.local
 web/*secret*.md
 web/*key*.md
 web/node_modules/
@@ -49,11 +65,35 @@ mobile/.dart_tool/
 mobile/.flutter-plugins*
 mobile/.env
 mobile/.env.*
+mobile/.env.local
+mobile/.env.development
+mobile/.env.production
+mobile/.env.staging
+mobile/.env.test
 mobile/*secret*.md
 mobile/*key*.md
 
 # Database
 *.sql.backup
+*.db.backup
+*.dump
+
+# Autres fichiers sensibles
+config.json
+secrets.json
+credentials.json
+service-account.json
+google-services.json
+GoogleService-Info.plist
+firebase-config.json
+*.pem
+*.key
+*.crt
+*.p12
+
+# Fichiers de configuration IDE avec secrets potentiels
+.vscode/settings.json
+.idea/workspace.xml
 
 # OS
 .DS_Store

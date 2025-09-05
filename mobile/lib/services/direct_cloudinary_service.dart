@@ -4,16 +4,17 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path/path.dart' as path;
+import '../config/environment.dart';
 
 /// Service pour upload direct vers Cloudinary (sans passer par notre API)
 class DirectCloudinaryService {
   final Dio _dio;
   
-  // Configuration Cloudinary - vraies clés
-  static const String cloudinaryUrl = 'https://api.cloudinary.com/v1_1/dvqisegwj/image/upload';
-  static const String cloudName = 'dvqisegwj';
-  static const String apiKey = '821842469494291';
-  static const String apiSecret = 'YgVWPlhwCEuo9t8nRkwsfjzXcSI';
+  // Configuration Cloudinary depuis les variables d'environnement
+  static String get cloudinaryUrl => Environment.cloudinaryUploadUrl;
+  static String get cloudName => Environment.cloudinaryCloudName;
+  static String get apiKey => Environment.cloudinaryApiKey;
+  static String get apiSecret => Environment.cloudinaryApiSecret;
   
   DirectCloudinaryService({Dio? dio}) : _dio = dio ?? Dio();
 
