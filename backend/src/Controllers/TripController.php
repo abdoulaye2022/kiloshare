@@ -901,6 +901,67 @@ class TripController
         }
     }
 
+    public function addCloudinaryImages(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $tripId = (int) $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::find($tripId);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+
+            if (!$trip->isOwner($user)) {
+                return Response::forbidden('You can only add images to your own trips');
+            }
+
+            // Vérifier le nombre d'images existantes (max 5)
+            $currentImageCount = $trip->images()->count();
+            
+            $body = json_decode($request->getBody()->getContents(), true);
+            $images = $body['images'] ?? [];
+            
+            if (empty($images)) {
+                return Response::badRequest('No images data provided');
+            }
+            
+            if ($currentImageCount + count($images) > 5) {
+                return Response::error('Maximum 5 images allowed per trip');
+            }
+
+            $createdImages = [];
+            
+            foreach ($images as $index => $imageData) {
+                $tripImage = TripImage::create([
+                    'trip_id' => $trip->id,
+                    'image_path' => $imageData['url'],
+                    'image_name' => $imageData['image_name'] ?? basename($imageData['public_id']),
+                    'public_id' => $imageData['public_id'],
+                    'url' => $imageData['url'],
+                    'thumbnail' => $imageData['thumbnail'],
+                    'width' => $imageData['width'] ?? null,
+                    'height' => $imageData['height'] ?? null,
+                    'file_size' => $imageData['file_size'] ?? null,
+                    'format' => $imageData['format'] ?? 'jpg',
+                    'mime_type' => 'image/' . ($imageData['format'] ?? 'jpeg'),
+                    'is_primary' => $imageData['is_primary'] ?? false,
+                    'alt_text' => $imageData['alt_text'],
+                    'order' => $currentImageCount + $index,
+                ]);
+
+                $createdImages[] = $tripImage;
+            }
+
+            return Response::success([
+                'images' => $createdImages
+            ], 'Images added successfully');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to add images: ' . $e->getMessage());
+        }
+    }
+
     public function removeTripImage(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');

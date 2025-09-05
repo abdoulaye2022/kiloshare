@@ -1133,6 +1133,38 @@ class TripService {
       throw _handleDioException(e);
     }
   }
+
+  /// Add Cloudinary images to an existing trip
+  Future<void> addCloudinaryImages({
+    required String tripId,
+    required List<Map<String, dynamic>> images,
+  }) async {
+    try {
+      final token = await _authService.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const TripException('Authentication token is required. Please log in again.');
+      }
+
+      final response = await _dio.post('/trips/$tripId/cloudinary-images',
+        data: {
+          'images': images,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      if (response.data['success'] != true) {
+        throw TripException(response.data['message'] ?? 'Failed to add images to trip');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
 }
 
 class TripException implements Exception {

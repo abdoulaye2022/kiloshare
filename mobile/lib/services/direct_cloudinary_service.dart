@@ -37,7 +37,7 @@ class DirectCloudinaryService {
         
         // Créer les paramètres pour l'upload signé
         final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-        final publicId = 'kiloshare/trips/trip_${timestamp}_$i';
+        final publicId = 'trip_${timestamp}_$i';  // Sans le folder, car il sera ajouté automatiquement
         
         // Paramètres pour la signature
         final params = {

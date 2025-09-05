@@ -1264,13 +1264,48 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
         await _tripService.updateTrip(widget.tripId!, updateData);
 
-        // TODO: Handle images for edit mode - upload to Cloudinary and update trip
+        // Handle images for edit mode - upload to Cloudinary and update trip
         if (_selectedImages.isNotEmpty) {
           try {
-            print('TODO: Images would be handled here for edit mode');
-            // For now, skip image handling in edit mode
+            print('DEBUG: Uploading ${_selectedImages.length} images to Cloudinary for edit mode');
+            final uploadResults = await _cloudinaryService.uploadTripPhotos(
+              _selectedImages,
+            );
+            
+            print('DEBUG: Images uploaded successfully, now updating trip_images table');
+            
+            // Prepare image data for API
+            final imageData = uploadResults.map((uploadResult) => {
+              'url': uploadResult['url'],
+              'thumbnail': uploadResult['thumbnail'],
+              'public_id': uploadResult['public_id'],
+              'image_name': uploadResult['public_id'].split('/').last,
+              'width': uploadResult['width'],
+              'height': uploadResult['height'],
+              'file_size': uploadResult['file_size'],
+              'format': uploadResult['format'],
+              'is_primary': uploadResult['is_primary'],
+              'alt_text': uploadResult['alt_text'],
+            }).toList();
+            
+            // Add images to the trip via API
+            await _tripService.addCloudinaryImages(
+              tripId: widget.tripId!,
+              images: imageData,
+            );
+            
+            print('DEBUG: All images uploaded and added to trip successfully');
           } catch (e) {
-            print('Warning: Image upload failed: $e');
+            print('ERROR: Image upload failed: $e');
+            // Show error to user but don't prevent trip update
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erreur lors de l\'upload des images: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         }
 
