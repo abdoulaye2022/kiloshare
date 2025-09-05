@@ -174,12 +174,12 @@ class AuthController
             $user = User::withEmail($data['email'])->first();
 
             if (!$user || !password_verify($data['password'], $user->password_hash)) {
-                return Response::unauthorized('Invalid credentials');
+                return Response::unauthorized('Adresse e-mail ou mot de passe incorrect');
             }
 
             // Vérifier le statut
             if (!$user->isActive()) {
-                return Response::unauthorized('Account is not active');
+                return Response::unauthorized('Votre compte n\'est pas actif');
             }
 
             // Mettre à jour la dernière connexion
@@ -237,11 +237,11 @@ class AuthController
                         ->first();
 
             if (!$user || !password_verify($data['password'], $user->password_hash)) {
-                return Response::unauthorized('Invalid admin credentials');
+                return Response::unauthorized('Identifiants administrateur incorrects');
             }
 
             if (!$user->isActive()) {
-                return Response::unauthorized('Admin account is not active');
+                return Response::unauthorized('Le compte administrateur n\'est pas actif');
             }
 
             // Mettre à jour la dernière connexion
