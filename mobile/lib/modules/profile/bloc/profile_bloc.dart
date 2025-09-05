@@ -126,7 +126,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
       emit(const ProfileActionLoading(action: 'upload_avatar'));
       
-      final avatarUrl = await _profileService.uploadAvatar(event.imageFile);
+      final uploadResult = await _profileService.uploadAvatar(event.imageFile);
+      final avatarUrl = uploadResult['profile_picture'] as String? ?? '';
       
       emit(AvatarUploaded(avatarUrl: avatarUrl));
       

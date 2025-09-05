@@ -10,7 +10,7 @@ import '../../auth/models/user_model.dart';
 import '../../../themes/modern_theme.dart';
 import '../../../utils/debug_storage_cleaner.dart';
 import '../../../services/logout_service.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import '../widgets/avatar_picker_widget.dart';
 
 class UserSettingsScreen extends StatefulWidget {
   const UserSettingsScreen({super.key});
@@ -135,32 +135,18 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-            ),
-            child: isAuthenticated
-                ? CloudinaryAvatar(
-                    imageUrl: user?.profilePicture,
-                    userName: '${user?.firstName ?? ''} ${user?.lastName ?? ''}',
-                    radius: 37,
-                    textStyle: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  )
-                : const CircleAvatar(
-                    radius: 37,
-                    child: Icon(
-                      Icons.person_outline,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
+          AvatarPickerWidget(
+            currentAvatarUrl: user?.profilePicture,
+            size: 86,
+            isEditable: isAuthenticated,
+            onAvatarChanged: (newAvatarUrl) {
+              // Mettre à jour l'état de l'utilisateur si nécessaire
+              if (mounted) {
+                setState(() {
+                  // L'avatar sera automatiquement mis à jour lors du prochain rebuild
+                });
+              }
+            },
           ),
           const SizedBox(height: 12),
           Text(

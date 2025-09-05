@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace KiloShare\Controllers;
 
 use KiloShare\Models\Notification;
+use KiloShare\Models\UserFCMToken;
+use KiloShare\Services\FirebaseNotificationService;
 use KiloShare\Utils\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -183,6 +185,104 @@ class NotificationController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to fetch notifications by type: ' . $e->getMessage());
+        }
+    }
+
+    public function registerFCMToken(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $data = $request->getParsedBody();
+
+        try {
+            $token = $data['token'] ?? null;
+            $platform = $data['platform'] ?? 'mobile';
+            $deviceInfo = $data['device_info'] ?? [];
+
+            if (empty($token)) {
+                return Response::validationError(['token' => 'FCM token is required']);
+            }
+
+            $firebaseService = new FirebaseNotificationService();
+            $success = $firebaseService->registerToken($user->id, $token, $platform);
+
+            if ($success) {
+                if (!empty($deviceInfo)) {
+                    UserFCMToken::where('user_id', $user->id)
+                              ->where('fcm_token', $token)
+                              ->update(['device_info' => $deviceInfo]);
+                }
+
+                return Response::success([
+                    'message' => 'FCM token registered successfully',
+                    'token' => $token
+                ]);
+            } else {
+                return Response::serverError('Failed to register FCM token');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error registering FCM token: ' . $e->getMessage());
+        }
+    }
+
+    public function unregisterFCMToken(ServerRequestInterface $request): ResponseInterface
+    {
+        $data = $request->getParsedBody();
+
+        try {
+            $token = $data['token'] ?? null;
+
+            if (empty($token)) {
+                return Response::validationError(['token' => 'FCM token is required']);
+            }
+
+            $firebaseService = new FirebaseNotificationService();
+            $success = $firebaseService->unregisterToken($token);
+
+            if ($success) {
+                return Response::success([
+                    'message' => 'FCM token unregistered successfully'
+                ]);
+            } else {
+                return Response::serverError('Failed to unregister FCM token');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error unregistering FCM token: ' . $e->getMessage());
+        }
+    }
+
+    public function sendTestNotification(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        try {
+            $firebaseService = new FirebaseNotificationService();
+            $success = $firebaseService->sendTestNotification($user->id);
+
+            if ($success) {
+                return Response::success([
+                    'message' => 'Test notification sent successfully'
+                ]);
+            } else {
+                return Response::serverError('Failed to send test notification');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error sending test notification: ' . $e->getMessage());
+        }
+    }
+
+    public function getFCMStats(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $firebaseService = new FirebaseNotificationService();
+            $stats = $firebaseService->getTokenStats();
+
+            return Response::success($stats);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error getting FCM stats: ' . $e->getMessage());
         }
     }
 }

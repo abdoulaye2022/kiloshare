@@ -180,7 +180,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       
       // Upload avatar if selected
       if (_selectedImage != null) {
-        avatarUrl = await _profileService.uploadAvatar(_selectedImage!);
+        final uploadResult = await _profileService.uploadAvatar(_selectedImage!);
+        avatarUrl = uploadResult['profile_picture'] as String?;
       }
 
       // Prepare profile data

@@ -253,16 +253,102 @@ class UserProfileController
         $user = $request->getAttribute('user');
 
         try {
-            // TODO: Implémenter l'upload d'image
-            // Pour l'instant, retourner un succès fictif
+            $uploadedFiles = $request->getUploadedFiles();
             
-            return Response::success([
-                'message' => 'Profile picture uploaded successfully'
-            ]);
+            if (empty($uploadedFiles['avatar'])) {
+                return Response::validationError(['avatar' => 'No avatar file uploaded']);
+            }
+
+            $avatar = $uploadedFiles['avatar'];
+            
+            if ($avatar->getError() !== UPLOAD_ERR_OK) {
+                return Response::validationError(['avatar' => 'File upload error']);
+            }
+
+            // Vérifier le type de fichier
+            $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            $mimeType = $avatar->getClientMediaType();
+            
+            if (!in_array($mimeType, $allowedTypes)) {
+                return Response::validationError(['avatar' => 'Invalid file type. Only JPEG, PNG and WebP are allowed']);
+            }
+
+            // Vérifier la taille (5MB max)
+            $maxSize = 5 * 1024 * 1024; // 5MB
+            if ($avatar->getSize() > $maxSize) {
+                return Response::validationError(['avatar' => 'File too large. Maximum size is 5MB']);
+            }
+
+            // Créer un fichier temporaire
+            $tempDir = sys_get_temp_dir();
+            $tempFile = tempnam($tempDir, 'avatar_' . $user->id . '_');
+            
+            if (!$tempFile) {
+                return Response::serverError('Failed to create temporary file');
+            }
+
+            try {
+                // Déplacer le fichier uploadé vers le fichier temporaire
+                $avatar->moveTo($tempFile);
+
+                // Upload vers Cloudinary
+                $cloudinaryService = new \KiloShare\Services\CloudinaryService();
+                $uploadResult = $cloudinaryService->uploadAvatar($tempFile, (int)$user->id);
+
+                // Supprimer l'ancien avatar si il existe
+                if ($user->profile_picture) {
+                    // Extraire le public_id de l'ancienne URL
+                    $oldPublicId = $this->extractPublicIdFromUrl($user->profile_picture);
+                    if ($oldPublicId) {
+                        $cloudinaryService->deleteImage($oldPublicId);
+                    }
+                }
+
+                // Mettre à jour l'URL de l'avatar dans la base de données
+                $user->profile_picture = $uploadResult['url'];
+                $user->save();
+
+                // Supprimer le fichier temporaire
+                unlink($tempFile);
+
+                return Response::success([
+                    'user' => [
+                        'id' => $user->id,
+                        'profile_picture' => $user->profile_picture,
+                        'profile_picture_thumbnail' => $uploadResult['thumbnail'] ?? null,
+                    ]
+                ], 'Profile picture uploaded successfully');
+
+            } finally {
+                // S'assurer que le fichier temporaire est supprimé même en cas d'erreur
+                if (file_exists($tempFile)) {
+                    unlink($tempFile);
+                }
+            }
 
         } catch (\Exception $e) {
+            error_log('Avatar upload error: ' . $e->getMessage());
             return Response::serverError('Failed to upload profile picture: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Extraire le public_id depuis une URL Cloudinary
+     */
+    private function extractPublicIdFromUrl(string $url): ?string
+    {
+        // Pattern pour extraire le public_id d'une URL Cloudinary
+        // Format: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{format}
+        if (preg_match('/\/v\d+\/(.+)\.[a-zA-Z]{3,4}$/', $url, $matches)) {
+            return $matches[1];
+        }
+        
+        // Pattern alternatif sans version
+        if (preg_match('/\/upload\/(.+)\.[a-zA-Z]{3,4}$/', $url, $matches)) {
+            return $matches[1];
+        }
+        
+        return null;
     }
 
     public function deleteAccount(ServerRequestInterface $request): ResponseInterface

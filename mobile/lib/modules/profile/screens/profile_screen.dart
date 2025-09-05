@@ -8,8 +8,9 @@ import '../bloc/profile_state.dart';
 import '../widgets/profile_info_tab.dart';
 import '../widgets/verification_tab.dart';
 import '../widgets/trust_badge_widget.dart';
+import '../widgets/avatar_picker_widget.dart';
 import '../../auth/services/auth_service.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import '../../../utils/profile_debug_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,20 +19,21 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   bool _isAuthenticated = false;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _checkAuthentication();
-    
+
     // Load profile data when screen initializes
     context.read<ProfileBloc>().add(const GetUserProfile());
   }
-  
+
   void _checkAuthentication() async {
     final authService = AuthService.instance;
     final isAuth = await authService.isAuthenticated();
@@ -113,32 +115,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           if (state is ProfileLoading) {
             return _buildLoadingScreen();
           }
-          
+
           if (state is NoProfile) {
             return _buildNoProfileScreen(context);
           }
-          
+
           if (state is ProfileError && state.error.toString().contains('401')) {
             return _buildUnauthorizedScreen(context);
           }
-          
+
           if (state is ProfileError) {
             return _buildErrorScreen(context, state.message);
           }
-          
+
           if (state is ProfileLoaded) {
             return _buildMainContent(context, state);
           }
-          
+
           if (state is ProfilePartiallyLoaded) {
             return _buildPartialContent(context, state);
           }
-          
+
           // Default case for other states like ProfileActionLoading
           if (state is ProfileActionLoading) {
             return _buildActionLoadingScreen(state.action);
           }
-          
+
           return _buildInitialScreen();
         },
       ),
@@ -179,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         message = 'Suppression du document...';
         break;
     }
-    
+
     return Scaffold(
       body: Center(
         child: Column(
@@ -218,8 +220,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             Text(
               'Créez votre profil pour commencer',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
+                    color: Colors.grey[600],
+                  ),
             ),
             const SizedBox(height: 24),
             _isAuthenticated
@@ -263,8 +265,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             Text(
               'Veuillez vous reconnecter',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
+                    color: Colors.grey[600],
+                  ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -305,8 +307,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                      color: Colors.grey[600],
+                    ),
               ),
             ),
             const SizedBox(height: 24),
@@ -361,7 +363,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               pinned: true,
               backgroundColor: Theme.of(context).colorScheme.inversePrimary,
               flexibleSpace: FlexibleSpaceBar(
-                background: _buildProfileHeader(context, profile, state.verificationStatus),
+                background: _buildProfileHeader(
+                    context, profile, state.verificationStatus),
               ),
               actions: [
                 if (_isAuthenticated)
@@ -377,7 +380,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
-                    context.read<ProfileBloc>().add(const RefreshAllProfileData());
+                    context
+                        .read<ProfileBloc>()
+                        .add(const RefreshAllProfileData());
                   },
                 ),
               ],
@@ -386,13 +391,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               delegate: _SliverAppBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  tabs: [
+                  tabs: const [
                     Tab(
-                      icon: const Icon(Icons.person),
+                      icon: Icon(Icons.person),
                       text: 'Informations',
                     ),
                     Tab(
-                      icon: const Icon(Icons.verified_user),
+                      icon: Icon(Icons.verified_user),
                       text: 'Vérification',
                     ),
                   ],
@@ -405,12 +410,20 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         body: TabBarView(
           controller: _tabController,
           children: [
-            ProfileInfoTab(
-              profile: profile,
-              isAuthenticated: _isAuthenticated,
-              onEdit: _isAuthenticated 
-                  ? () => context.go('/edit-profile')
-                  : () => context.go('/auth/login'),
+            Column(
+              children: [
+                // Widget de debug temporaire
+                ProfileDebugWidget(profile: profile),
+                Expanded(
+                  child: ProfileInfoTab(
+                    profile: profile,
+                    isAuthenticated: _isAuthenticated,
+                    onEdit: _isAuthenticated
+                        ? () => context.go('/edit-profile')
+                        : () => context.go('/auth/login'),
+                  ),
+                ),
+              ],
             ),
             VerificationTab(
               profile: profile,
@@ -425,7 +438,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildPartialContent(BuildContext context, ProfilePartiallyLoaded state) {
+  Widget _buildPartialContent(
+      BuildContext context, ProfilePartiallyLoaded state) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profil'),
@@ -457,20 +471,23 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                   const SizedBox(height: 8),
                   ...state.errors.map((error) => Text(
-                    '• $error',
-                    style: TextStyle(color: Colors.orange[700]),
-                  )),
+                        '• $error',
+                        style: TextStyle(color: Colors.orange[700]),
+                      )),
                 ],
               ),
             ),
           Expanded(
             child: state.profile != null
-                ? _buildMainContent(context, ProfileLoaded(
-                    profile: state.profile,
-                    documents: state.documents ?? [],
-                    badges: state.badges ?? [],
-                    verificationStatus: state.verificationStatus ?? const VerificationStatus(),
-                  ))
+                ? _buildMainContent(
+                    context,
+                    ProfileLoaded(
+                      profile: state.profile,
+                      documents: state.documents ?? [],
+                      badges: state.badges ?? [],
+                      verificationStatus: state.verificationStatus ??
+                          const VerificationStatus(),
+                    ))
                 : _buildNoProfileScreen(context),
           ),
         ],
@@ -478,7 +495,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, profile, verificationStatus) {
+  Widget _buildProfileHeader(
+      BuildContext context, profile, verificationStatus) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -494,18 +512,19 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   children: [
                     Text(
                       profile.displayName,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     if (profile.bio != null && profile.bio!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         profile.bio!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
+                              color: Colors.white70,
+                            ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -514,15 +533,15 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     Row(
                       children: [
                         if (profile.badges.isNotEmpty) ...[
-                          ...profile.badges.take(3).map((badge) => 
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: TrustBadgeWidget(
-                                badge: badge,
-                                size: 20,
+                          ...profile.badges.take(3).map(
+                                (badge) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: TrustBadgeWidget(
+                                    badge: badge,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                           if (profile.badges.length > 3)
                             Text(
                               '+${profile.badges.length - 3}',
@@ -545,22 +564,27 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   Widget _buildAvatar(profile) {
+    // Debug: afficher les informations de l'avatar
+    debugPrint('🖼️ Avatar Debug - Profile: $profile');
+    debugPrint('🖼️ Avatar Debug - AvatarUrl: ${profile?.avatarUrl}');
+    debugPrint('🖼️ Avatar Debug - Profile type: ${profile.runtimeType}');
+    
     return Container(
-      width: 80,
-      height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
       ),
-      child: CloudinaryAvatar(
-        imageUrl: profile.avatarUrl,
-        userName: profile.displayName,
-        radius: 37,
-        textStyle: const TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+      child: AvatarPickerWidget(
+        currentAvatarUrl: profile?.avatarUrl,
+        size: 80,
+        isEditable: _isAuthenticated,
+        onAvatarChanged: (newAvatarUrl) {
+          debugPrint('🔄 Avatar changed to: $newAvatarUrl');
+          // Recharger le profil pour refléter les changements
+          if (mounted) {
+            context.read<ProfileBloc>().add(const GetUserProfile());
+          }
+        },
       ),
     );
   }

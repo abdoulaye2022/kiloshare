@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../config/app_config.dart';
 import '../models/user_profile.dart';
@@ -59,6 +60,9 @@ class ProfileService {
         // L'API renvoie les données utilisateur dans data.user
         final userData = response.data['data']['user'];
         if (userData != null) {
+          // Debug: afficher les données reçues de l'API
+          debugPrint('👤 ProfileService - User data: $userData');
+          debugPrint('📷 ProfileService - Profile picture: ${userData['profile_picture']}');
           
           // Adapter toutes les données utilisateur au format UserProfile
           return UserProfile.fromJson({
@@ -138,8 +142,12 @@ class ProfileService {
   }
 
   // Avatar Upload avec Cloudinary
-  Future<String> uploadAvatar(File imageFile) async {
+  Future<Map<String, dynamic>> uploadAvatar(File imageFile) async {
     try {
+      final token = await _getAccessToken();
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
 
       FormData formData = FormData.fromMap({
         'avatar': await MultipartFile.fromFile(
@@ -148,21 +156,32 @@ class ProfileService {
         ),
       });
 
-      final response = await _dio.post('/user/profile/picture', data: formData, options: Options(
-        headers: {
-          if (await _getAccessToken() != null) 'Authorization': 'Bearer ${await _getAccessToken()}',
-        },
-      ));
-
+      final response = await _dio.post(
+        '/user/profile/picture', 
+        data: formData, 
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
 
       if (response.data['success'] == true && response.data['data'] != null) {
-        return response.data['data']['avatar_url'] ?? 
-               response.data['data']['cloudinary_url'] ?? 
-               response.data['data']['secure_url'] ?? '';
+        final data = response.data['data']['user'] ?? response.data['data'];
+        return {
+          'profile_picture': data['profile_picture'],
+          'profile_picture_thumbnail': data['profile_picture_thumbnail'],
+          'message': response.data['message'] ?? 'Avatar uploaded successfully',
+        };
       }
 
       throw Exception(response.data['message'] ?? 'Erreur lors de l\'upload de l\'avatar vers Cloudinary');
     } catch (e) {
+      if (e is DioException) {
+        final errorMessage = e.response?.data?['message'] ?? e.message ?? 'Network error';
+        throw Exception('Upload failed: $errorMessage');
+      }
       rethrow;
     }
   }

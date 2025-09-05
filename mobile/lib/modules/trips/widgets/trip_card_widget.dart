@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/trip_model.dart';
 import '../../../widgets/optimized_cloudinary_image.dart';
+import '../../profile/widgets/avatar_display_widget.dart';
 
 class TripCardWidget extends StatelessWidget {
   final Trip trip;
@@ -354,17 +355,11 @@ class TripCardWidget extends StatelessWidget {
     return Row(
       children: [
         // Avatar
-        CircleAvatar(
-          radius: 16,
-          backgroundImage: user.profilePicture != null
-              ? NetworkImage(user.profilePicture!)
-              : null,
-          child: user.profilePicture == null
-              ? Text(
-                  user.initials,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                )
-              : null,
+        AvatarDisplayWidget(
+          avatarUrl: user.profilePicture,
+          userName: user.displayName,
+          size: 32,
+          borderWidth: 0,
         ),
         
         const SizedBox(width: 8),

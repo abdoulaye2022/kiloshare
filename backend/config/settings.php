@@ -74,4 +74,16 @@ return [
         'allowed_types' => ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'],
         'storage_path' => __DIR__ . '/../storage/uploads',
     ],
+
+    'firebase' => [
+        'project_id' => $_ENV['FIREBASE_PROJECT_ID'] ?? '',
+        'credentials_path' => $_ENV['FIREBASE_CREDENTIALS_PATH'] ?? __DIR__ . '/../config/firebase-service-account.json',
+        'database_url' => $_ENV['FIREBASE_DATABASE_URL'] ?? '',
+        'storage_bucket' => $_ENV['FIREBASE_STORAGE_BUCKET'] ?? '',
+        'messaging' => [
+            'enabled' => filter_var($_ENV['FCM_ENABLED'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'timeout' => (int) ($_ENV['FCM_TIMEOUT'] ?? 30),
+            'batch_size' => (int) ($_ENV['FCM_BATCH_SIZE'] ?? 500),
+        ],
+    ],
 ];
