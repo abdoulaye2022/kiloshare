@@ -46,12 +46,14 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   const [commissionStats, setCommissionStats] = useState<any>(null);
   const [platformAnalytics, setPlatformAnalytics] = useState<any>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTransactions();
     fetchStats();
     fetchCommissionStats();
     fetchPlatformAnalytics();
+    fetchPendingTransfers();
   }, [filter, typeFilter]);
 
   const fetchTransactions = async () => {
@@ -116,6 +118,55 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
       }
     } catch (error) {
       console.error('Error fetching platform analytics:', error);
+    }
+  };
+
+  const fetchPendingTransfers = async () => {
+    try {
+      const response = await adminAuth.apiRequest('/api/v1/admin/payments/pending-transfers');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Pending transfers API response:', data);
+        setPendingTransfers(data.data?.transfers || data.transfers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pending transfers:', error);
+    }
+  };
+
+  const handleTransferPayment = async (transferId: string, action: 'approve' | 'reject' | 'force') => {
+    try {
+      const response = await adminAuth.apiRequest(`/api/v1/admin/payments/transfers/${transferId}/${action}`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          reason: action === 'approve' ? 'Admin approved transfer' : 
+                 action === 'force' ? 'Admin forced transfer (24h passed)' : 'Admin rejected transfer'
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`Transfer ${action} successful:`, result);
+        
+        // Show success message
+        if (action === 'approve') {
+          alert(`Transfert approuvé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
+        } else if (action === 'force') {
+          alert(`Transfert forcé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
+        } else {
+          alert('Transfert rejeté avec succès');
+        }
+        
+        fetchPendingTransfers();
+        fetchStats();
+      } else {
+        const errorData = await response.json();
+        console.error('Transfer action failed:', errorData);
+        alert(`Erreur lors du transfert: ${errorData.message || 'Une erreur inconnue s\'est produite'}`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing transfer:`, error);
     }
   };
 
@@ -509,6 +560,102 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Transfer Management Section */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Gestion des transferts de paiement</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Transferts en attente vers les comptes Stripe des transporteurs
+          </p>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Voyage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Transporteur</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Montant</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Statut</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {pendingTransfers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    Aucun transfert en attente
+                  </td>
+                </tr>
+              ) : (
+                pendingTransfers.map((transfer) => {
+                  const canForceTransfer = transfer.hours_since_delivery >= 24;
+                  
+                  return (
+                    <tr key={transfer.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {transfer.trip?.departure_city} → {transfer.trip?.arrival_city}
+                        </div>
+                        <div className="text-sm text-gray-600">#{transfer.trip?.id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {transfer.transporter?.first_name} {transfer.transporter?.last_name}
+                        </div>
+                        <div className="text-sm text-gray-600">{transfer.transporter?.email}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(transfer.amount, transfer.currency)}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Commission: {formatCurrency(transfer.commission, transfer.currency)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          transfer.status === 'ready' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {transfer.status === 'ready' ? 'Prêt' : 'En attente'}
+                        </span>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {canForceTransfer ? 'Peut transférer' : `${Math.max(0, 24 - transfer.hours_since_delivery)}h restantes`}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleTransferPayment(transfer.id, 'approve')}
+                            className="text-green-600 hover:text-green-900 px-3 py-1 border border-green-600 rounded-md hover:bg-green-50"
+                          >
+                            Approuver
+                          </button>
+                          {canForceTransfer && (
+                            <button
+                              onClick={() => handleTransferPayment(transfer.id, 'force')}
+                              className="text-blue-600 hover:text-blue-900 px-3 py-1 border border-blue-600 rounded-md hover:bg-blue-50 font-medium"
+                            >
+                              Transférer (24h)
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleTransferPayment(transfer.id, 'reject')}
+                            className="text-red-600 hover:text-red-900 px-3 py-1 border border-red-600 rounded-md hover:bg-red-50"
+                          >
+                            Rejeter
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

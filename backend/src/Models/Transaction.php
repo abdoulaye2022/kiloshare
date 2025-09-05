@@ -15,6 +15,7 @@ class Transaction extends Model
         'stripe_payment_intent_id',
         'stripe_payment_method_id',
         'stripe_account_id',
+        'stripe_transfer_id',
         'amount',
         'commission',
         'receiver_amount',
@@ -24,6 +25,9 @@ class Transaction extends Model
         'payment_method',
         'processed_at',
         'delivered_at',
+        'transferred_at',
+        'rejected_at',
+        'rejected_by',
     ];
 
     protected $casts = [
@@ -32,6 +36,8 @@ class Transaction extends Model
         'receiver_amount' => 'decimal:2',
         'processed_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'transferred_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function booking(): BelongsTo
@@ -41,7 +47,7 @@ class Transaction extends Model
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'completed');
+        return $query->whereIn('status', ['completed', 'succeeded']);
     }
 
     public function scopePending($query)

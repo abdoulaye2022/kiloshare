@@ -97,7 +97,8 @@ export default function ConnectedAccountsManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        setPendingTransfers(data.data?.transfers || []);
+        console.log('Pending transfers API response:', data);
+        setPendingTransfers(data.data?.transfers || data.transfers || []);
       }
     } catch (error) {
       console.error('Error fetching pending transfers:', error);
@@ -135,12 +136,26 @@ export default function ConnectedAccountsManagement() {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        console.log(`Transfer ${action} successful:`, result);
+        
+        // Show success message
+        if (action === 'approve') {
+          alert(`Transfert approuvé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
+        } else if (action === 'force') {
+          alert(`Transfert forcé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
+        } else {
+          alert('Transfert rejeté avec succès');
+        }
+        
         fetchPendingTransfers();
         fetchStats();
         setShowTransferModal(false);
         setSelectedTransfer(null);
       } else {
-        console.error('Transfer action failed');
+        const errorData = await response.json();
+        console.error('Transfer action failed:', errorData);
+        alert(`Erreur lors du transfert: ${errorData.message || 'Une erreur inconnue s\'est produite'}`);
       }
     } catch (error) {
       console.error(`Error ${action}ing transfer:`, error);
