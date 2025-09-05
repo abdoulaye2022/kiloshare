@@ -104,55 +104,14 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
     print('DEBUG: Starting price suggestion calculation...');
 
     try {
-      // Use multi-transport service if transport type is specified
-      if (widget.transportType != null) {
-        try {
-          final multiSuggestion =
-              await _multiTransportService.getPriceSuggestionMulti(
-            transportType: widget.transportType!.value,
-            departureCity: widget.departureCity!,
-            arrivalCity: widget.arrivalCity!,
-            weightKg: widget.weightKg,
-            currency: _selectedCurrency,
-          );
-
-          setState(() {
-            _multiTransportSuggestion = multiSuggestion;
-            _useSuggestedPrice = true;
-          });
-
-          // Auto-select the suggested price
-          widget.onPriceSelected(
-              multiSuggestion.suggestedPricePerKg, _selectedCurrency);
-        } catch (e) {
-          // If multi-transport endpoint is not available, fallback to original service
-          print('DEBUG: Multi-transport error: $e');
-          print('DEBUG: Error type: ${e.runtimeType}');
-          if (e.toString().contains('ENDPOINT_NOT_AVAILABLE')) {
-            print(
-                'DEBUG: Multi-transport endpoint not available, using fallback');
-            await _useFallbackPriceSuggestion();
-          } else {
-            print('DEBUG: Rethrowing error: $e');
-            rethrow;
-          }
-        }
-      } else {
-        print('DEBUG: No transport type specified, using fallback');
-        await _useFallbackPriceSuggestion();
-      }
+      // Always use fallback price suggestion since multi-transport API is not available
+      print('DEBUG: Using fallback price suggestion service');
+      await _useFallbackPriceSuggestion();
     } catch (e) {
       print('DEBUG: Final catch block - error: $e');
       print('DEBUG: Error type: ${e.runtimeType}');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Impossible de calculer le prix suggéré: $e'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-
-        // Set a default price when suggestion fails
+        // Set a default price when suggestion fails (no error toast)
         final defaultPrice = 15.0; // CAD per kg
         _priceController.text = defaultPrice.toString();
         setState(() {

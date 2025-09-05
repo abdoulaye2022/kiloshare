@@ -12,25 +12,26 @@ use Carbon\Carbon;
 class EscrowAccount extends Model
 {
     protected $table = 'escrow_accounts';
+    
+    // Disable timestamps since the table doesn't have created_at/updated_at columns
+    public $timestamps = false;
 
     protected $fillable = [
-        'trip_id',
-        'booking_id',
-        'amount',
-        'currency',
+        'transaction_id',
+        'amount_held',
+        'amount_released',
+        'hold_reason',
         'status',
-        'stripe_payment_intent_id',
         'held_at',
         'released_at',
-        'release_reason',
+        'release_notes',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount_held' => 'decimal:2',
+        'amount_released' => 'decimal:2',
         'held_at' => 'datetime',
         'released_at' => 'datetime',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
     ];
 
     // Status constants

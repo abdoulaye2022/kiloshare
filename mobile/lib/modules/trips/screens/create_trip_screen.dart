@@ -10,7 +10,7 @@ import '../widgets/trip_image_picker.dart';
 import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
 import '../services/multi_transport_service.dart';
-import '../../../services/mock_cloudinary_service.dart';
+import '../../../services/direct_cloudinary_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +46,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   // Images
   List<File> _selectedImages = [];
   List<TripImage> _existingImages = [];
-  late final MockCloudinaryService _cloudinaryService;
+  late final DirectCloudinaryService _cloudinaryService;
 
   // Form controllers
   final _flightNumberController = TextEditingController();
@@ -61,8 +61,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   void initState() {
     super.initState();
     
-    // Initialize MockCloudinaryService
-    _cloudinaryService = MockCloudinaryService();
+    // Initialize DirectCloudinaryService
+    _cloudinaryService = DirectCloudinaryService();
     
     // Initialize transport type if provided
     if (widget.initialTransportType != null) {

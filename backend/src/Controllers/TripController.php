@@ -194,6 +194,9 @@ class TripController
             'special_notes' => Validator::optional(Validator::stringType()),
             'flight_number' => Validator::optional(Validator::stringType()),
             'airline' => Validator::optional(Validator::stringType()),
+            'restricted_categories' => Validator::optional(Validator::array()),
+            'restricted_items' => Validator::optional(Validator::array()),
+            'restriction_notes' => Validator::optional(Validator::stringType()),
             'images' => Validator::optional(Validator::array()),
         ];
 
@@ -204,6 +207,11 @@ class TripController
         }
         
         try {
+            // Debug restrictions data
+            error_log("TripController::create - restricted_categories: " . json_encode($data['restricted_categories'] ?? null));
+            error_log("TripController::create - restricted_items: " . json_encode($data['restricted_items'] ?? null));
+            error_log("TripController::create - restriction_notes: " . json_encode($data['restriction_notes'] ?? null));
+            
             // Générer un titre automatique si non fourni
             $title = $data['title'] ?? "{$data['departure_city']} → {$data['arrival_city']}";
             
@@ -231,7 +239,11 @@ class TripController
                 'price_per_kg' => (float) $data['price_per_kg'],
                 'currency' => $data['currency'],
                 'is_domestic' => $data['departure_country'] === $data['arrival_country'],
-                'restrictions' => [],
+                'restrictions' => [
+                    'categories' => $data['restricted_categories'] ?? [],
+                    'items' => $data['restricted_items'] ?? [],
+                    'notes' => $data['restriction_notes'] ?? null,
+                ],
                 'special_notes' => $data['special_notes'] ?? '',
                 'status' => Trip::STATUS_DRAFT,
             ]);
@@ -239,12 +251,18 @@ class TripController
             // Gérer les images si présentes (URLs Cloudinary)
             $images = [];
             if (!empty($data['images']) && is_array($data['images'])) {
+                error_log("TripController: Processing " . count($data['images']) . " images");
+                error_log("TripController: Images data: " . json_encode($data['images']));
                 try {
                     $images = $this->handleTripImageUrls($data['images'], $trip);
+                    error_log("TripController: Successfully processed " . count($images) . " images");
                 } catch (\Exception $e) {
                     error_log("Image processing failed during trip creation: " . $e->getMessage());
+                    error_log("Stack trace: " . $e->getTraceAsString());
                     // Continuer même si le traitement d'images échoue
                 }
+            } else {
+                error_log("TripController: No images to process. Images data: " . json_encode($data['images'] ?? null));
             }
 
             return Response::created([
@@ -295,6 +313,10 @@ class TripController
             if ($user && $trip->user_id !== $user->id) {
                 // TODO: Incrémenter les vues
             }
+            
+            // Debug restrictions
+            error_log("TripController::get - Trip restrictions raw: " . json_encode($trip->restrictions));
+            error_log("TripController::get - Trip restrictions type: " . gettype($trip->restrictions));
 
             return Response::success([
                 'trip' => [
@@ -317,7 +339,10 @@ class TripController
                     'status' => $trip->status,
                     'is_domestic' => $trip->is_domestic,
                     'restrictions' => $trip->restrictions,
-                    'special_instructions' => $trip->special_notes,
+                    'restricted_categories' => $trip->restrictions['categories'] ?? [],
+                    'restricted_items' => $trip->restrictions['items'] ?? [],
+                    'restriction_notes' => $trip->restrictions['notes'] ?? null,
+                    'special_notes' => $trip->special_notes,
                     'route' => $trip->route,
                     'duration' => $trip->duration,
                     'is_expired' => $trip->is_expired,
@@ -421,10 +446,22 @@ class TripController
                 'title', 'description', 'departure_city', 'departure_country',
                 'departure_date', 'arrival_city', 'arrival_country', 'arrival_date',
                 'transport_type', 'available_weight_kg', 'price_per_kg', 'restrictions',
+                'restricted_categories', 'restricted_items', 'restriction_notes',
                 'special_notes'
             ];
 
             $updateData = array_intersect_key($data, array_flip($allowedFields));
+
+            // Transform individual restriction fields into restrictions JSON
+            if (isset($data['restricted_categories']) || isset($data['restricted_items']) || isset($data['restriction_notes'])) {
+                $updateData['restrictions'] = [
+                    'categories' => $data['restricted_categories'] ?? [],
+                    'items' => $data['restricted_items'] ?? [],
+                    'notes' => $data['restriction_notes'] ?? null,
+                ];
+                // Remove individual fields to avoid conflicts
+                unset($updateData['restricted_categories'], $updateData['restricted_items'], $updateData['restriction_notes']);
+            }
 
             if (isset($updateData['departure_date'])) {
                 $updateData['departure_date'] = Carbon::parse($updateData['departure_date']);
@@ -725,6 +762,7 @@ class TripController
                     'image_path' => $cloudinaryResult['public_id'],
                     'url' => $cloudinaryResult['url'],
                     'thumbnail' => $cloudinaryResult['thumbnail'],
+                    'image_name' => $filename,
                     'is_primary' => ($currentImageCount + count($uploadedImages)) === 0,
                     'order' => $currentImageCount + count($uploadedImages) + 1,
                     'file_size' => $cloudinaryResult['file_size'],
@@ -763,15 +801,21 @@ class TripController
     {
         $processedImages = [];
         $currentImageCount = $trip->images()->count();
+        
+        error_log("handleTripImageUrls: Starting with " . count($imageUrls) . " images, trip has " . $currentImageCount . " existing images");
 
         foreach ($imageUrls as $index => $imageData) {
+            error_log("handleTripImageUrls: Processing image $index: " . json_encode($imageData));
+            
             // Limite de 5 images par trip
             if ($currentImageCount + count($processedImages) >= 5) {
+                error_log("handleTripImageUrls: Reached image limit, breaking");
                 break;
             }
 
             // Valider que l'URL est bien fournie
             if (empty($imageData['url'])) {
+                error_log("handleTripImageUrls: Image $index has no URL, skipping");
                 continue;
             }
 
@@ -782,6 +826,7 @@ class TripController
                     'image_path' => $imageData['public_id'] ?? '',
                     'url' => $imageData['url'],
                     'thumbnail' => $imageData['thumbnail'] ?? null,
+                    'image_name' => basename(parse_url($imageData['url'], PHP_URL_PATH)),
                     'is_primary' => ($currentImageCount + count($processedImages)) === 0,
                     'order' => $currentImageCount + count($processedImages) + 1,
                     'file_size' => $imageData['file_size'] ?? null,
@@ -905,6 +950,10 @@ class TripController
                 return Response::notFound('Trip not found');
             }
             
+            // Debug restrictions for edit mode
+            error_log("TripController::getUserTrip - Trip restrictions raw: " . json_encode($trip->restrictions));
+            error_log("TripController::getUserTrip - Trip special_notes: " . json_encode($trip->special_notes));
+            
             return Response::success([
                 'trip' => [
                     'id' => $trip->id,
@@ -927,7 +976,10 @@ class TripController
                     'status' => $trip->status,
                     'is_domestic' => $trip->is_domestic,
                     'restrictions' => $trip->restrictions,
-                    'special_instructions' => $trip->special_notes,
+                    'restricted_categories' => $trip->restrictions['categories'] ?? [],
+                    'restricted_items' => $trip->restrictions['items'] ?? [],
+                    'restriction_notes' => $trip->restrictions['notes'] ?? null,
+                    'special_notes' => $trip->special_notes,
                     'route' => $trip->route,
                     'duration' => $trip->duration,
                     'is_expired' => $trip->is_expired,

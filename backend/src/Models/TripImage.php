@@ -26,6 +26,7 @@ class TripImage extends Model
         'width',
         'height',
         'mime_type',
+        'image_name',
     ];
 
     protected $casts = [

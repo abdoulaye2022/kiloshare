@@ -27,6 +27,20 @@ class _RestrictedItemsSelectorState extends State<RestrictedItemsSelector> {
     super.initState();
     _selectedCategories = List.from(widget.selectedCategories);
     _selectedItems = List.from(widget.selectedItems);
+    
+    // Auto-déduire les catégories des items déjà sélectionnés
+    _deduceCategoriesFromItems();
+  }
+  
+  void _deduceCategoriesFromItems() {
+    for (String item in _selectedItems) {
+      for (String category in RestrictedItemsData.categories) {
+        final categoryItems = RestrictedItemsData.itemsByCategory[category] ?? [];
+        if (categoryItems.contains(item) && !_selectedCategories.contains(category)) {
+          _selectedCategories.add(category);
+        }
+      }
+    }
   }
 
   void _toggleCategory(String category) {
@@ -47,11 +61,33 @@ class _RestrictedItemsSelectorState extends State<RestrictedItemsSelector> {
     setState(() {
       if (_selectedItems.contains(item)) {
         _selectedItems.remove(item);
+        // Supprimer la catégorie si plus aucun item de cette catégorie n'est sélectionné
+        _removeUnusedCategories();
       } else {
         _selectedItems.add(item);
+        // Ajouter automatiquement la catégorie correspondante
+        _addCategoryForItem(item);
       }
     });
     _notifyChange();
+  }
+  
+  void _addCategoryForItem(String item) {
+    for (String category in RestrictedItemsData.categories) {
+      final categoryItems = RestrictedItemsData.itemsByCategory[category] ?? [];
+      if (categoryItems.contains(item) && !_selectedCategories.contains(category)) {
+        _selectedCategories.add(category);
+        break;
+      }
+    }
+  }
+  
+  void _removeUnusedCategories() {
+    _selectedCategories.removeWhere((category) {
+      final categoryItems = RestrictedItemsData.itemsByCategory[category] ?? [];
+      // Garder la catégorie seulement s'il y a encore des items sélectionnés de cette catégorie
+      return !categoryItems.any((item) => _selectedItems.contains(item));
+    });
   }
 
   void _notifyChange() {
@@ -236,10 +272,10 @@ class _RestrictedItemsSelectorState extends State<RestrictedItemsSelector> {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(top: 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).primaryColor.withOpacity(0.3),
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
         ),
       ),
       child: Row(

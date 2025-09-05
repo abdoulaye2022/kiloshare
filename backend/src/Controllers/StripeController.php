@@ -9,8 +9,11 @@ use Psr\Http\Message\ServerRequestInterface;
 use KiloShare\Models\User;
 use KiloShare\Models\UserStripeAccount;
 use KiloShare\Models\Booking;
+use KiloShare\Models\BookingNegotiation;
+use KiloShare\Models\Trip;
 use KiloShare\Models\EscrowAccount;
 use KiloShare\Models\Transaction;
+use KiloShare\Models\VerificationCode;
 use KiloShare\Utils\Response;
 use Stripe\Stripe;
 use Stripe\Account;
@@ -457,7 +460,7 @@ class StripeController
     }
 
     /**
-     * Confirmer le paiement et créer l'escrow
+     * Confirmer le paiement et exécuter le workflow complet post-paiement
      */
     public function confirmPayment(ServerRequestInterface $request): ResponseInterface
     {
@@ -503,8 +506,8 @@ class StripeController
                 return Response::error('Erreur lors de la récupération du Payment Intent: ' . $e->getMessage(), [], 500);
             }
 
-            // Récupérer la réservation
-            $booking = Booking::with(['trip', 'sender', 'receiver'])
+            // Récupérer la réservation avec toutes les relations nécessaires
+            $booking = Booking::with(['trip', 'sender', 'receiver', 'negotiation'])
                 ->where('id', $bookingId)
                 ->first();
 
@@ -517,59 +520,403 @@ class StripeController
                 return Response::error('Non autorisé', [], 403);
             }
 
-            // Créer la transaction
-            $transaction = Transaction::create([
-                'user_id' => $booking->sender_id,
-                'booking_id' => $booking->id,
-                'amount' => $paymentIntent->amount / 100, // Convertir en dollars
-                'currency' => $paymentIntent->currency,
-                'stripe_payment_intent_id' => $paymentIntentId,
-                'status' => 'completed',
-                'type' => 'payment'
-            ]);
+            // Vérifier que le paiement n'a pas déjà été confirmé
+            if ($booking->payment_status === 'paid') {
+                return Response::error('Cette réservation a déjà été payée', [], 400);
+            }
 
-            // Calculer ou récupérer la commission
+            // ÉTAPE 1: Calculer les montants
             $commissionAmount = $booking->commission_amount;
             if ($commissionAmount === null) {
-                // Calculer la commission si elle n'est pas définie (15% par défaut)
                 $commissionRate = $booking->commission_rate ?? 15.00;
                 $totalAmount = $paymentIntent->amount / 100;
                 $commissionAmount = $totalAmount * ($commissionRate / 100);
                 
-                // Mettre à jour la réservation avec le montant de commission calculé
                 $booking->commission_amount = $commissionAmount;
                 $booking->save();
             }
 
-            // Créer l'escrow account
-            $escrowAmount = ($paymentIntent->amount / 100) - $commissionAmount;
+            $totalAmount = $paymentIntent->amount / 100;
+            $receiverAmount = $totalAmount - $commissionAmount;
+
+            // ÉTAPE 2: Créer la transaction de paiement reçu
+            $transaction = Transaction::create([
+                'booking_id' => $booking->id,
+                'amount' => $totalAmount,
+                'commission' => $commissionAmount,
+                'receiver_amount' => $receiverAmount,
+                'currency' => $paymentIntent->currency,
+                'stripe_payment_intent_id' => $paymentIntentId,
+                'status' => 'succeeded'
+            ]);
+
+            // ÉTAPE 3: Créer l'escrow account avec statut 'holding' (argent retenu)
             EscrowAccount::create([
                 'transaction_id' => $transaction->id,
-                'amount_held' => $escrowAmount,
+                'amount_held' => $receiverAmount,
                 'hold_reason' => 'delivery_confirmation',
                 'status' => 'holding'
             ]);
 
-            // Mettre à jour la réservation
+            // ÉTAPE 4: Mettre à jour le statut de la réservation
             $booking->update([
                 'payment_status' => 'paid',
                 'status' => Booking::STATUS_PAID
             ]);
 
-            // Mettre à jour le voyage
-            $booking->trip->update([
-                'status' => 'booked'
-            ]);
+            // ÉTAPE 5: Mettre à jour la négociation associée (si elle existe)
+            if ($booking->negotiation) {
+                $booking->negotiation->update(['status' => 'completed']);
+            }
 
-            return Response::success('Paiement confirmé et fonds mis en escrow', [
+            // ÉTAPE 6: Gérer la mise à jour du voyage et du poids disponible
+            $trip = $booking->trip;
+            $this->updateTripAfterPayment($trip, $booking);
+
+            // ÉTAPE 7: Générer les codes de vérification
+            $this->generateVerificationCodes($booking);
+
+            // ÉTAPE 8: Envoyer les notifications
+            // TODO: Implémenter le système de notifications
+            // $this->sendPaymentNotifications($booking);
+
+            // ÉTAPE 9: Mettre à jour les tables de résumé
+            $this->updateSummaryTables($booking, $trip);
+
+            error_log("StripeController.confirmPayment - Payment workflow completed successfully for booking: " . $bookingId);
+
+            return Response::success([
                 'transaction_id' => $transaction->id,
-                'escrow_amount' => $escrowAmount,
-                'commission_amount' => $booking->commission_amount
-            ]);
+                'escrow_amount' => $receiverAmount,
+                'commission_amount' => $commissionAmount,
+                'trip_status' => $trip->fresh()->status,
+                'remaining_weight' => $trip->fresh()->available_weight_kg,
+                'verification_codes_generated' => true
+            ], 'Paiement confirmé et workflow post-paiement exécuté avec succès');
 
         } catch (Exception $e) {
             error_log("Erreur confirmation paiement: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             return Response::error('Erreur lors de la confirmation du paiement', [], 500);
+        }
+    }
+
+    /**
+     * Met à jour le voyage après un paiement confirmé
+     */
+    private function updateTripAfterPayment(Trip $trip, Booking $booking): void
+    {
+        // Soustraire le poids réservé du poids disponible
+        $newAvailableWeight = max(0, $trip->available_weight_kg - $booking->weight_kg);
+        
+        // Calculer le poids total réservé
+        $totalBookedWeight = $trip->bookings()
+            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_IN_TRANSIT, Booking::STATUS_DELIVERED])
+            ->sum('weight_kg');
+
+        // Déterminer le nouveau statut
+        $newStatus = 'booked';
+        if ($newAvailableWeight <= 0) {
+            // Plus de place disponible - le voyage reste booked mais n'apparaît plus dans les recherches
+            $newStatus = 'booked';
+        }
+
+        // Mettre à jour le voyage
+        $trip->update([
+            'available_weight_kg' => $newAvailableWeight,
+            'total_booked_weight' => $totalBookedWeight,
+            'status' => $newStatus
+        ]);
+
+        error_log("Trip {$trip->id} updated: available_weight={$newAvailableWeight}, total_booked={$totalBookedWeight}, status={$newStatus}");
+    }
+
+    /**
+     * Génère les codes de vérification pickup et delivery
+     */
+    private function generateVerificationCodes(Booking $booking): array
+    {
+        $codes = [];
+        
+        try {
+            // Générer le code pickup (6 chiffres) pour le voyageur
+            $pickupVerification = VerificationCode::generate(
+                $booking->receiver_id,
+                VerificationCode::TYPE_PICKUP_CODE,
+                6,
+                $booking->id
+            );
+
+            // Générer le code delivery (6 chiffres) pour l'expéditeur  
+            $deliveryVerification = VerificationCode::generate(
+                $booking->sender_id,
+                VerificationCode::TYPE_DELIVERY_CODE,
+                6,
+                $booking->id
+            );
+
+            $codes = [
+                'pickup' => $pickupVerification->code,
+                'delivery' => $deliveryVerification->code
+            ];
+            
+            error_log("Generated verification codes for booking {$booking->id}: pickup={$pickupVerification->code}, delivery={$deliveryVerification->code}");
+            
+        } catch (Exception $e) {
+            error_log("Error generating verification codes: " . $e->getMessage());
+            // Return empty codes if generation fails
+            $codes = ['pickup' => null, 'delivery' => null];
+        }
+
+        return $codes;
+    }
+
+    /**
+     * Met à jour les tables de résumé pour maintenir la cohérence
+     */
+    private function updateSummaryTables(Booking $booking, Trip $trip): void
+    {
+        try {
+            // Mettre à jour trip_status_summary
+            \Illuminate\Support\Facades\DB::statement("
+                INSERT INTO trip_status_summary (status, count, last_updated) 
+                VALUES (?, 1, NOW()) 
+                ON DUPLICATE KEY UPDATE 
+                count = count + 1, 
+                last_updated = NOW()
+            ", [$trip->status]);
+
+            // Mettre à jour booking_summary
+            \Illuminate\Support\Facades\DB::statement("
+                INSERT INTO booking_summary (status, count, last_updated) 
+                VALUES (?, 1, NOW()) 
+                ON DUPLICATE KEY UPDATE 
+                count = count + 1, 
+                last_updated = NOW()
+            ", [$booking->status]);
+
+            // Mettre à jour active_trips_overview
+            \Illuminate\Support\Facades\DB::statement("
+                UPDATE active_trips_overview 
+                SET booked_trips = (
+                    SELECT COUNT(*) FROM trips WHERE status = 'booked'
+                ), 
+                last_updated = NOW()
+            ");
+
+            error_log("Summary tables updated successfully for booking {$booking->id}");
+            
+        } catch (Exception $e) {
+            error_log("Error updating summary tables: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Valider le code pickup et marquer le début du voyage
+     */
+    public function validatePickupCode(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $user = $request->getAttribute('user');
+            
+            $rawBody = $request->getBody()->getContents();
+            $data = json_decode($rawBody, true);
+            
+            $code = $data['code'] ?? null;
+            $bookingId = $data['booking_id'] ?? null;
+
+            if (!$code || !$bookingId) {
+                return Response::error('Code et booking ID requis', [], 400);
+            }
+
+            // Vérifier le code pickup
+            $verification = VerificationCode::verify($code, VerificationCode::TYPE_PICKUP_CODE, $bookingId);
+            
+            if (!$verification) {
+                return Response::error('Code pickup invalide ou expiré', [], 400);
+            }
+
+            // Récupérer la réservation
+            $booking = Booking::with(['trip', 'sender', 'receiver'])
+                ->where('id', $bookingId)
+                ->first();
+
+            if (!$booking) {
+                return Response::error('Réservation non trouvée', [], 404);
+            }
+
+            // Vérifier que l'utilisateur est le voyageur (receiver)
+            if ($booking->receiver_id !== $user->id) {
+                return Response::error('Non autorisé - vous devez être le voyageur', [], 403);
+            }
+
+            // Marquer le code comme utilisé
+            $verification->markAsUsed();
+
+            // Mettre à jour le statut de la réservation
+            $booking->update(['status' => Booking::STATUS_IN_TRANSIT]);
+
+            // Vérifier si c'est la première réservation à commencer pour ce voyage
+            $trip = $booking->trip;
+            $hasOtherActiveBookings = $trip->bookings()
+                ->whereIn('status', [Booking::STATUS_IN_TRANSIT, Booking::STATUS_DELIVERED])
+                ->where('id', '!=', $booking->id)
+                ->exists();
+
+            // Si c'est la première réservation active, marquer le voyage comme en cours
+            if (!$hasOtherActiveBookings) {
+                $trip->update(['status' => Trip::STATUS_IN_PROGRESS]);
+            }
+
+            return Response::success([
+                'booking_status' => $booking->status,
+                'trip_status' => $trip->fresh()->status,
+                'message' => 'Code pickup validé - voyage commencé'
+            ], 'Pickup confirmé avec succès');
+
+        } catch (Exception $e) {
+            error_log("Erreur validation pickup: " . $e->getMessage());
+            return Response::error('Erreur lors de la validation du pickup', [], 500);
+        }
+    }
+
+    /**
+     * Valider le code delivery et marquer la livraison
+     */
+    public function validateDeliveryCode(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $user = $request->getAttribute('user');
+            
+            $rawBody = $request->getBody()->getContents();
+            $data = json_decode($rawBody, true);
+            
+            $code = $data['code'] ?? null;
+            $bookingId = $data['booking_id'] ?? null;
+
+            if (!$code || !$bookingId) {
+                return Response::error('Code et booking ID requis', [], 400);
+            }
+
+            // Vérifier le code delivery
+            $verification = VerificationCode::verify($code, VerificationCode::TYPE_DELIVERY_CODE, $bookingId);
+            
+            if (!$verification) {
+                return Response::error('Code delivery invalide ou expiré', [], 400);
+            }
+
+            // Récupérer la réservation
+            $booking = Booking::with(['trip', 'sender', 'receiver'])
+                ->where('id', $bookingId)
+                ->first();
+
+            if (!$booking) {
+                return Response::error('Réservation non trouvée', [], 404);
+            }
+
+            // Vérifier que l'utilisateur est l'expéditeur (sender)
+            if ($booking->sender_id !== $user->id) {
+                return Response::error('Non autorisé - vous devez être l\'expéditeur', [], 403);
+            }
+
+            // Vérifier que la réservation est en transit
+            if ($booking->status !== Booking::STATUS_IN_TRANSIT) {
+                return Response::error('La réservation doit être en transit pour confirmer la livraison', [], 400);
+            }
+
+            // Marquer le code comme utilisé
+            $verification->markAsUsed();
+
+            // Mettre à jour le statut de la réservation
+            $booking->update([
+                'status' => Booking::STATUS_DELIVERED,
+                'delivery_date' => now()
+            ]);
+
+            // Libérer les fonds automatiquement
+            $this->processEscrowRelease($booking);
+
+            // Vérifier si toutes les réservations du voyage sont livrées
+            $trip = $booking->trip;
+            $this->checkTripCompletion($trip);
+
+            return Response::success([
+                'booking_status' => $booking->status,
+                'trip_status' => $trip->fresh()->status,
+                'escrow_released' => true,
+                'message' => 'Livraison confirmée - fonds libérés'
+            ], 'Delivery confirmé avec succès');
+
+        } catch (Exception $e) {
+            error_log("Erreur validation delivery: " . $e->getMessage());
+            return Response::error('Erreur lors de la validation de la livraison', [], 500);
+        }
+    }
+
+    /**
+     * Libérer les fonds de l'escrow automatiquement après livraison
+     */
+    private function processEscrowRelease(Booking $booking): void
+    {
+        try {
+            // Récupérer le compte escrow pour cette réservation
+            $escrowAccount = EscrowAccount::whereHas('transaction', function($query) use ($booking) {
+                $query->where('booking_id', $booking->id);
+            })->where('status', 'holding')->first();
+
+            if (!$escrowAccount) {
+                error_log("No escrow account found for booking {$booking->id}");
+                return;
+            }
+
+            // Marquer l'escrow comme libéré
+            $escrowAccount->update([
+                'status' => 'fully_released',
+                'amount_released' => $escrowAccount->amount_held,
+                'released_at' => now(),
+                'release_notes' => 'Livraison confirmée automatiquement'
+            ]);
+
+            // Créer une transaction de payout vers le voyageur
+            Transaction::create([
+                'booking_id' => $booking->id,
+                'amount' => $escrowAccount->amount_released,
+                'commission' => 0, // Commission déjà déduite
+                'receiver_amount' => $escrowAccount->amount_released,
+                'currency' => 'cad',
+                'status' => 'succeeded',
+                'processed_at' => now()
+            ]);
+
+            error_log("Escrow released successfully for booking {$booking->id}: {$escrowAccount->amount_released}");
+
+        } catch (Exception $e) {
+            error_log("Error releasing escrow for booking {$booking->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Vérifier si le voyage est terminé (toutes livraisons effectuées)
+     */
+    private function checkTripCompletion(Trip $trip): void
+    {
+        // Compter les réservations non livrées
+        $undeliveredCount = $trip->bookings()
+            ->whereIn('status', [
+                Booking::STATUS_PAID,
+                Booking::STATUS_IN_TRANSIT,
+                Booking::STATUS_IN_PROGRESS
+            ])
+            ->count();
+
+        // Si toutes les réservations sont livrées, marquer le voyage comme terminé
+        if ($undeliveredCount === 0) {
+            $trip->update([
+                'status' => Trip::STATUS_COMPLETED,
+                'completed_at' => now()
+            ]);
+
+            error_log("Trip {$trip->id} marked as completed - all deliveries finished");
         }
     }
 

@@ -231,6 +231,12 @@ return function (App $app) {
                 // Payment routes
                 $stripeGroup->post('/payment/create-intent', [StripeController::class, 'createPaymentIntent']);
                 $stripeGroup->post('/payment/confirm', [StripeController::class, 'confirmPayment']);
+                
+                // Verification routes
+                $stripeGroup->post('/pickup/validate', [StripeController::class, 'validatePickupCode']);
+                $stripeGroup->post('/delivery/validate', [StripeController::class, 'validateDeliveryCode']);
+                
+                // Escrow routes
                 $stripeGroup->post('/escrow/{booking_id}/release', [StripeController::class, 'releaseEscrow']);
             })->add(new AuthMiddleware());
 

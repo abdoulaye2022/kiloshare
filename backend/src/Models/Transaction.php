@@ -12,12 +12,15 @@ class Transaction extends Model
     protected $table = 'transactions';
 
     protected $fillable = [
-        'escrow_account_id',
-        'type',
+        'booking_id',
+        'stripe_payment_intent_id',
+        'stripe_payment_method_id',
         'amount',
+        'commission',
+        'receiver_amount',
         'currency',
-        'stripe_transaction_id',
-        'description',
+        'status',
+        'payment_method',
         'processed_at',
     ];
 
