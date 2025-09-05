@@ -38,6 +38,9 @@ class Trip extends Model
         'special_notes',
         'published_at',
         'expires_at',
+        'cancellation_reason',
+        'cancelled_at',
+        'cancelled_by',
     ];
 
     protected $casts = [
@@ -50,6 +53,7 @@ class Trip extends Model
         'total_reward' => 'decimal:2',
         'is_domestic' => 'boolean',
         'restrictions' => 'array',
+        'cancelled_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -60,6 +64,7 @@ class Trip extends Model
         'arrival_date',
         'published_at',
         'expires_at',
+        'cancelled_at',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -130,6 +135,11 @@ class Trip extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(UserReview::class);
+    }
+
+    public function cancellationReports(): HasMany
+    {
+        return $this->hasMany(TripCancellationReport::class);
     }
 
     // Accesseurs

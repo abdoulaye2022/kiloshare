@@ -215,6 +215,12 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
             _buildDescription(),
           ],
 
+          // Images section
+          if (_trip!.hasImages) ...[
+            const SizedBox(height: 16),
+            _buildImagesSection(),
+          ],
+
           const SizedBox(height: 16),
           
           // Actions
@@ -1419,6 +1425,125 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     } catch (e) {
       _showMessage('Erreur lors de la remise en brouillon: $e', Colors.red);
     }
+  }
+
+  Widget _buildImagesSection() {
+    if (_trip?.images == null || _trip!.images!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Images du voyage',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 200,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              itemCount: _trip!.images!.length,
+              itemBuilder: (context, index) {
+                final image = _trip!.images![index];
+                return Container(
+                  width: 300,
+                  margin: EdgeInsets.only(right: 12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          image.url,
+                          width: 300,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 300,
+                              height: 200,
+                              color: Colors.grey[200],
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error loading trip image: $error');
+                            return Container(
+                              width: 300,
+                              height: 200,
+                              color: Colors.grey[300],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error, size: 40, color: Colors.red),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Erreur de chargement',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        if (image.isPrimary)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Principal',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${_trip!.imageCount} image${_trip!.imageCount > 1 ? 's' : ''}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showMessage(String message, Color color) {

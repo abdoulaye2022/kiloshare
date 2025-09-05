@@ -10,6 +10,7 @@ use KiloShare\Models\TripImage;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use KiloShare\Services\CloudinaryService;
+use KiloShare\Services\CancellationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -580,29 +581,110 @@ class TripController
         }
     }
 
+    /**
+     * Vérifie si un voyageur peut annuler son voyage
+     */
+    public function checkTripCancellation(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $trip = Trip::find($id);
+            if (!$trip) {
+                return Response::notFound('Voyage non trouvé');
+            }
+
+            $cancellationService = new CancellationService();
+            $result = $cancellationService->canTravelerCancelTrip($user, $trip);
+
+            return Response::success([
+                'can_cancel' => $result['allowed'],
+                'reason' => $result['reason'] ?? null,
+                'has_bookings' => $result['has_bookings'] ?? false,
+                'requires_reason' => $result['has_bookings'] ?? false
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la vérification: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Annule un voyage avec les politiques strictes
+     */
     public function cancelTrip(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
-
+        
         try {
             $trip = Trip::find($id);
-
-            if (!$trip || !$trip->isOwner($user)) {
-                return Response::notFound('Trip not found');
+            if (!$trip) {
+                return Response::notFound('Voyage non trouvé');
             }
 
-            $trip->cancel();
+            // Récupérer les données de la requête
+            $body = $request->getParsedBody();
+            $reason = $body['cancellation_reason'] ?? null;
+
+            $cancellationService = new CancellationService();
+            $result = $cancellationService->cancelTripByTraveler($trip, $reason);
 
             return Response::success([
                 'trip' => [
                     'id' => $trip->id,
                     'status' => $trip->status,
-                ]
-            ], 'Trip cancelled successfully');
+                    'cancelled_at' => $trip->cancelled_at
+                ],
+                'message' => $result['message'],
+                'refunds_processed' => $result['refunds_processed']
+            ]);
 
         } catch (\Exception $e) {
-            return Response::serverError('Failed to cancel trip: ' . $e->getMessage());
+            return Response::badRequest($e->getMessage());
+        }
+    }
+
+    /**
+     * Récupère l'historique des annulations d'un utilisateur
+     */
+    public function getCancellationHistory(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        
+        try {
+            $cancellationService = new CancellationService();
+            $summary = $cancellationService->getUserCancellationSummary($user->id);
+
+            // Récupérer les rapports d'annulation publics
+            $publicReports = \Illuminate\Database\Capsule\Manager::table('trip_cancellation_reports')
+                ->join('trips', 'trip_cancellation_reports.trip_id', '=', 'trips.id')
+                ->where('trip_cancellation_reports.user_id', $user->id)
+                ->where('trip_cancellation_reports.is_public', true)
+                ->where(function ($query) {
+                    $query->whereNull('trip_cancellation_reports.expires_at')
+                          ->orWhere('trip_cancellation_reports.expires_at', '>', now());
+                })
+                ->select([
+                    'trip_cancellation_reports.*',
+                    'trips.title as trip_title',
+                    'trips.departure_city',
+                    'trips.arrival_city'
+                ])
+                ->orderBy('trip_cancellation_reports.created_at', 'desc')
+                ->get();
+
+            return Response::success([
+                'summary' => $summary,
+                'public_reports' => $publicReports,
+                'next_cancellation_allowed' => $summary['can_cancel_with_booking'] ? 
+                    'Immédiatement' : 
+                    Carbon::parse($summary['last_cancellation_date'])->addDays(90)->format('d/m/Y')
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la récupération de l\'historique: ' . $e->getMessage());
         }
     }
 
@@ -997,6 +1079,87 @@ class TripController
         }
     }
 
+    public function getTripImages(ServerRequestInterface $request): ResponseInterface
+    {
+        $tripId = (int) $request->getAttribute('id');
+        $user = $request->getAttribute('user'); // Peut être null pour les requêtes publiques
+
+        try {
+            $trip = Trip::find($tripId);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+
+            // Permettre l'accès aux images quel que soit le statut du voyage
+            // Cela permet de voir les images même pour les brouillons
+
+            $images = TripImage::where('trip_id', $tripId)
+                ->orderBy('order', 'asc')
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            return Response::success([
+                'images' => $images->map(function ($image) {
+                    return [
+                        'id' => $image->id,
+                        'url' => $image->url,
+                        'thumbnail' => $image->thumbnail,
+                        'alt_text' => $image->alt_text,
+                        'is_primary' => $image->is_primary,
+                        'order' => $image->order
+                    ];
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to fetch trip images: ' . $e->getMessage());
+        }
+    }
+
+    public function getPublicTripDetails(ServerRequestInterface $request): ResponseInterface
+    {
+        $tripId = (int) $request->getAttribute('id');
+
+        try {
+            $trip = Trip::with(['user', 'images', 'bookings'])
+                       ->find($tripId);
+
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'uuid' => $trip->uuid,
+                    'user_id' => $trip->user_id,
+                    'title' => $trip->title,
+                    'description' => $trip->description,
+                    'departure_city' => $trip->departure_city,
+                    'departure_country' => $trip->departure_country,
+                    'arrival_city' => $trip->arrival_city,
+                    'arrival_country' => $trip->arrival_country,
+                    'departure_date' => $trip->departure_date,
+                    'arrival_date' => $trip->arrival_date,
+                    'available_weight_kg' => $trip->available_weight_kg,
+                    'price_per_kg' => $trip->price_per_kg,
+                    'currency' => $trip->currency,
+                    'status' => $trip->status,
+                    'user_name' => $trip->user->first_name . ' ' . $trip->user->last_name,
+                    'user_email' => $trip->user->email,
+                    'remaining_weight' => $trip->available_weight_kg, // Simplifié pour l'instant
+                    'images' => $trip->images->map(function ($image) {
+                        return $image->url;
+                    })->toArray(),
+                    'image_urls' => $trip->images->pluck('url')->toArray()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to fetch trip details: ' . $e->getMessage());
+        }
+    }
+
     public function getUserTrip(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
@@ -1014,6 +1177,8 @@ class TripController
             // Debug restrictions for edit mode
             error_log("TripController::getUserTrip - Trip restrictions raw: " . json_encode($trip->restrictions));
             error_log("TripController::getUserTrip - Trip special_notes: " . json_encode($trip->special_notes));
+            error_log("TripController::getUserTrip - Trip images count: " . $trip->images->count());
+            error_log("TripController::getUserTrip - Trip images: " . json_encode($trip->images->toArray()));
             
             return Response::success([
                 'trip' => [
@@ -1052,7 +1217,18 @@ class TripController
                         'profile_picture' => $trip->user->profile_picture,
                         'is_verified' => $trip->user->is_verified,
                     ],
-                    'images' => $trip->images,
+                    'images' => $trip->images->map(function ($image) {
+                        return [
+                            'id' => $image->id,
+                            'url' => $image->url,
+                            'thumbnail' => $image->thumbnail,
+                            'alt_text' => $image->alt_text,
+                            'is_primary' => $image->is_primary,
+                            'order' => $image->order
+                        ];
+                    })->toArray(),
+                    // URLs simples pour compatibilité Flutter
+                    'image_urls' => $trip->images->pluck('url')->toArray(),
                     'bookings_count' => $trip->bookings->count(),
                     'can_book' => false, // User's own trip, cannot book
                     'is_owner' => true,

@@ -136,7 +136,7 @@ return function (App $app) {
             // Public trips (no auth required)
             $v1Group->get('/trips', [TripController::class, 'getPublicTrips']);
             $v1Group->get('/trips/price-suggestion', [TripController::class, 'getPriceSuggestion']);
-            $v1Group->get('/trips/{id}', [TripController::class, 'get']);
+            $v1Group->get('/trips/{id}', [TripController::class, 'getPublicTripDetails']);
 
             // Protected trip routes
             $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
@@ -146,7 +146,10 @@ return function (App $app) {
                 $tripGroup->post('/{id}/publish', [TripController::class, 'publishTrip']);
                 $tripGroup->post('/{id}/pause', [TripController::class, 'pauseTrip']);
                 $tripGroup->post('/{id}/resume', [TripController::class, 'resumeTrip']);
+                // Nouvelles routes d'annulation strictes
+                $tripGroup->get('/{id}/cancellation-check', [TripController::class, 'checkTripCancellation']);
                 $tripGroup->post('/{id}/cancel', [TripController::class, 'cancelTrip']);
+                $tripGroup->get('/cancellation-history', [TripController::class, 'getCancellationHistory']);
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->post('/{id}/cloudinary-images', [TripController::class, 'addCloudinaryImages']);
@@ -171,6 +174,9 @@ return function (App $app) {
             $v1Group->get('/user/trips/{id}', [TripController::class, 'getUserTrip'])
                 ->add(new AuthMiddleware());
 
+            // Public trip images (no auth required)
+            $v1Group->get('/trips/{id}/images', [TripController::class, 'getTripImages']);
+            
             // Search routes
             $v1Group->get('/search/trips', [SearchController::class, 'searchTrips']);
             $v1Group->get('/search/cities', [SearchController::class, 'getCitySuggestions']);
@@ -194,6 +200,12 @@ return function (App $app) {
                 $bookingGroup->post('/{id}/negotiate', [BookingController::class, 'addNegotiation']);
                 $bookingGroup->post('/{id}/payment-ready', [BookingController::class, 'markPaymentReady']);
                 $bookingGroup->post('/{id}/photos', [BookingController::class, 'addPackagePhoto']);
+                
+                // Nouvelles routes d'annulation strictes pour les réservations
+                $bookingGroup->get('/{id}/cancellation-check', [BookingController::class, 'checkBookingCancellation']);
+                $bookingGroup->post('/{id}/cancel', [BookingController::class, 'cancelBooking']);
+                $bookingGroup->post('/{id}/no-show', [BookingController::class, 'markAsNoShow']);
+                $bookingGroup->get('/cancellation-history', [BookingController::class, 'getCancellationHistory']);
             })->add(new AuthMiddleware());
 
             // Booking negotiation routes

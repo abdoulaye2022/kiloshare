@@ -8,6 +8,7 @@ use KiloShare\Models\Booking;
 use KiloShare\Models\Trip;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
+use KiloShare\Services\CancellationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -486,6 +487,169 @@ class BookingController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to add package photo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Vérifie si un expéditeur peut annuler sa réservation
+     */
+    public function checkBookingCancellation(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $booking = Booking::find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            $cancellationService = new CancellationService();
+            $result = $cancellationService->canSenderCancelBooking($user, $booking);
+
+            $responseData = [
+                'can_cancel' => $result['allowed'],
+                'reason' => $result['reason'] ?? null
+            ];
+
+            if ($result['allowed']) {
+                $responseData['cancellation_type'] = $result['type'];
+                $responseData['refund_percentage'] = $result['refund_rate'];
+                
+                // Calculer les détails financiers
+                if ($result['type'] === 'late_cancel') {
+                    $responseData['warning'] = 'Annulation tardive: vous ne récupérerez que 50% du montant payé';
+                } elseif ($result['type'] === 'early_cancel') {
+                    $responseData['warning'] = 'Les frais KiloShare et Stripe seront déduits du remboursement';
+                }
+            }
+
+            return Response::success($responseData);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la vérification: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Annule une réservation avec les politiques strictes
+     */
+    public function cancelBooking(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $booking = Booking::find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            $cancellationService = new CancellationService();
+            $result = $cancellationService->cancelBookingBySender($booking);
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'cancelled_at' => $booking->cancelled_at,
+                    'cancellation_type' => $booking->cancellation_type
+                ],
+                'message' => $result['message'],
+                'refund_percentage' => $result['refund_percentage']
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::badRequest($e->getMessage());
+        }
+    }
+
+    /**
+     * Marque une réservation comme no-show (non-présentation)
+     */
+    public function markAsNoShow(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+        
+        try {
+            $booking = Booking::find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que c'est le voyageur qui marque comme no-show
+            if ($booking->trip->user_id !== $user->id) {
+                return Response::forbidden('Seul le voyageur peut marquer une réservation comme no-show');
+            }
+
+            // Vérifier que la réservation est confirmée
+            if ($booking->status !== Booking::STATUS_ACCEPTED) {
+                return Response::badRequest('Seules les réservations confirmées peuvent être marquées comme no-show');
+            }
+
+            $cancellationService = new CancellationService();
+            $cancellationService->markBookingAsNoShow($booking);
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'cancellation_type' => $booking->cancellation_type,
+                    'cancelled_at' => $booking->cancelled_at
+                ],
+                'message' => 'Réservation marquée comme no-show. L\'expéditeur ne sera pas remboursé.'
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors du marquage no-show: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Récupère l'historique des annulations d'un expéditeur
+     */
+    public function getCancellationHistory(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        
+        try {
+            // Récupérer les réservations annulées par l'expéditeur
+            $cancelledBookings = Booking::where('sender_id', $user->id)
+                ->whereIn('status', [Booking::STATUS_CANCELLED])
+                ->whereNotNull('cancelled_at')
+                ->with(['trip'])
+                ->orderBy('cancelled_at', 'desc')
+                ->get();
+
+            $history = $cancelledBookings->map(function ($booking) {
+                return [
+                    'booking_id' => $booking->id,
+                    'trip_title' => $booking->trip->title,
+                    'trip_route' => $booking->trip->departure_city . ' → ' . $booking->trip->arrival_city,
+                    'cancelled_at' => $booking->cancelled_at,
+                    'cancellation_type' => $booking->cancellation_type,
+                    'cancellation_reason' => $booking->cancellation_reason,
+                    'final_price' => $booking->final_price,
+                    'refund_processed' => true // À implémenter selon le système de paiement
+                ];
+            });
+
+            // Calculer des statistiques
+            $stats = [
+                'total_cancellations' => $cancelledBookings->count(),
+                'early_cancellations' => $cancelledBookings->where('cancellation_type', 'early')->count(),
+                'late_cancellations' => $cancelledBookings->where('cancellation_type', 'late')->count(),
+                'no_shows' => $cancelledBookings->where('cancellation_type', 'no_show')->count()
+            ];
+
+            return Response::success([
+                'history' => $history,
+                'statistics' => $stats
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la récupération de l\'historique: ' . $e->getMessage());
         }
     }
 }

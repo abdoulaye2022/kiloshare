@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Calendar, Package2 as Weight, DollarSign, User, MessageCircle } from 'lucide-react';
+import { Search, MapPin, Calendar, Package2 as Weight, DollarSign, User, MessageCircle, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Trip {
   id: number;
@@ -33,6 +34,7 @@ interface ProposalData {
 }
 
 export default function TripsListPage() {
+  const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +57,7 @@ export default function TripsListPage() {
   const fetchPublicTrips = async () => {
     try {
       // Utiliser l'API de recherche publique pour obtenir les voyages disponibles
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/search/trips?status=active&limit=50`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/search/trips?status=active&limit=50`);
       
       if (response.ok) {
         const data = await response.json();
@@ -91,7 +93,7 @@ export default function TripsListPage() {
       // On utilisera un token d'auth réel dans l'implémentation finale
       const token = localStorage.getItem('auth_token') || 'demo_token';
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/bookings/request`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/bookings/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -251,15 +253,22 @@ export default function TripsListPage() {
                     </div>
                     <div className="flex space-x-3">
                       <button
+                        onClick={() => router.push(`/trips/${trip.id}`)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>Voir détails</span>
+                      </button>
+                      <button
                         onClick={() => handleMakeProposal(trip)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                       >
                         <MessageCircle className="h-4 w-4" />
-                        <span>Faire une proposition</span>
+                        <span>Proposition</span>
                       </button>
                       <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
                         <DollarSign className="h-4 w-4" />
-                        <span>Payer directement</span>
+                        <span>Payer</span>
                       </button>
                     </div>
                   </div>

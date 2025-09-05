@@ -31,6 +31,9 @@ class Booking extends Model
         'pickup_date',
         'delivery_date',
         'special_instructions',
+        'cancelled_at',
+        'cancellation_type',
+        'cancellation_reason',
     ];
 
     protected $casts = [
@@ -41,6 +44,7 @@ class Booking extends Model
         'commission_amount' => 'decimal:2',
         'pickup_date' => 'datetime',
         'delivery_date' => 'datetime',
+        'cancelled_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -65,6 +69,13 @@ class Booking extends Model
     const PAYMENT_CAPTURED = 'captured';
     const PAYMENT_FAILED = 'failed';
     const PAYMENT_REFUNDED = 'refunded';
+
+    // Types d'annulation
+    const CANCELLATION_EARLY = 'early';      // Plus de 24h avant
+    const CANCELLATION_LATE = 'late';        // Moins de 24h avant
+    const CANCELLATION_NO_SHOW = 'no_show';  // Non-présentation
+    const CANCELLATION_BY_TRAVELER = 'by_traveler'; // Annulé par le voyageur
+    const CANCELLATION_BY_SENDER = 'by_sender';     // Annulé par l'expéditeur
 
     protected static function boot()
     {

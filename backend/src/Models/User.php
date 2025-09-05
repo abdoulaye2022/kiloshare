@@ -53,6 +53,10 @@ class User extends Model
         'last_login_at',
         'social_provider',
         'social_id',
+        'cancellation_count',
+        'last_cancellation_date',
+        'suspension_reason',
+        'is_suspended',
     ];
 
     protected $hidden = [
@@ -64,6 +68,8 @@ class User extends Model
         'is_verified' => 'boolean',
         'newsletter_subscribed' => 'boolean',
         'marketing_emails' => 'boolean',
+        'is_suspended' => 'boolean',
+        'last_cancellation_date' => 'datetime',
         'date_of_birth' => 'date',
         'email_verified_at' => 'datetime',
         'phone_verified_at' => 'datetime',
@@ -131,6 +137,21 @@ class User extends Model
     public function favorites(): HasMany
     {
         return $this->hasMany(TripFavorite::class);
+    }
+
+    public function cancellationReports(): HasMany
+    {
+        return $this->hasMany(TripCancellationReport::class);
+    }
+
+    public function publicCancellationReports(): HasMany
+    {
+        return $this->hasMany(TripCancellationReport::class)
+                    ->where('is_public', true)
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    });
     }
 
     public function tokens(): HasMany
