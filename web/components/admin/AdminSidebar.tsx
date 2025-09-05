@@ -42,6 +42,12 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           href: '/admin/stats',
           icon: BarChart3,
           active: isActive('/admin/stats')
+        },
+        {
+          label: 'Analytics',
+          href: '/admin/analytics',
+          icon: BarChart3,
+          active: isActive('/admin/analytics')
         }
       ]
     },

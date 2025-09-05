@@ -43,10 +43,15 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   const [stats, setStats] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
+  const [commissionStats, setCommissionStats] = useState<any>(null);
+  const [platformAnalytics, setPlatformAnalytics] = useState<any>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
     fetchStats();
+    fetchCommissionStats();
+    fetchPlatformAnalytics();
   }, [filter, typeFilter]);
 
   const fetchTransactions = async () => {
@@ -58,7 +63,10 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
       
       if (response.ok) {
         const data = await response.json();
-        setTransactions(data.transactions || []);
+        console.log('Transactions API response:', data);
+        // Handle nested data structure: data.data.transactions
+        const transactions = data.data?.transactions || data.transactions || [];
+        setTransactions(transactions);
       } else {
         console.error('Failed to fetch transactions');
       }
@@ -75,10 +83,39 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
       
       if (response.ok) {
         const data = await response.json();
-        setStats(data.stats);
+        console.log('Stats API response:', data);
+        // Handle nested data structure
+        const stats = data.data?.stats || data.stats;
+        setStats(stats);
       }
     } catch (error) {
       console.error('Error fetching transaction stats:', error);
+    }
+  };
+
+  const fetchCommissionStats = async () => {
+    try {
+      const response = await adminAuth.apiRequest('/api/v1/admin/payments/commission-stats');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCommissionStats(data.data?.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching commission stats:', error);
+    }
+  };
+
+  const fetchPlatformAnalytics = async () => {
+    try {
+      const response = await adminAuth.apiRequest('/api/v1/admin/analytics/platform');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPlatformAnalytics(data.data?.analytics);
+      }
+    } catch (error) {
+      console.error('Error fetching platform analytics:', error);
     }
   };
 
@@ -154,6 +191,13 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
     }
   };
 
+  const formatCurrency = (amount: number, currency: string = 'CAD') => {
+    return new Intl.NumberFormat('fr-CA', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -183,11 +227,11 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-green-600">{stats.total_revenue?.toFixed(2) || '0.00'} €</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.total_revenue || 0)}</div>
               <div className="text-sm text-gray-600">Revenus totaux</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-blue-600">{stats.total_commission?.toFixed(2) || '0.00'} €</div>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(stats.total_commission || 0)}</div>
               <div className="text-sm text-gray-600">Commissions</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
@@ -198,6 +242,154 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
               <div className="text-2xl font-bold text-red-600">{stats.failed_count || 0}</div>
               <div className="text-sm text-gray-600">Échouées</div>
             </div>
+          </div>
+        )}
+
+        {/* Commission & Analytics Section */}
+        {(commissionStats || platformAnalytics) && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Analytics de la plateforme</h3>
+              <button
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+              >
+                {showAnalytics ? 'Masquer' : 'Afficher'} les détails
+              </button>
+            </div>
+
+            {/* Commission Stats */}
+            {commissionStats && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(commissionStats.total_commission || 0)}
+                  </div>
+                  <div className="text-sm text-blue-700">Commission totale collectée</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {commissionStats.commission_rate || '0'}%
+                  </div>
+                  <div className="text-sm text-purple-700">Taux de commission moyen</div>
+                </div>
+                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                  <div className="text-2xl font-bold text-indigo-600">
+                    {formatCurrency(commissionStats.monthly_commission || 0)}
+                  </div>
+                  <div className="text-sm text-indigo-700">Commission ce mois</div>
+                </div>
+                <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                  <div className="text-2xl font-bold text-teal-600">
+                    {commissionStats.commission_transactions || '0'}
+                  </div>
+                  <div className="text-sm text-teal-700">Transactions avec commission</div>
+                </div>
+              </div>
+            )}
+
+            {/* Expanded Analytics */}
+            {showAnalytics && platformAnalytics && (
+              <div className="bg-white p-6 rounded-lg border">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Volume Analytics */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-900 mb-3">Volume des transactions</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Transactions aujourd'hui</span>
+                        <span className="text-sm font-medium">{platformAnalytics.daily_transactions || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Transactions ce mois</span>
+                        <span className="text-sm font-medium">{platformAnalytics.monthly_transactions || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Volume total traité</span>
+                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.total_volume || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Valeur moyenne/transaction</span>
+                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.avg_transaction_value || 0)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Analytics */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-900 mb-3">Utilisateurs actifs</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Utilisateurs actifs</span>
+                        <span className="text-sm font-medium">{platformAnalytics.active_users || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Nouveaux utilisateurs</span>
+                        <span className="text-sm font-medium">{platformAnalytics.new_users || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Comptes connectés</span>
+                        <span className="text-sm font-medium">{platformAnalytics.connected_accounts || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Taux de conversion</span>
+                        <span className="text-sm font-medium">{platformAnalytics.conversion_rate?.toFixed(1) || '0.0'}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Performance Analytics */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-900 mb-3">Performance</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Taux de succès</span>
+                        <span className="text-sm font-medium text-green-600">{platformAnalytics.success_rate?.toFixed(1) || '0.0'}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Taux d'échec</span>
+                        <span className="text-sm font-medium text-red-600">{platformAnalytics.failure_rate?.toFixed(1) || '0.0'}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Remboursements</span>
+                        <span className="text-sm font-medium">{platformAnalytics.refunds_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Frais Stripe totaux</span>
+                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.stripe_fees || 0)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Charts placeholder */}
+                <div className="mt-6 pt-6 border-t">
+                  <h4 className="text-md font-medium text-gray-900 mb-3">Tendances (7 derniers jours)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Volume quotidien</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {formatCurrency(platformAnalytics.daily_trend?.volume || 0)}
+                      </div>
+                      <div className={`text-sm ${platformAnalytics.daily_trend?.volume_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {platformAnalytics.daily_trend?.volume_change >= 0 ? '+' : ''}
+                        {platformAnalytics.daily_trend?.volume_change?.toFixed(1) || '0.0'}% par rapport à hier
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Transactions quotidiennes</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {platformAnalytics.daily_trend?.transactions || '0'}
+                      </div>
+                      <div className={`text-sm ${platformAnalytics.daily_trend?.transactions_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {platformAnalytics.daily_trend?.transactions_change >= 0 ? '+' : ''}
+                        {platformAnalytics.daily_trend?.transactions_change?.toFixed(1) || '0.0'}% par rapport à hier
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -282,10 +474,10 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {transaction.amount.toFixed(2)} {transaction.currency}
+                      {formatCurrency(transaction.amount, transaction.currency)}
                     </div>
                     <div className="text-sm text-gray-600">
-                      Net: {transaction.net_amount.toFixed(2)} {transaction.currency}
+                      Net: {formatCurrency(transaction.net_amount, transaction.currency)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -369,20 +561,20 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
                       <div>
                         <label className="text-sm font-medium text-gray-700">Montant</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {selectedTransaction.amount.toFixed(2)} {selectedTransaction.currency}
+                          {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}
                         </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Montant net</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {selectedTransaction.net_amount.toFixed(2)} {selectedTransaction.currency}
+                          {formatCurrency(selectedTransaction.net_amount, selectedTransaction.currency)}
                         </p>
                       </div>
                       {selectedTransaction.stripe_fee && (
                         <div>
                           <label className="text-sm font-medium text-gray-700">Frais Stripe</label>
                           <p className="mt-1 text-sm text-gray-900">
-                            {selectedTransaction.stripe_fee.toFixed(2)} {selectedTransaction.currency}
+                            {formatCurrency(selectedTransaction.stripe_fee || 0, selectedTransaction.currency)}
                           </p>
                         </div>
                       )}

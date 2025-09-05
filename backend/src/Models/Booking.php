@@ -122,6 +122,11 @@ class Booking extends Model
         return $this->hasMany(Message::class);
     }
 
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
     // Méthodes utilitaires
     public function canBeAcceptedBy(User $user): bool
     {

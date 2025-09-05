@@ -645,7 +645,7 @@ class TripController
             $departureCountry = $queryParams['departure_country'] ?? null;
             $arrivalCity = $queryParams['arrival_city'] ?? null;
             $arrivalCountry = $queryParams['arrival_country'] ?? null;
-            $currency = $queryParams['currency'] ?? 'EUR';
+            $currency = $queryParams['currency'] ?? 'CAD';
             
             if (!$departureCity || !$departureCountry || !$arrivalCity || !$arrivalCountry) {
                 return Response::badRequest('Missing required parameters: departure_city, departure_country, arrival_city, arrival_country');

@@ -44,10 +44,14 @@ export default function ConnectedAccountsManagement() {
   const [selectedAccount, setSelectedAccount] = useState<ConnectedAccount | null>(null);
   const [showAccountDetails, setShowAccountDetails] = useState(false);
   const [stats, setStats] = useState<any>(null);
+  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
 
   useEffect(() => {
     fetchAccounts();
     fetchStats();
+    fetchPendingTransfers();
   }, [filter]);
 
   const fetchAccounts = async () => {
@@ -60,7 +64,9 @@ export default function ConnectedAccountsManagement() {
       if (response.ok) {
         const data = await response.json();
         console.log('Connected accounts API response:', data);
-        setAccounts(data.data?.accounts || []);
+        // Handle nested data structure: data.data.accounts
+        const accounts = data.data?.data?.accounts || data.data?.accounts || [];
+        setAccounts(accounts);
       } else {
         console.error('Failed to fetch connected accounts');
       }
@@ -85,6 +91,19 @@ export default function ConnectedAccountsManagement() {
     }
   };
 
+  const fetchPendingTransfers = async () => {
+    try {
+      const response = await adminAuth.apiRequest('/api/v1/admin/payments/pending-transfers');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPendingTransfers(data.data?.transfers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pending transfers:', error);
+    }
+  };
+
   const handleAccountAction = async (accountId: string, action: 'enable' | 'disable' | 'review') => {
     try {
       const response = await adminAuth.apiRequest(`/api/v1/admin/stripe/connected-accounts/${accountId}/action`, {
@@ -103,6 +122,36 @@ export default function ConnectedAccountsManagement() {
     } catch (error) {
       console.error(`Error ${action}ing account:`, error);
     }
+  };
+
+  const handleTransferPayment = async (transferId: string, action: 'approve' | 'reject' | 'force') => {
+    try {
+      const response = await adminAuth.apiRequest(`/api/v1/admin/payments/transfers/${transferId}/${action}`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          reason: action === 'approve' ? 'Admin approved transfer' : 
+                 action === 'force' ? 'Admin forced transfer (24h passed)' : 'Admin rejected transfer'
+        })
+      });
+
+      if (response.ok) {
+        fetchPendingTransfers();
+        fetchStats();
+        setShowTransferModal(false);
+        setSelectedTransfer(null);
+      } else {
+        console.error('Transfer action failed');
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing transfer:`, error);
+    }
+  };
+
+  const formatCurrency = (amount: number, currency: string = 'CAD') => {
+    return new Intl.NumberFormat('fr-CA', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
   };
 
   const getStatusBadge = (status: string) => {
@@ -180,8 +229,37 @@ export default function ConnectedAccountsManagement() {
               <div className="text-sm text-gray-600">Restreints</div>
             </div>
             <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-blue-600">{stats.total_balance?.toFixed(2) || '0.00'} €</div>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(stats.total_balance || 0)}</div>
               <div className="text-sm text-gray-600">Solde total</div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Transfers Alert */}
+        {pendingTransfers.length > 0 && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">
+                    Transferts en attente
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>{pendingTransfers.length} transfert(s) en attente d'approbation ou prêt(s) à être effectué(s).</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTransferModal(true)}
+                className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-1 rounded-md text-sm font-medium"
+              >
+                Gérer les transferts
+              </button>
             </div>
           </div>
         )}
@@ -283,9 +361,9 @@ export default function ConnectedAccountsManagement() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {account.balance ? (
                       <div className="text-sm text-gray-900">
-                        <div>Disponible: {account.balance.available.toFixed(2)} €</div>
+                        <div>Disponible: {formatCurrency(account.balance.available)}</div>
                         <div className="text-xs text-gray-500">
-                          En attente: {account.balance.pending.toFixed(2)} €
+                          En attente: {formatCurrency(account.balance.pending)}
                         </div>
                       </div>
                     ) : (
@@ -457,6 +535,164 @@ export default function ConnectedAccountsManagement() {
                     Fermer
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Management Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="w-full">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Gestion des transferts de paiement
+                      </h3>
+                      <button
+                        onClick={() => setShowTransferModal(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600">
+                        Voici les transferts en attente d'approbation vers les comptes connectés des transporteurs.
+                        Les transferts peuvent être effectués automatiquement 24h après la livraison confirmée.
+                      </p>
+                    </div>
+
+                    {/* Transfers Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Voyage
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Transporteur
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Montant
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Statut
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Délai
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {pendingTransfers.map((transfer) => {
+                            const canForceTransfer = transfer.hours_since_delivery >= 24;
+                            const hoursLeft = Math.max(0, 24 - transfer.hours_since_delivery);
+                            
+                            return (
+                              <tr key={transfer.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {transfer.trip?.departure_city} → {transfer.trip?.arrival_city}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    #{transfer.trip?.id}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    {transfer.transporter?.first_name} {transfer.transporter?.last_name}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    {transfer.transporter?.email}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {formatCurrency(transfer.amount, transfer.currency)}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    Commission: {formatCurrency(transfer.commission, transfer.currency)}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    transfer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    transfer.status === 'ready' ? 'bg-green-100 text-green-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {transfer.status === 'pending' ? 'En attente' :
+                                     transfer.status === 'ready' ? 'Prêt' : transfer.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {canForceTransfer ? (
+                                    <span className="text-green-600 font-medium">Peut transférer</span>
+                                  ) : (
+                                    <span className="text-yellow-600">
+                                      {hoursLeft}h restantes
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => handleTransferPayment(transfer.id, 'approve')}
+                                      className="text-green-600 hover:text-green-900"
+                                    >
+                                      Approuver
+                                    </button>
+                                    {canForceTransfer && (
+                                      <button
+                                        onClick={() => handleTransferPayment(transfer.id, 'force')}
+                                        className="text-blue-600 hover:text-blue-900 font-medium"
+                                      >
+                                        Transférer (24h)
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleTransferPayment(transfer.id, 'reject')}
+                                      className="text-red-600 hover:text-red-900"
+                                    >
+                                      Rejeter
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {pendingTransfers.length === 0 && (
+                      <div className="text-center py-8">
+                        <div className="text-gray-500">Aucun transfert en attente</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  onClick={() => setShowTransferModal(false)}
+                  className="bg-white hover:bg-gray-50 text-gray-900 px-4 py-2 rounded-md text-sm font-medium border border-gray-300"
+                >
+                  Fermer
+                </button>
               </div>
             </div>
           </div>

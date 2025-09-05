@@ -109,6 +109,28 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->post('/stripe/connected-accounts/{id}/action', [AdminController::class, 'performAccountAction'])
                     ->add(new AuthMiddleware());
+                
+                // Analytics management
+                $adminGroup->get('/analytics/platform', [AdminController::class, 'getPlatformAnalytics'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->get('/analytics/platform/metrics', [AdminController::class, 'getPlatformMetrics'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->get('/analytics/platform/trends', [AdminController::class, 'getPlatformTrends'])
+                    ->add(new AuthMiddleware());
+                
+                // Commission tracking
+                $adminGroup->get('/payments/commission-stats', [AdminController::class, 'getCommissionStats'])
+                    ->add(new AuthMiddleware());
+                
+                // Transfer management
+                $adminGroup->get('/payments/pending-transfers', [AdminController::class, 'getPendingTransfers'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/payments/transfers/{id}/approve', [AdminController::class, 'approveTransfer'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/payments/transfers/{id}/reject', [AdminController::class, 'rejectTransfer'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/payments/transfers/{id}/force', [AdminController::class, 'forceTransfer'])
+                    ->add(new AuthMiddleware());
             });
 
             // Public trips (no auth required)
