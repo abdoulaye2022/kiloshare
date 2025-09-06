@@ -24,12 +24,26 @@ class FirebaseNotificationService
         try {
             $factory = new Factory();
             
-            // Si on a un chemin vers le service account key file
-            $credentialsPath = __DIR__ . '/../../' . $firebaseConfig['credentials_path'];
-            if (!empty($firebaseConfig['credentials_path']) && file_exists($credentialsPath)) {
-                $factory = $factory->withServiceAccount($credentialsPath);
+            // Configuration via les variables d'environnement
+            if (!empty($firebaseConfig['private_key']) && !empty($firebaseConfig['client_email'])) {
+                // Créer la configuration service account à partir des variables d'environnement
+                $serviceAccountConfig = [
+                    'type' => $firebaseConfig['type'],
+                    'project_id' => $firebaseConfig['project_id'],
+                    'private_key_id' => $firebaseConfig['private_key_id'],
+                    'private_key' => $firebaseConfig['private_key'],
+                    'client_email' => $firebaseConfig['client_email'],
+                    'client_id' => $firebaseConfig['client_id'],
+                    'auth_uri' => $firebaseConfig['auth_uri'],
+                    'token_uri' => $firebaseConfig['token_uri'],
+                    'auth_provider_x509_cert_url' => $firebaseConfig['auth_provider_x509_cert_url'],
+                    'client_x509_cert_url' => $firebaseConfig['client_x509_cert_url'],
+                    'universe_domain' => $firebaseConfig['universe_domain']
+                ];
+                
+                $factory = $factory->withServiceAccount($serviceAccountConfig);
             } else {
-                // Configuration via project ID seulement
+                // Configuration via project ID seulement (fallback)
                 $factory = $factory->withProjectId($firebaseConfig['project_id'] ?? 'kiloshare-8f7fa');
             }
             

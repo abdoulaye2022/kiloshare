@@ -77,7 +77,16 @@ return [
 
     'firebase' => [
         'project_id' => $_ENV['FIREBASE_PROJECT_ID'] ?? '',
-        'credentials_path' => $_ENV['FIREBASE_CREDENTIALS_PATH'] ?? __DIR__ . '/../config/firebase-service-account.json',
+        'type' => $_ENV['FIREBASE_TYPE'] ?? 'service_account',
+        'private_key_id' => $_ENV['FIREBASE_PRIVATE_KEY_ID'] ?? '',
+        'private_key' => str_replace('\\n', "\n", $_ENV['FIREBASE_PRIVATE_KEY'] ?? ''),
+        'client_email' => $_ENV['FIREBASE_CLIENT_EMAIL'] ?? '',
+        'client_id' => $_ENV['FIREBASE_CLIENT_ID'] ?? '',
+        'auth_uri' => $_ENV['FIREBASE_AUTH_URI'] ?? 'https://accounts.google.com/o/oauth2/auth',
+        'token_uri' => $_ENV['FIREBASE_TOKEN_URI'] ?? 'https://oauth2.googleapis.com/token',
+        'auth_provider_x509_cert_url' => $_ENV['FIREBASE_AUTH_PROVIDER_CERT_URL'] ?? 'https://www.googleapis.com/oauth2/v1/certs',
+        'client_x509_cert_url' => $_ENV['FIREBASE_CLIENT_CERT_URL'] ?? '',
+        'universe_domain' => $_ENV['FIREBASE_UNIVERSE_DOMAIN'] ?? 'googleapis.com',
         'database_url' => $_ENV['FIREBASE_DATABASE_URL'] ?? '',
         'storage_bucket' => $_ENV['FIREBASE_STORAGE_BUCKET'] ?? '',
         'messaging' => [
