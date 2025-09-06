@@ -126,6 +126,34 @@ class UserNotificationPreferences extends Model
     }
 
     /**
+     * Créer des préférences par défaut pour un utilisateur
+     */
+    public static function createForUser(int $userId): self
+    {
+        return self::create([
+            'user_id' => $userId,
+            'push_enabled' => true,
+            'email_enabled' => true,
+            'sms_enabled' => true,
+            'in_app_enabled' => true,
+            'marketing_enabled' => false,
+            'quiet_hours_enabled' => true,
+            'quiet_hours_start' => '22:00:00',
+            'quiet_hours_end' => '08:00:00',
+            'timezone' => 'Europe/Paris',
+            'trip_updates_push' => true,
+            'trip_updates_email' => true,
+            'booking_updates_push' => true,
+            'booking_updates_email' => true,
+            'payment_updates_push' => true,
+            'payment_updates_email' => true,
+            'security_alerts_push' => true,
+            'security_alerts_email' => true,
+            'language' => 'fr',
+        ]);
+    }
+
+    /**
      * Obtenir les préférences formatées pour l'API
      */
     public function toApiArray(): array

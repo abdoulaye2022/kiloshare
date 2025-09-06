@@ -39,57 +39,47 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     if (_hasLoaded) return;
     _hasLoaded = true;
     
-    print('=== TRIP DETAILS DEBUG START ===');
-    print('TripDetailsFinal: Loading data for trip ID: ${widget.tripId}');
-    print('TripDetailsFinal: Trip ID type: ${widget.tripId.runtimeType}');
-    print('TripDetailsFinal: Trip ID length: ${widget.tripId.length}');
+    // Debug messages removed for production
     
     try {
       // Check auth status
       final token = await AuthService.instance.getStoredToken();
       final isAuth = token != null && !AuthService.instance.isTokenExpired(token);
-      print('TripDetailsFinal: Authentication status - isAuth: $isAuth, hasToken: ${token != null}');
+      // Auth status checked
       
       String? userId;
       if (isAuth) {
         try {
           final user = await AuthService.instance.getCurrentUser();
           userId = user?.id.toString();
-          print('TripDetailsFinal: Current user ID: $userId');
+          // User ID obtained
         } catch (e) {
-          print('TripDetailsFinal: Error getting current user: $e');
+          // Error getting current user
         }
       } else {
-        print('TripDetailsFinal: No authentication - proceeding with public access');
+        // Proceeding with public access
       }
 
       // Load trip data
       final tripService = TripService();
-      print('TripDetailsFinal: About to call getTripById with ID: "${widget.tripId}"');
+      // Loading trip data
       
       final trip = await tripService.getTripById(widget.tripId);
       
-      print('TripDetailsFinal: Trip loaded successfully!');
-      print('TripDetailsFinal: - Trip ID: ${trip.id}');
-      print('TripDetailsFinal: - Trip Status: ${trip.status}');
-      print('TripDetailsFinal: - Trip Owner ID: ${trip.userId}');
-      print('TripDetailsFinal: - Current User ID: $userId');
-      print('TripDetailsFinal: - Is Owner: ${trip.userId == userId}');
-      print('TripDetailsFinal: - Departure: ${trip.departureCity} → ${trip.arrivalCity}');
-      print('=== TRIP DETAILS DEBUG SUCCESS ===');
+      // Trip loaded successfully
       
       // Check favorite status if authenticated and not owner
       bool isFavorite = false;
       if (isAuth && userId != null && trip.userId != userId) {
         try {
-          print('TripDetailsFinal: Checking favorite status for trip: ${widget.tripId}');
+          // Checking favorite status
           isFavorite = await FavoritesService.instance.isFavorite(widget.tripId);
-          print('TripDetailsFinal: Trip is favorite: $isFavorite');
+          // Favorite status checked
         } catch (e) {
-          print('TripDetailsFinal: Error checking favorite status: $e');
+          // Error checking favorite status
         }
       } else {
-        print('TripDetailsFinal: Skipping favorite check - isAuth: $isAuth, isOwner: ${trip.userId == userId}');
+        // Skipping favorite check
       }
       
       if (mounted) {
@@ -103,13 +93,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         });
       }
     } catch (e) {
-      print('=== TRIP DETAILS DEBUG ERROR ===');
-      print('TripDetailsFinal: Error loading trip data');
-      print('TripDetailsFinal: - Requested Trip ID: "${widget.tripId}"');
-      print('TripDetailsFinal: - Error Type: ${e.runtimeType}');
-      print('TripDetailsFinal: - Error Message: $e');
-      print('TripDetailsFinal: - Error String Contains "Trip not found": ${e.toString().contains('Trip not found')}');
-      print('=== TRIP DETAILS DEBUG ERROR END ===');
+      // Error loading trip data
       
       String errorMessage;
       if (e.toString().contains('Trip not found')) {
@@ -1042,7 +1026,11 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
           child: ElevatedButton.icon(
             onPressed: () => context.push('/login'),
             icon: const Icon(Icons.login),
-            label: const Text('Se connecter'),
+            label: const Text(
+              'Se connecter',
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -1054,7 +1042,11 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
           child: OutlinedButton.icon(
             onPressed: () => context.push('/register'),
             icon: const Icon(Icons.person_add),
-            label: const Text('S\'inscrire'),
+            label: const Text(
+              'S\'inscrire',
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
         ),
       ],
@@ -1068,7 +1060,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
 
   void _publishTrip() async {
     try {
-      print('=== DEBUG: Publishing trip ${_trip?.id} ===');
+      // Publishing trip
       
       if (_trip == null) {
         _showMessage('Erreur: voyage non trouvé', Colors.red);
@@ -1078,7 +1070,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       final tripService = TripService();
       final publishedTrip = await tripService.publishTrip(_trip!.id.toString());
       
-      print('DEBUG: Trip published successfully');
+      // Trip published successfully
       
       // Update local trip data
       setState(() {
@@ -1088,7 +1080,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       _showMessage('Annonce publiée avec succès !', Colors.green);
       
     } catch (e) {
-      print('ERROR: Failed to publish trip: $e');
+      // Failed to publish trip
       _showMessage('Erreur lors de la publication: $e', Colors.red);
     }
   }
@@ -1177,8 +1169,8 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
 
   void _duplicateTrip() async {
     try {
-      print('=== DEBUG DUPLICATE BUTTON PRESSED ===');
-      print('Trip ID: ${_trip?.id}');
+      // Duplicate button pressed
+      // Duplicating trip
       
       if (_trip == null) {
         _showMessage('Erreur: voyage non trouvé', Colors.red);
@@ -1188,13 +1180,13 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       final tripService = TripService();
       final duplicatedTrip = await tripService.duplicateTrip(_trip!.id.toString());
       
-      print('Duplication successful, new trip ID: ${duplicatedTrip.id}');
+      // Duplication successful
       _showMessage('Annonce dupliquée avec succès', Colors.green);
       
       // Optionally navigate to the new trip or refresh
       
     } catch (e) {
-      print('Duplication failed: $e');
+      // Duplication failed
       _showMessage('Erreur lors de la duplication: $e', Colors.red);
     }
   }
@@ -1289,7 +1281,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   }
 
   void _toggleFavorite() async {
-    print('TripDetailsFinal: Toggle favorite clicked - current state: $_isFavorite');
+    // Toggle favorite clicked
     
     if (!_isAuthenticated) {
       _showMessage('Veuillez vous connecter pour ajouter aux favoris', Colors.orange);
@@ -1303,17 +1295,17 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     
     try {
       final result = await FavoritesService.instance.toggleFavorite(widget.tripId);
-      print('TripDetailsFinal: Toggle result: $result');
+      // Toggle result received
       
       if (result['success'] == true) {
         final newFavoriteState = result['isFavorite'] ?? false;
-        print('TripDetailsFinal: Updating state from $_isFavorite to $newFavoriteState');
+        // Updating favorite state
         
         setState(() {
           _isFavorite = newFavoriteState;
         });
         
-        print('TripDetailsFinal: State updated - new _isFavorite: $_isFavorite');
+        // State updated
         
         _showMessage(
           _isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris', 
@@ -1323,7 +1315,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
       }
     } catch (e) {
-      print('TripDetailsFinal: Toggle error: $e');
+      // Toggle error
       _showMessage('Erreur lors de la mise à jour des favoris', Colors.red);
     }
   }
@@ -1696,7 +1688,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
-                            print('Error loading trip image: $error');
+                            // Error loading trip image
                             return Container(
                               width: 300,
                               height: 200,

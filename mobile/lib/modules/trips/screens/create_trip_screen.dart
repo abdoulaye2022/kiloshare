@@ -1096,13 +1096,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   void _nextStep() {
-    print('=== DEBUG _nextStep called ===');
-    print('Current step: $_currentStep');
-    print('Total steps: $_totalSteps');
-    print('Can continue: ${_canContinue()}');
+    // print('=== DEBUG _nextStep called ===');
+    // print('Current step: $_currentStep');
+    // print('Total steps: $_totalSteps');
+    // print('Can continue: ${_canContinue()}');
 
     if (_currentStep < _totalSteps - 1) {
-      print('Moving to next step');
+      // print('Moving to next step');
       setState(() {
         _currentStep++;
       });
@@ -1211,10 +1211,10 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             'transport_type': _tripData['transport_type'],
             'departure_city': _tripData['departure_city'],
             'departure_country': _tripData['departure_country'],
-            'departure_date': _tripData['departure_date']?.toIso8601String(),
+            'departure_date': _tripData['departure_date']?.toUtc().toIso8601String(),
             'arrival_city': _tripData['arrival_city'],
             'arrival_country': _tripData['arrival_country'],
-            'arrival_date': _tripData['arrival_date']?.toIso8601String(),
+            'arrival_date': _tripData['arrival_date']?.toUtc().toIso8601String(),
             'available_weight_kg': _tripData['available_weight_kg']?.toDouble(),
             'price_per_kg': _tripData['price_per_kg']?.toDouble(),
             'currency': _tripData['currency'] ?? 'CAD',

@@ -34,6 +34,13 @@ class FavoritesService {
   /// Ajouter un voyage aux favoris
   Future<bool> addToFavorites(String tripId) async {
     try {
+      // Vérifier l'authentification
+      final token = await AuthService.instance.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('FavoritesService: User not authenticated, cannot add to favorites');
+        return false;
+      }
+
       final options = await _getAuthHeaders();
       
 
@@ -52,6 +59,12 @@ class FavoritesService {
   /// Retirer un voyage des favoris
   Future<bool> removeFromFavorites(String tripId) async {
     try {
+      // Vérifier l'authentification
+      final token = await AuthService.instance.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('FavoritesService: User not authenticated, cannot remove from favorites');
+        return false;
+      }
 
       final response = await _dio.delete(
         '/favorites/trips/$tripId',
@@ -68,6 +81,13 @@ class FavoritesService {
   /// Vérifier si un voyage est en favoris
   Future<bool> isFavorite(String tripId) async {
     try {
+      // Vérifier l'authentification
+      final token = await AuthService.instance.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('FavoritesService: User not authenticated, cannot check favorite status');
+        return false;
+      }
+
       final response = await _dio.get(
         '/favorites/trips/$tripId/status',
         options: await _getAuthHeaders(),
@@ -84,6 +104,13 @@ class FavoritesService {
   /// Récupérer la liste des voyages favoris
   Future<List<Trip>> getFavoriteTrips() async {
     try {
+      // Vérifier si l'utilisateur est authentifié avant l'appel API
+      final token = await AuthService.instance.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('FavoritesService: User not authenticated, returning empty list');
+        return [];
+      }
+
       final response = await _dio.get(
         '/favorites',
         options: await _getAuthHeaders(),
@@ -109,6 +136,12 @@ class FavoritesService {
   /// Retourne un Map avec {success: bool, isFavorite: bool}
   Future<Map<String, dynamic>> toggleFavorite(String tripId) async {
     try {
+      // Vérifier l'authentification
+      final token = await AuthService.instance.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('FavoritesService: User not authenticated, cannot toggle favorite');
+        return {'success': false, 'isFavorite': false};
+      }
 
       final response = await _dio.post(
         '/favorites/trips/$tripId/toggle',

@@ -42,6 +42,13 @@ class AuthService {
         // Check if this is a 401 error (Unauthorized)
         if (err.response?.statusCode == 401) {
           
+          // Don't try to refresh if this is already a refresh request (avoid infinite loop)
+          if (err.requestOptions.path.contains('/auth/refresh')) {
+            await clearTokens();
+            handler.next(err);
+            return;
+          }
+          
           final refreshToken = await _storage.read(key: 'refresh_token');
           if (refreshToken == null) {
             await clearTokens();
@@ -51,7 +58,7 @@ class AuthService {
 
           try {
             // Attempt to refresh the token
-            await refreshTokens('');
+            await refreshTokens(refreshToken);
             
             // Retry the original request with the new token
             final newToken = await _storage.read(key: 'access_token');
@@ -542,9 +549,16 @@ class AuthService {
 
     if (await isTokenExpiredStored()) {
       try {
-        await refreshTokens('');
-        return true;
+        final refreshToken = await getRefreshToken();
+        if (refreshToken != null) {
+          await refreshTokens(refreshToken);
+          return true;
+        } else {
+          await clearTokens();
+          return false;
+        }
       } catch (e) {
+        await clearTokens();
         return false;
       }
     }

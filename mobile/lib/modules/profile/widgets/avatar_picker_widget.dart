@@ -33,7 +33,7 @@ class _AvatarPickerWidgetState extends State<AvatarPickerWidget> {
   void initState() {
     super.initState();
     _currentAvatarUrl = widget.currentAvatarUrl;
-    debugPrint('🎭 AvatarPickerWidget - Initial URL: $_currentAvatarUrl');
+    // debugPrint('🎭 AvatarPickerWidget - Initial URL: $_currentAvatarUrl');
   }
 
   @override
@@ -41,7 +41,7 @@ class _AvatarPickerWidgetState extends State<AvatarPickerWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentAvatarUrl != widget.currentAvatarUrl) {
       _currentAvatarUrl = widget.currentAvatarUrl;
-      debugPrint('🔄 AvatarPickerWidget - Updated URL: $_currentAvatarUrl');
+      // debugPrint('🔄 AvatarPickerWidget - Updated URL: $_currentAvatarUrl');
     }
   }
 

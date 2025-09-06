@@ -90,13 +90,13 @@ class SocialLoginButtons extends StatelessWidget {
   }
   
   void _signInWithGoogle(BuildContext context) {
-    print('🔍 Attempting Google Sign-In...');
+    // print('🔍 Attempting Google Sign-In...');
     context.read<AuthBloc>().add(const SocialSignInRequested('google'));
   }
   
   
   void _signInWithApple(BuildContext context) {
-    print('🔍 Attempting Apple Sign-In...');
+    // print('🔍 Attempting Apple Sign-In...');
     context.read<AuthBloc>().add(const SocialSignInRequested('apple'));
   }
 }

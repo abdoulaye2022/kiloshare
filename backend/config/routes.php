@@ -19,6 +19,7 @@ use KiloShare\Controllers\StripeController;
 use KiloShare\Controllers\TrackingController;
 use KiloShare\Controllers\ReviewController;
 use KiloShare\Controllers\NotificationPreferencesController;
+use KiloShare\Controllers\TestNotificationController;
 use KiloShare\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -320,6 +321,14 @@ return function (App $app) {
                 $adminPrefGroup->get('/{userId}', [NotificationPreferencesController::class, 'getAdminUserPreferences']);
                 $adminPrefGroup->put('/{userId}', [NotificationPreferencesController::class, 'updateAdminUserPreferences']);
             })->add(new AuthMiddleware()); // TODO: Add admin middleware
+
+            // Test notification routes (development only)
+            $v1Group->group('/test/notifications', function (RouteCollectorProxy $testGroup) {
+                $testGroup->post('/send', [TestNotificationController::class, 'sendTest']);
+                $testGroup->post('/test-all', [TestNotificationController::class, 'testAllPreferences']);
+                $testGroup->post('/test-with-prefs', [TestNotificationController::class, 'testWithPreferences']);
+                $testGroup->get('/channel-status', [TestNotificationController::class, 'getChannelStatus']);
+            })->add(new AuthMiddleware());
 
             // Stripe Connect routes
             $v1Group->group('/stripe', function (RouteCollectorProxy $stripeGroup) {

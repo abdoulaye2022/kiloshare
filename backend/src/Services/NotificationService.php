@@ -7,7 +7,7 @@ namespace KiloShare\Services;
 use KiloShare\Models\Notification;
 use KiloShare\Models\NotificationLog;
 use KiloShare\Models\NotificationTemplate;
-use KiloShare\Models\UserNotificationPreference;
+use KiloShare\Models\UserNotificationPreferences;
 use KiloShare\Models\User;
 use KiloShare\Services\Channels\PushNotificationChannel;
 use KiloShare\Services\Channels\EmailNotificationChannel;
@@ -105,7 +105,7 @@ class NotificationService
         Notification $notification,
         string $channelName,
         array $variables,
-        UserNotificationPreference $preferences
+        UserNotificationPreferences $preferences
     ): array {
         try {
             if (!isset($this->channels[$channelName])) {
@@ -200,13 +200,13 @@ class NotificationService
     /**
      * Obtenir les préférences utilisateur
      */
-    private function getUserPreferences(int $userId): UserNotificationPreference
+    private function getUserPreferences(int $userId): UserNotificationPreferences
     {
-        $preferences = UserNotificationPreference::where('user_id', $userId)->first();
+        $preferences = UserNotificationPreferences::where('user_id', $userId)->first();
         
         if (!$preferences) {
             // Créer des préférences par défaut
-            $preferences = UserNotificationPreference::createForUser($userId);
+            $preferences = UserNotificationPreferences::createForUser($userId);
         }
         
         return $preferences;
@@ -217,20 +217,38 @@ class NotificationService
      */
     private function getChannelsForNotification(
         string $type,
-        UserNotificationPreference $preferences,
+        UserNotificationPreferences $preferences,
         array $options
     ): array {
         $channels = [];
 
-        // Toujours créer la notification in-app
-        if ($preferences->canReceiveNotificationType($type, 'in_app')) {
-            $channels[] = 'in_app';
+        // Vérifier les canaux généraux d'abord
+        $availableChannels = [];
+        
+        if ($preferences->push_enabled) {
+            $availableChannels[] = 'push';
+        }
+        if ($preferences->email_enabled) {
+            $availableChannels[] = 'email';
+        }
+        if ($preferences->sms_enabled) {
+            $availableChannels[] = 'sms';
+        }
+        if ($preferences->in_app_enabled) {
+            $availableChannels[] = 'in_app';
         }
 
-        // Push notifications
-        if ($preferences->canReceiveNotificationType($type, 'push') && 
-            !isset($options['channels']) || in_array('push', $options['channels'])) {
-            $channels[] = 'push';
+        // Vérifier les préférences spécifiques par type de notification
+        $typeChannels = $this->getChannelsForType($type, $preferences);
+        
+        // Intersection des canaux disponibles et autorisés pour ce type
+        foreach ($availableChannels as $channel) {
+            if (in_array($channel, $typeChannels)) {
+                // Vérifier si le canal est explicitement demandé dans les options
+                if (!isset($options['channels']) || in_array($channel, $options['channels'])) {
+                    $channels[] = $channel;
+                }
+            }
         }
 
         // Email pour certains types importants
@@ -249,6 +267,37 @@ class NotificationService
         }
 
         return array_unique($channels);
+    }
+
+    /**
+     * Obtenir les canaux autorisés pour un type de notification
+     */
+    private function getChannelsForType(string $type, UserNotificationPreferences $preferences): array
+    {
+        $channels = [];
+
+        // Toujours inclure in_app si activé
+        if ($preferences->in_app_enabled) {
+            $channels[] = 'in_app';
+        }
+
+        // Push pour la plupart des types
+        if ($preferences->push_enabled && $preferences->canReceiveNotificationType($type, 'push')) {
+            $channels[] = 'push';
+        }
+
+        // Email pour certains types
+        if ($preferences->email_enabled && $preferences->canReceiveNotificationType($type, 'email')) {
+            $channels[] = 'email';
+        }
+
+        // SMS uniquement pour codes et urgences
+        $smsTypes = ['sms_pickup_code', 'sms_delivery_code', 'sms_verification'];
+        if ($preferences->sms_enabled && in_array($type, $smsTypes)) {
+            $channels[] = 'sms';
+        }
+
+        return $channels;
     }
 
     /**
