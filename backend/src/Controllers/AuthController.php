@@ -10,6 +10,8 @@ use KiloShare\Models\UserToken;
 use KiloShare\Models\EmailVerification;
 use KiloShare\Services\EmailService;
 use KiloShare\Services\FirebaseNotificationService;
+use KiloShare\Traits\HasJWTConfig;
+use KiloShare\Traits\HandlesAPIResponses;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use Psr\Http\Message\ResponseInterface;
@@ -19,12 +21,11 @@ use Carbon\Carbon;
 
 class AuthController
 {
-    private array $jwtConfig;
+    use HasJWTConfig, HandlesAPIResponses;
 
     public function __construct()
     {
-        $settings = require __DIR__ . '/../../config/settings.php';
-        $this->jwtConfig = $settings['jwt'];
+        // JWT config now handled by trait
     }
 
     public function register(ServerRequestInterface $request): ResponseInterface
@@ -76,7 +77,7 @@ class AuthController
                 'user_id' => $user->id,
                 'token' => $tokens['refresh_token'],
                 'type' => 'refresh',
-                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+                'expires_at' => Carbon::now()->addSeconds($this->getJWTConfig()['refresh_token_expiry']),
             ]);
 
             // Créer une vérification d'email et envoyer l'email
@@ -197,7 +198,7 @@ class AuthController
                 'user_id' => $user->id,
                 'token' => $tokens['refresh_token'],
                 'type' => 'refresh',
-                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+                'expires_at' => Carbon::now()->addSeconds($this->getJWTConfig()['refresh_token_expiry']),
             ]);
 
             // Enregistrer le token FCM si fourni
@@ -262,7 +263,7 @@ class AuthController
                 'user_id' => $user->id,
                 'token' => $tokens['refresh_token'],
                 'type' => 'refresh',
-                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+                'expires_at' => Carbon::now()->addSeconds($this->getJWTConfig()['refresh_token_expiry']),
             ]);
 
             return Response::success([
@@ -338,7 +339,7 @@ class AuthController
                 'user_id' => $user->id,
                 'token' => $tokens['refresh_token'],
                 'type' => 'refresh',
-                'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
+                'expires_at' => Carbon::now()->addSeconds($this->getJWTConfig()['refresh_token_expiry']),
             ]);
 
             return Response::success([
@@ -370,13 +371,14 @@ class AuthController
     private function generateTokens(User $user): array
     {
         $now = time();
-        $accessTokenExpiry = $now + $this->jwtConfig['access_token_expiry'];
-        $refreshTokenExpiry = $now + $this->jwtConfig['refresh_token_expiry'];
+        $jwtConfig = $this->getJWTConfig();
+        $accessTokenExpiry = $now + $jwtConfig['access_token_expiry'];
+        $refreshTokenExpiry = $now + $jwtConfig['refresh_token_expiry'];
 
         // Access token payload
         $accessPayload = [
-            'iss' => $this->jwtConfig['issuer'],
-            'aud' => $this->jwtConfig['audience'],
+            'iss' => $jwtConfig['issuer'],
+            'aud' => $jwtConfig['audience'],
             'iat' => $now,
             'exp' => $accessTokenExpiry,
             'sub' => $user->uuid,
@@ -395,8 +397,8 @@ class AuthController
 
         // Refresh token payload
         $refreshPayload = [
-            'iss' => $this->jwtConfig['issuer'],
-            'aud' => $this->jwtConfig['audience'],
+            'iss' => $jwtConfig['issuer'],
+            'aud' => $jwtConfig['audience'],
             'iat' => $now,
             'exp' => $refreshTokenExpiry,
             'sub' => $user->uuid,
@@ -405,10 +407,10 @@ class AuthController
         ];
 
         return [
-            'access_token' => JWT::encode($accessPayload, $this->jwtConfig['secret'], $this->jwtConfig['algorithm']),
-            'refresh_token' => JWT::encode($refreshPayload, $this->jwtConfig['secret'], $this->jwtConfig['algorithm']),
+            'access_token' => JWT::encode($accessPayload, $jwtConfig['secret'], $jwtConfig['algorithm']),
+            'refresh_token' => JWT::encode($refreshPayload, $jwtConfig['secret'], $jwtConfig['algorithm']),
             'token_type' => 'bearer',
-            'expires_in' => $this->jwtConfig['access_token_expiry'],
+            'expires_in' => $jwtConfig['access_token_expiry'],
         ];
     }
 
