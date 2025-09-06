@@ -9,6 +9,7 @@ use KiloShare\Models\User;
 use KiloShare\Models\UserToken;
 use KiloShare\Models\EmailVerification;
 use KiloShare\Services\EmailService;
+use KiloShare\Services\FirebaseNotificationService;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use Psr\Http\Message\ResponseInterface;
@@ -99,6 +100,9 @@ class AuthController
                 error_log("Stack trace: " . $e->getTraceAsString());
                 $message = 'User registered successfully. Email verification service is temporarily unavailable.';
             }
+
+            // Enregistrer le token FCM si fourni
+            $this->registerFCMTokenIfProvided($data, $user->id);
 
             return Response::created([
                 'user' => [
@@ -195,6 +199,9 @@ class AuthController
                 'type' => 'refresh',
                 'expires_at' => Carbon::now()->addSeconds($this->jwtConfig['refresh_token_expiry']),
             ]);
+
+            // Enregistrer le token FCM si fourni
+            $this->registerFCMTokenIfProvided($data, $user->id);
 
             return Response::success([
                 'user' => [
@@ -403,5 +410,25 @@ class AuthController
             'token_type' => 'bearer',
             'expires_in' => $this->jwtConfig['access_token_expiry'],
         ];
+    }
+
+    /**
+     * Enregistrer le token FCM si fourni dans les données
+     */
+    private function registerFCMTokenIfProvided(array $data, int $userId): void
+    {
+        if (!empty($data['fcm_token']) && !empty($data['platform'])) {
+            try {
+                $firebaseService = new FirebaseNotificationService();
+                $firebaseService->registerToken(
+                    $userId, 
+                    $data['fcm_token'], 
+                    $data['platform'] ?? 'mobile'
+                );
+            } catch (\Exception $e) {
+                // Log l'erreur mais ne pas faire échouer l'authentification
+                error_log("Erreur enregistrement FCM token lors de l'auth: " . $e->getMessage());
+            }
+        }
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KiloShare\Controllers;
 
 use KiloShare\Models\User;
+use KiloShare\Services\FirebaseNotificationService;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use KiloShare\Utils\JWTHelper;
@@ -80,6 +81,9 @@ class SocialAuthController
 
             // Générer les tokens JWT
             $tokens = JWTHelper::generateTokens($user);
+
+            // Enregistrer le token FCM si fourni
+            $this->registerFCMTokenIfProvided($data, $user->id);
 
             return Response::success([
                 'user' => [
@@ -185,6 +189,9 @@ class SocialAuthController
             // Générer les tokens JWT
             $tokens = JWTHelper::generateTokens($user);
 
+            // Enregistrer le token FCM si fourni
+            $this->registerFCMTokenIfProvided($data, $user->id);
+
             return Response::success([
                 'user' => [
                     'id' => $user->id,
@@ -253,6 +260,26 @@ class SocialAuthController
             
         } catch (\Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * Enregistrer le token FCM si fourni dans les données
+     */
+    private function registerFCMTokenIfProvided(array $data, int $userId): void
+    {
+        if (!empty($data['fcm_token']) && !empty($data['platform'])) {
+            try {
+                $firebaseService = new FirebaseNotificationService();
+                $firebaseService->registerToken(
+                    $userId, 
+                    $data['fcm_token'], 
+                    $data['platform'] ?? 'mobile'
+                );
+            } catch (\Exception $e) {
+                // Log l'erreur mais ne pas faire échouer l'authentification
+                error_log("Erreur enregistrement FCM token lors de l'auth SSO: " . $e->getMessage());
+            }
         }
     }
 }

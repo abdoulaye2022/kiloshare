@@ -251,10 +251,23 @@ return function (App $app) {
 
             // Message routes
             $v1Group->group('/messages', function (RouteCollectorProxy $msgGroup) {
-                $msgGroup->get('/conversations', [MessageController::class, 'getUserConversations']);
+                // Conversations
+                $msgGroup->get('/conversations', [MessageController::class, 'getConversations']);
+                $msgGroup->get('/conversations/{conversation_id}/messages', [MessageController::class, 'getConversationMessages']);
+                $msgGroup->get('/conversations/{conversation_id}/stats', [MessageController::class, 'getConversationStats']);
+                
+                // Legacy booking messages support
                 $msgGroup->get('/bookings/{id}', [MessageController::class, 'getBookingMessages']);
-                $msgGroup->post('/bookings/{id}', [MessageController::class, 'sendMessage']);
+                
+                // Send messages
+                $msgGroup->post('', [MessageController::class, 'sendMessage']);
+                $msgGroup->post('/conversations/{conversation_id}/actions', [MessageController::class, 'sendQuickAction']);
+                $msgGroup->post('/conversations/{conversation_id}/location', [MessageController::class, 'shareLocation']);
+                $msgGroup->post('/conversations/{conversation_id}/photo', [MessageController::class, 'sharePhoto']);
+                
+                // Message management
                 $msgGroup->post('/{id}/read', [MessageController::class, 'markAsRead']);
+                $msgGroup->delete('/{id}', [MessageController::class, 'deleteMessage']);
             })->add(new AuthMiddleware());
 
             // Notification routes

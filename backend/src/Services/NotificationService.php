@@ -193,7 +193,7 @@ class NotificationService
             $message,
             $variables,
             $options['priority'] ?? 'normal',
-            isset($options['expires_in_hours']) ? now()->addHours($options['expires_in_hours']) : null
+            isset($options['expires_in_hours']) ? date('Y-m-d H:i:s', strtotime('+' . $options['expires_in_hours'] . ' hours')) : null
         );
     }
 
@@ -300,10 +300,10 @@ class NotificationService
         
         // Récupérer les notifications en attente
         $queueItems = \KiloShare\Models\NotificationQueue::where('status', 'pending')
-            ->where('scheduled_at', '<=', now())
+            ->where('scheduled_at', '<=', date('Y-m-d H:i:s'))
             ->where(function ($query) {
                 $query->whereNull('expires_at')
-                      ->orWhere('expires_at', '>', now());
+                      ->orWhere('expires_at', '>', date('Y-m-d H:i:s'));
             })
             ->orderBy('priority', 'desc')
             ->orderBy('scheduled_at', 'asc')
@@ -328,9 +328,9 @@ class NotificationService
                         'status' => 'failed',
                         'attempts' => $item->attempts + 1,
                         'error_message' => $result['error'],
-                        'last_attempt_at' => now(),
+                        'last_attempt_at' => date('Y-m-d H:i:s'),
                         'next_attempt_at' => $item->attempts < $item->max_attempts 
-                            ? now()->addMinutes(pow(5, $item->attempts)) 
+                            ? date('Y-m-d H:i:s', strtotime('+' . pow(5, $item->attempts) . ' minutes')) 
                             : null
                     ]);
                 }
@@ -340,7 +340,7 @@ class NotificationService
                     'status' => 'failed',
                     'error_message' => $e->getMessage(),
                     'attempts' => $item->attempts + 1,
-                    'last_attempt_at' => now(),
+                    'last_attempt_at' => date('Y-m-d H:i:s'),
                 ]);
             }
         }
@@ -364,10 +364,10 @@ class NotificationService
                 'channel' => $options['channel'] ?? 'push',
                 'priority' => $options['priority'] ?? 'normal',
                 'scheduled_at' => isset($options['delay_minutes']) 
-                    ? now()->addMinutes($options['delay_minutes']) 
-                    : now(),
+                    ? date('Y-m-d H:i:s', strtotime('+' . $options['delay_minutes'] . ' minutes'))
+                    : date('Y-m-d H:i:s'),
                 'expires_at' => isset($options['expires_in_hours']) 
-                    ? now()->addHours($options['expires_in_hours']) 
+                    ? date('Y-m-d H:i:s', strtotime('+' . $options['expires_in_hours'] . ' hours')) 
                     : null,
                 'recipient' => $options['recipient'] ?? '',
                 'title' => $options['title'] ?? '',

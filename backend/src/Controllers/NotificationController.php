@@ -13,15 +13,15 @@ use KiloShare\Utils\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-class NotificationController extends BaseController
+class NotificationController
 {
     private NotificationService $notificationService;
 
     public function __construct()
     {
-        parent::__construct();
         $this->notificationService = new NotificationService();
     }
+
 
     public function getUserNotifications(ServerRequestInterface $request): ResponseInterface
     {

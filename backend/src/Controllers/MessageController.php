@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace KiloShare\Controllers;
 
 use KiloShare\Models\Booking;
-use KiloShare\Models\Message;
+use KiloShare\Models\Conversation;
+use KiloShare\Models\MessageModel;
+use KiloShare\Services\MessagingService;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use Psr\Http\Message\ResponseInterface;
@@ -13,54 +15,83 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class MessageController
 {
+    private MessagingService $messagingService;
+
+    public function __construct()
+    {
+        $this->messagingService = new MessagingService();
+    }
+
+    public function getConversations(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $queryParams = $request->getQueryParams();
+
+        try {
+            $limit = min((int)($queryParams['limit'] ?? 20), 50);
+            $offset = (int)($queryParams['offset'] ?? 0);
+
+            $conversation = new Conversation();
+            $conversations = $conversation->getUserConversations($user->id, $limit, $offset);
+
+            return Response::success([
+                'conversations' => $conversations,
+                'total_unread' => $conversation->getUnreadCount($user->id)
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to fetch conversations: ' . $e->getMessage());
+        }
+    }
+
+    public function getConversationMessages(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('conversation_id');
+        $queryParams = $request->getQueryParams();
+
+        try {
+            $limit = min((int)($queryParams['limit'] ?? 50), 100);
+            $offset = (int)($queryParams['offset'] ?? 0);
+
+            $messageModel = new MessageModel();
+            $messages = $messageModel->getConversationMessages($conversationId, $user->id, $limit, $offset);
+
+            // Mark messages as read
+            $messageModel->markConversationAsRead($conversationId, $user->id);
+
+            return Response::success([
+                'messages' => $messages
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to fetch messages: ' . $e->getMessage());
+        }
+    }
+
     public function getBookingMessages(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $bookingId = $request->getAttribute('id');
+        $bookingId = (int)$request->getAttribute('id');
 
         try {
-            $booking = Booking::with('trip')->find($bookingId);
-
-            if (!$booking) {
-                return Response::notFound('Booking not found');
+            // Get or create conversation for this booking
+            $conversation = $this->messagingService->createOrGetConversation($bookingId, $user->id);
+            
+            if (!$conversation) {
+                return Response::serverError('Failed to access conversation');
             }
 
-            if ($booking->user_id !== $user->id && $booking->trip->user_id !== $user->id) {
-                return Response::forbidden('Access denied');
-            }
+            // Get messages for this conversation
+            $messageModel = new MessageModel();
+            $messages = $messageModel->getConversationMessages($conversation['id'], $user->id);
 
-            $messages = Message::forBooking($bookingId)
-                              ->with(['sender', 'receiver'])
-                              ->orderBy('created_at', 'asc')
-                              ->get();
-
-            // Marquer les messages reçus comme lus
-            Message::forBooking($bookingId)
-                   ->where('receiver_id', $user->id)
-                   ->where('is_read', false)
-                   ->update(['is_read' => true, 'read_at' => now()]);
+            // Mark messages as read
+            $messageModel->markConversationAsRead($conversation['id'], $user->id);
 
             return Response::success([
-                'messages' => $messages->map(function ($message) {
-                    return [
-                        'id' => $message->id,
-                        'content' => $message->content,
-                        'message_type' => $message->message_type,
-                        'attachment_url' => $message->attachment_url,
-                        'is_read' => $message->is_read,
-                        'created_at' => $message->created_at,
-                        'sender' => [
-                            'id' => $message->sender->id,
-                            'first_name' => $message->sender->first_name,
-                            'profile_picture' => $message->sender->profile_picture,
-                        ],
-                    ];
-                }),
-                'booking' => [
-                    'id' => $booking->id,
-                    'uuid' => $booking->uuid,
-                    'status' => $booking->status,
-                ]
+                'conversation' => $conversation,
+                'messages' => $messages
             ]);
 
         } catch (\Exception $e) {
@@ -71,140 +102,204 @@ class MessageController
     public function sendMessage(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $bookingId = $request->getAttribute('id');
         $data = json_decode($request->getBody()->getContents(), true);
 
-        $validator = new Validator();
-        $rules = [
-            'content' => Validator::required()->stringType()->length(1, 1000),
-            'message_type' => Validator::optional(Validator::stringType()),
-        ];
-
-        if (!$validator->validate($data, $rules)) {
-            return Response::validationError($validator->getErrors());
-        }
-
         try {
-            $booking = Booking::with('trip')->find($bookingId);
-
-            if (!$booking) {
-                return Response::notFound('Booking not found');
+            if (empty($data['content'])) {
+                return Response::validationError(['content' => 'Message content is required']);
             }
 
-            if ($booking->user_id !== $user->id && $booking->trip->user_id !== $user->id) {
-                return Response::forbidden('Access denied');
+            if (strlen($data['content']) > 1000) {
+                return Response::validationError(['content' => 'Message too long (max 1000 characters)']);
             }
 
-            $receiverId = $booking->user_id === $user->id ? $booking->trip->user_id : $booking->user_id;
+            $conversationId = (int)($data['conversation_id'] ?? 0);
+            $bookingId = (int)($data['booking_id'] ?? 0);
 
-            $message = Message::create([
-                'booking_id' => $bookingId,
-                'sender_id' => $user->id,
-                'receiver_id' => $receiverId,
-                'content' => $data['content'],
-                'message_type' => $data['message_type'] ?? 'text',
-            ]);
+            // Handle both conversation and booking based messaging
+            if ($conversationId) {
+                $result = $this->messagingService->sendMessage(
+                    $conversationId,
+                    $user->id,
+                    $data['content'],
+                    $data['message_type'] ?? MessageModel::TYPE_TEXT,
+                    $data['metadata'] ?? []
+                );
+            } elseif ($bookingId) {
+                $conversation = $this->messagingService->createOrGetConversation($bookingId, $user->id);
+                if (!$conversation) {
+                    return Response::serverError('Failed to create conversation');
+                }
+                
+                $result = $this->messagingService->sendMessage(
+                    $conversation['id'],
+                    $user->id,
+                    $data['content'],
+                    $data['message_type'] ?? MessageModel::TYPE_TEXT,
+                    $data['metadata'] ?? []
+                );
+            } else {
+                return Response::validationError(['conversation_id' => 'Conversation ID or Booking ID required']);
+            }
 
-            return Response::created([
-                'message' => [
-                    'id' => $message->id,
-                    'content' => $message->content,
-                    'message_type' => $message->message_type,
-                    'created_at' => $message->created_at,
-                ]
-            ], 'Message sent successfully');
+            if ($result['success']) {
+                return Response::success($result);
+            } else {
+                return Response::serverError($result['error'] ?? 'Failed to send message');
+            }
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to send message: ' . $e->getMessage());
         }
     }
 
-    public function getUserConversations(ServerRequestInterface $request): ResponseInterface
+    public function sendQuickAction(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('conversation_id');
+        $data = json_decode($request->getBody()->getContents(), true);
 
         try {
-            // Récupérer toutes les conversations de l'utilisateur
-            $conversations = Message::where('sender_id', $user->id)
-                                   ->orWhere('receiver_id', $user->id)
-                                   ->with(['booking.trip', 'sender', 'receiver'])
-                                   ->orderBy('created_at', 'desc')
-                                   ->get()
-                                   ->groupBy('booking_id')
-                                   ->map(function ($messages) use ($user) {
-                                       $latestMessage = $messages->first();
-                                       $otherUser = $latestMessage->sender_id === $user->id 
-                                           ? $latestMessage->receiver 
-                                           : $latestMessage->sender;
-                                       
-                                       $unreadCount = $messages->where('receiver_id', $user->id)
-                                                               ->where('is_read', false)
-                                                               ->count();
+            if (empty($data['action_type'])) {
+                return Response::validationError(['action_type' => 'Action type is required']);
+            }
 
-                                       return [
-                                           'booking_id' => $latestMessage->booking_id,
-                                           'booking' => [
-                                               'uuid' => $latestMessage->booking->uuid,
-                                               'status' => $latestMessage->booking->status,
-                                               'trip' => [
-                                                   'title' => $latestMessage->booking->trip->title,
-                                                   'departure_city' => $latestMessage->booking->trip->departure_city,
-                                                   'arrival_city' => $latestMessage->booking->trip->arrival_city,
-                                               ],
-                                           ],
-                                           'other_user' => [
-                                               'id' => $otherUser->id,
-                                               'first_name' => $otherUser->first_name,
-                                               'profile_picture' => $otherUser->profile_picture,
-                                           ],
-                                           'latest_message' => [
-                                               'content' => $latestMessage->content,
-                                               'created_at' => $latestMessage->created_at,
-                                               'is_from_me' => $latestMessage->sender_id === $user->id,
-                                           ],
-                                           'unread_count' => $unreadCount,
-                                       ];
-                                   })
-                                   ->values();
+            $result = $this->messagingService->sendQuickAction(
+                $conversationId,
+                $user->id,
+                $data['action_type'],
+                $data['action_data'] ?? []
+            );
 
-            return Response::success([
-                'conversations' => $conversations,
-                'total' => $conversations->count(),
-            ]);
+            if ($result['success']) {
+                return Response::success($result);
+            } else {
+                return Response::serverError($result['error'] ?? 'Failed to process action');
+            }
 
         } catch (\Exception $e) {
-            return Response::serverError('Failed to fetch conversations: ' . $e->getMessage());
+            return Response::serverError('Failed to process action: ' . $e->getMessage());
+        }
+    }
+
+    public function shareLocation(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('conversation_id');
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        try {
+            if (empty($data['latitude']) || empty($data['longitude'])) {
+                return Response::validationError(['location' => 'Latitude and longitude are required']);
+            }
+
+            $result = $this->messagingService->shareLocation(
+                $conversationId,
+                $user->id,
+                (float)$data['latitude'],
+                (float)$data['longitude'],
+                $data['address'] ?? null
+            );
+
+            if ($result['success']) {
+                return Response::success($result);
+            } else {
+                return Response::serverError($result['error'] ?? 'Failed to share location');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to share location: ' . $e->getMessage());
+        }
+    }
+
+    public function sharePhoto(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('conversation_id');
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        try {
+            if (empty($data['photo_path'])) {
+                return Response::validationError(['photo_path' => 'Photo path is required']);
+            }
+
+            $result = $this->messagingService->sharePhoto(
+                $conversationId,
+                $user->id,
+                $data['photo_path'],
+                $data['caption'] ?? null
+            );
+
+            if ($result['success']) {
+                return Response::success($result);
+            } else {
+                return Response::serverError($result['error'] ?? 'Failed to share photo');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to share photo: ' . $e->getMessage());
         }
     }
 
     public function markAsRead(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $messageId = $request->getAttribute('id');
+        $messageId = (int)$request->getAttribute('id');
 
         try {
-            $message = Message::find($messageId);
+            $messageModel = new MessageModel();
+            $success = $messageModel->markAsRead($messageId, $user->id);
 
-            if (!$message) {
-                return Response::notFound('Message not found');
+            if ($success) {
+                return Response::success(['message' => 'Message marked as read']);
+            } else {
+                return Response::serverError('Failed to mark message as read');
             }
-
-            if ($message->receiver_id !== $user->id) {
-                return Response::forbidden('Access denied');
-            }
-
-            $message->markAsRead();
-
-            return Response::success([
-                'message' => [
-                    'id' => $message->id,
-                    'is_read' => $message->is_read,
-                    'read_at' => $message->read_at,
-                ]
-            ], 'Message marked as read');
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to mark message as read: ' . $e->getMessage());
+        }
+    }
+
+    public function deleteMessage(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $messageId = (int)$request->getAttribute('id');
+
+        try {
+            $messageModel = new MessageModel();
+            $success = $messageModel->deleteMessage($messageId, $user->id);
+
+            if ($success) {
+                return Response::success(['message' => 'Message deleted']);
+            } else {
+                return Response::serverError('Failed to delete message');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to delete message: ' . $e->getMessage());
+        }
+    }
+
+    public function getConversationStats(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('conversation_id');
+
+        try {
+            // Verify user is participant
+            $conversation = new Conversation();
+            if (!$conversation->isParticipant($conversationId, $user->id)) {
+                return Response::forbidden('Access denied');
+            }
+
+            $messageModel = new MessageModel();
+            $stats = $messageModel->getMessageStats($conversationId);
+
+            return Response::success(['stats' => $stats]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to get stats: ' . $e->getMessage());
         }
     }
 }

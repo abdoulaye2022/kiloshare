@@ -148,7 +148,7 @@ class FirebaseNotificationService
             if ($existingToken) {
                 // Réactiver le token s'il était désactivé
                 $existingToken->is_active = true;
-                $existingToken->updated_at = now();
+                $existingToken->updated_at = date('Y-m-d H:i:s');
                 return $existingToken->save();
             }
             
