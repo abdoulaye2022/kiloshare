@@ -23,8 +23,6 @@ class MessagingService {
         },
       );
 
-      print('📱 [MessagingService] getConversations response: ${response.statusCode}');
-      print('📱 [MessagingService] getConversations body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -40,7 +38,6 @@ class MessagingService {
         };
       }
     } catch (e) {
-      print('❌ [MessagingService] Error getting conversations: $e');
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
@@ -72,8 +69,6 @@ class MessagingService {
         }),
       );
 
-      print('📱 [MessagingService] getOrCreateConversation response: ${response.statusCode}');
-      print('📱 [MessagingService] getOrCreateConversation body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -89,7 +84,6 @@ class MessagingService {
         };
       }
     } catch (e) {
-      print('❌ [MessagingService] Error creating conversation: $e');
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
@@ -118,8 +112,6 @@ class MessagingService {
         },
       );
 
-      print('📱 [MessagingService] getMessages response: ${response.statusCode}');
-      print('📱 [MessagingService] getMessages body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -135,7 +127,6 @@ class MessagingService {
         };
       }
     } catch (e) {
-      print('❌ [MessagingService] Error getting messages: $e');
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',
@@ -168,8 +159,6 @@ class MessagingService {
         }),
       );
 
-      print('📱 [MessagingService] sendMessage response: ${response.statusCode}');
-      print('📱 [MessagingService] sendMessage body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -185,7 +174,6 @@ class MessagingService {
         };
       }
     } catch (e) {
-      print('❌ [MessagingService] Error sending message: $e');
       return {
         'success': false,
         'message': 'Erreur de connexion: $e',

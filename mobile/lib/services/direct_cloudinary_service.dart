@@ -63,13 +63,6 @@ class DirectCloudinaryService {
           'public_id': publicId,
         });
 
-        // Debug log before upload
-        print('DirectCloudinaryService: Uploading image $i to Cloudinary...');
-        print('DirectCloudinaryService: URL: $cloudinaryUrl');
-        print('DirectCloudinaryService: API Key: $apiKey');
-        print('DirectCloudinaryService: Timestamp: $timestamp');
-        print('DirectCloudinaryService: Public ID: $publicId');
-        print('DirectCloudinaryService: Signature: $signature');
         
         // Upload vers Cloudinary
         final response = await _dio.post(
@@ -83,15 +76,12 @@ class DirectCloudinaryService {
         // Nettoyer le fichier temporaire
         await _cleanupTempFile(compressedFile);
 
-        print('DirectCloudinaryService: Response status: ${response.statusCode}');
-        print('DirectCloudinaryService: Response data: ${response.data}');
 
         if (response.statusCode == 200) {
           final data = response.data;
           
           // Check if upload was successful
           if (data['secure_url'] != null) {
-            print('DirectCloudinaryService: Upload successful! URL: ${data['secure_url']}');
             results.add({
               'url': data['secure_url'],
               'public_id': data['public_id'],
@@ -105,12 +95,9 @@ class DirectCloudinaryService {
               'order': i,
             });
           } else {
-            print('DirectCloudinaryService: Upload failed - no secure_url in response');
             throw Exception('Upload failed for image $i: No secure_url in response');
           }
         } else {
-          print('DirectCloudinaryService: Upload failed with status ${response.statusCode}');
-          print('DirectCloudinaryService: Error response: ${response.data}');
           throw Exception('Upload failed for image $i: ${response.statusCode} - ${response.data}');
         }
       }
@@ -118,7 +105,6 @@ class DirectCloudinaryService {
       return results;
       
     } catch (e) {
-      print('DirectCloudinaryService error: $e');
       rethrow;
     }
   }

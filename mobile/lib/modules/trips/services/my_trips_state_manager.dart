@@ -95,7 +95,6 @@ class MyTripsStateManager extends ChangeNotifier {
 
   /// Charge tous les onglets en parallèle lors de l'initialisation
   Future<void> loadAllData({bool force = false}) async {
-    debugPrint('MyTripsStateManager: Loading all data (force: $force)...');
     
     await Future.wait([
       loadTripsData(force: force),
@@ -108,7 +107,6 @@ class MyTripsStateManager extends ChangeNotifier {
   Future<void> loadTripsData({bool force = false}) async {
     // Vérifier le cache si pas forcé
     if (!force && _shouldUseCache(_lastSyncTrips)) {
-      debugPrint('MyTripsStateManager: Using cached trips data');
       return;
     }
     
@@ -116,17 +114,14 @@ class MyTripsStateManager extends ChangeNotifier {
     _errorTrips = null;
     
     try {
-      debugPrint('MyTripsStateManager: Fetching trips from API...');
       final trips = await _tripService.getUserTrips();
       
       _allTrips = trips;
       _myTrips = trips.where((trip) => trip.status != TripStatus.draft).toList();
       _lastSyncTrips = DateTime.now();
       
-      debugPrint('MyTripsStateManager: Loaded ${_myTrips.length} published trips');
       _applyFilters();
     } catch (e) {
-      debugPrint('MyTripsStateManager: Error loading trips: $e');
       _errorTrips = e.toString();
     } finally {
       _setLoadingTrips(false);
@@ -137,7 +132,6 @@ class MyTripsStateManager extends ChangeNotifier {
   Future<void> loadDraftsData({bool force = false}) async {
     // Vérifier le cache si pas forcé
     if (!force && _shouldUseCache(_lastSyncDrafts)) {
-      debugPrint('MyTripsStateManager: Using cached drafts data');
       return;
     }
     
@@ -145,14 +139,12 @@ class MyTripsStateManager extends ChangeNotifier {
     _errorDrafts = null;
     
     try {
-      debugPrint('MyTripsStateManager: Fetching drafts from API...');
       List<Trip> drafts;
       
       try {
         // Essayer l'endpoint dédié aux brouillons
         drafts = await _tripService.getDrafts();
       } catch (e) {
-        debugPrint('MyTripsStateManager: Drafts endpoint failed, falling back to filtering: $e');
         // Fallback : filtrer depuis les trips existants
         if (_allTrips.isEmpty) {
           final trips = await _tripService.getUserTrips();
@@ -164,10 +156,8 @@ class MyTripsStateManager extends ChangeNotifier {
       _drafts = drafts;
       _lastSyncDrafts = DateTime.now();
       
-      debugPrint('MyTripsStateManager: Loaded ${_drafts.length} drafts');
       _applyFilters();
     } catch (e) {
-      debugPrint('MyTripsStateManager: Error loading drafts: $e');
       _errorDrafts = e.toString();
     } finally {
       _setLoadingDrafts(false);
@@ -178,7 +168,6 @@ class MyTripsStateManager extends ChangeNotifier {
   Future<void> loadFavoritesData({bool force = false}) async {
     // Vérifier le cache si pas forcé
     if (!force && _shouldUseCache(_lastSyncFavorites)) {
-      debugPrint('MyTripsStateManager: Using cached favorites data');
       return;
     }
     
@@ -186,16 +175,13 @@ class MyTripsStateManager extends ChangeNotifier {
     _errorFavorites = null;
     
     try {
-      debugPrint('MyTripsStateManager: Fetching favorites from API...');
       final favorites = await FavoritesService.instance.getFavoriteTrips();
       
       _favorites = favorites;
       _lastSyncFavorites = DateTime.now();
       
-      debugPrint('MyTripsStateManager: Loaded ${_favorites.length} favorites');
       _applyFilters();
     } catch (e) {
-      debugPrint('MyTripsStateManager: Error loading favorites: $e');
       _errorFavorites = e.toString();
     } finally {
       _setLoadingFavorites(false);
@@ -316,7 +302,6 @@ class MyTripsStateManager extends ChangeNotifier {
 
   /// Applique tous les filtres aux trois listes
   void _applyFilters() {
-    debugPrint('MyTripsStateManager: Applying filters...');
     
     // Appliquer aux voyages publiés
     _filteredTrips = _applyFiltersToList(_myTrips);
@@ -327,7 +312,6 @@ class MyTripsStateManager extends ChangeNotifier {
     // Appliquer aux favoris
     _filteredFavorites = _applyFiltersToList(_favorites);
     
-    debugPrint('MyTripsStateManager: Filters applied - Trips: ${_filteredTrips.length}, Drafts: ${_filteredDrafts.length}, Favorites: ${_filteredFavorites.length}');
     notifyListeners();
   }
 
@@ -466,7 +450,6 @@ class MyTripsStateManager extends ChangeNotifier {
     _lastSyncTrips = null;
     _lastSyncDrafts = null;
     _lastSyncFavorites = null;
-    debugPrint('MyTripsStateManager: Cache invalidated');
   }
 
   /// Nettoie les ressources

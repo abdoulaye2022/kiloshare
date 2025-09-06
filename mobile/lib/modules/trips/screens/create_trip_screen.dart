@@ -1267,12 +1267,10 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         // Handle images for edit mode - upload to Cloudinary and update trip
         if (_selectedImages.isNotEmpty) {
           try {
-            print('DEBUG: Uploading ${_selectedImages.length} images to Cloudinary for edit mode');
             final uploadResults = await _cloudinaryService.uploadTripPhotos(
               _selectedImages,
             );
             
-            print('DEBUG: Images uploaded successfully, now updating trip_images table');
             
             // Prepare image data for API
             final imageData = uploadResults.map((uploadResult) => {
@@ -1327,7 +1325,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         List<Map<String, dynamic>>? imageData;
         if (_selectedImages.isNotEmpty) {
           try {
-            print('DEBUG: Uploading ${_selectedImages.length} images to Cloudinary first');
             final uploadResults = await _cloudinaryService.uploadTripPhotos(
               _selectedImages,
             );
@@ -1335,9 +1332,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             // Les résultats sont déjà au bon format
             imageData = uploadResults.cast<Map<String, dynamic>>();
             
-            print('DEBUG: Images uploaded to Cloudinary successfully');
           } catch (e) {
-            print('Warning: Cloudinary upload failed: $e');
             // Continue without images if upload fails
             imageData = null;
           }

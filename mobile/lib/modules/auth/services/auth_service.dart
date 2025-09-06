@@ -5,7 +5,6 @@ import '../models/user_model.dart';
 import 'simple_social_auth_service.dart';
 import '../../../config/app_config.dart';
 import '../../notifications/services/firebase_notification_service.dart';
-import 'package:flutter/foundation.dart';
 
 class AuthService {
   static AuthService? _instance;
@@ -116,14 +115,12 @@ class AuthService {
   // Initialiser Firebase Notifications après connexion
   Future<void> _initializeFirebaseNotifications() async {
     try {
-      debugPrint('🔥 Initialisation FCM après connexion...');
       final firebaseService = FirebaseNotificationService();
       // ✅ OPTIMISATION: Utiliser registerAfterLogin au lieu de initializeAfterLogin
       // pour éviter la double initialisation
       await firebaseService.registerAfterLogin();
-      debugPrint('✅ [KILOSHARE] Notifications initialisées avec succès après connexion');
     } catch (e) {
-      debugPrint('🔥 Erreur initialisation FCM: $e');
+      // Silent catch - notification errors shouldn't block login
     }
   }
 

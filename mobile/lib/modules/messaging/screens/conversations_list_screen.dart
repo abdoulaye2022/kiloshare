@@ -28,7 +28,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
   @override
   void initState() {
     super.initState();
-    print('📱 [ConversationsListScreen] initState - Starting to load conversations');
     _currentInstance = this;
     WidgetsBinding.instance.addObserver(this);
     _loadConversations();
@@ -54,7 +53,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
     super.didChangeAppLifecycleState(state);
     // Rafraîchir quand l'app revient au premier plan
     if (state == AppLifecycleState.resumed && _hasInitialized) {
-      print('📱 [ConversationsListScreen] App resumed, refreshing conversations');
       _loadConversations(silent: true);
     }
   }
@@ -64,7 +62,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
     super.didChangeDependencies();
     // Rafraîchir quand on revient sur cette page (changement d'onglet)
     if (_hasInitialized && ModalRoute.of(context)?.isCurrent == true) {
-      print('📱 [ConversationsListScreen] Tab focused, refreshing conversations');
       _loadConversations(silent: true);
     }
   }
@@ -80,14 +77,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
 
       final response = await _messagingService.getConversations();
       
-      print('📱 [ConversationsListScreen] Response: $response');
-      print('📱 [ConversationsListScreen] Success: ${response['success']}');
-      print('📱 [ConversationsListScreen] Data: ${response['data']}');
-      print('📱 [ConversationsListScreen] Conversations: ${response['data']?['data']?['conversations']}');
       
       if (response['success'] == true) {
         final conversations = List<Map<String, dynamic>>.from(response['data']['data']['conversations'] ?? []);
-        print('📱 [ConversationsListScreen] Parsed conversations count: ${conversations.length}');
         
         setState(() {
           _conversations = conversations;
@@ -102,7 +94,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
         }
       }
     } catch (e) {
-      print('📱 [ConversationsListScreen] Exception caught: $e');
       if (!silent) {
         setState(() {
           _error = 'Erreur: $e';
@@ -132,7 +123,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
   }
 
   Widget _buildBody() {
-    print('📱 [ConversationsListScreen] _buildBody - isLoading: $_isLoading, error: $_error, conversations count: ${_conversations.length}');
     
     if (_isLoading) {
       return const Center(

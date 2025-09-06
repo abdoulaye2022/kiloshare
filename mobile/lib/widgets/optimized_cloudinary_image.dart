@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
@@ -522,10 +521,6 @@ class CloudinaryAvatar extends StatelessWidget {
     Widget avatar;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      if (kDebugMode) {
-        print('[CloudinaryAvatar] Loading avatar: $imageUrl');
-        print('[CloudinaryAvatar] Is Cloudinary URL: ${_isCloudinaryUrl(imageUrl!)}');
-      }
       avatar = CircleAvatar(
         radius: radius,
         backgroundColor: backgroundColor ?? Colors.grey[200],

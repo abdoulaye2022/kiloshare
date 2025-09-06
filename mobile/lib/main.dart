@@ -22,7 +22,6 @@ import 'package:dio/dio.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint('📱 Message reçu en arrière-plan: ${message.messageId}');
 }
 
 void main() async {
@@ -31,20 +30,17 @@ void main() async {
   try {
     // Initialize environment configuration
     await Environment.initialize();
-    Environment.printConfig();
+    // Environment.printConfig(); // Disabled for production
     
     // ✅ ÉTAPE 1: Initialiser Firebase
-    debugPrint('🚀 Initialisation de Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('✅ Firebase initialisé avec succès');
     
     // ✅ ÉTAPE 2: Configurer les notifications en arrière-plan
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     
     // ✅ ÉTAPE 3: Initialisation basique des notifications (sans permissions)
-    debugPrint('🔔 Initialisation basique des notifications...');
     await FirebaseNotificationService().initializeBasic();
     
     // Initialize Stripe

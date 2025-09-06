@@ -9,7 +9,6 @@ class MockCloudinaryService {
     List<File> imageFiles, {
     Function(double)? onProgress,
   }) async {
-    print('MockCloudinaryService: Simulation upload de ${imageFiles.length} images');
     
     // Simuler un délai d'upload
     await Future.delayed(const Duration(milliseconds: 500));
@@ -39,7 +38,6 @@ class MockCloudinaryService {
       });
     }
     
-    print('MockCloudinaryService: Upload simulé terminé avec succès');
     return results;
   }
 }

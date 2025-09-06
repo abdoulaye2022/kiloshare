@@ -268,9 +268,6 @@ class Trip {
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
-    print('🔥 Trip.fromJson: Starting to parse trip data...');
-    print('🔥 Trip.fromJson: Input data type: ${json.runtimeType}');
-    print('🔥 Trip.fromJson: Input data keys: ${json.keys.toList()}');
     
     try {
       return Trip(

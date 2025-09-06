@@ -54,7 +54,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// ✅ NOUVELLE MÉTHODE: Initialiser les notifications FCM après connexion
   Future<void> _initializeNotificationsAfterLogin() async {
     try {
-      print('🔔 [KILOSHARE] Initialisation des notifications après connexion...');
+      // Initialize notifications after login
       // Attendre un délai pour que l'authentification soit complètement terminée
       await Future.delayed(const Duration(milliseconds: 1000));
       
@@ -64,11 +64,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Vérifier si le token existe et forcer l'envoi au backend
       final currentToken = _notificationService.fcmToken;
       if (currentToken != null && currentToken.isNotEmpty) {
-        print('🔥 [KILOSHARE] Token FCM disponible, envoi forcé au backend...');
+        // Force FCM token registration
         await _notificationService.registerAfterLogin();
       }
       
-      print('✅ [KILOSHARE] Notifications initialisées avec succès après connexion');
+      // Notifications initialized successfully
     } catch (e) {
       print('⚠️ [KILOSHARE] Erreur lors de l\'initialisation des notifications: $e');
       // Ne pas faire échouer l'authentification si les notifications échouent

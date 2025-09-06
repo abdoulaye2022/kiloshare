@@ -60,7 +60,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _currentUserId = user.id.toString();
       }
     } catch (e) {
-      print('📱 [ConversationScreen] Error getting current user: $e');
     }
     _initializeConversation();
   }
@@ -107,12 +106,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
         conversationId: _conversationId!,
       );
 
-      print('📱 [ConversationScreen] _loadMessages result: $result');
-      print('📱 [ConversationScreen] Messages data: ${result['data']?['data']?['messages']}');
 
       if (result['success'] == true) {
         final messages = List<Map<String, dynamic>>.from(result['data']?['data']?['messages'] ?? []);
-        print('📱 [ConversationScreen] Parsed messages count: ${messages.length}');
         
         setState(() {
           _messages = messages;
@@ -216,7 +212,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildBody() {
-    print('📱 [ConversationScreen] _buildBody - isLoading: $_isLoading, error: $_error, messages count: ${_messages.length}');
     
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());

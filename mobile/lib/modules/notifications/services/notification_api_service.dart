@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../config/app_config.dart';
@@ -66,11 +65,9 @@ class NotificationApiService {
       );
       
       if (response.statusCode == 200) {
-        debugPrint('🔥 Token FCM enregistré avec succès sur le serveur');
       }
 
     } catch (e) {
-      debugPrint('🔥 Erreur enregistrement token FCM: $e');
       rethrow;
     }
   }
