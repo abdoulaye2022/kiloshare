@@ -1199,7 +1199,30 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   }
 
   void _contactOwner() {
-    _showMessage('Fonctionnalité de contact bientôt disponible', Colors.blue);
+    if (_trip == null) {
+      _showMessage('Erreur: voyage non trouvé', Colors.red);
+      return;
+    }
+
+    if (!_isAuthenticated) {
+      _showMessage('Veuillez vous connecter pour contacter le propriétaire', Colors.orange);
+      return;
+    }
+
+    if (_isOwner) {
+      _showMessage('Vous ne pouvez pas vous contacter vous-même', Colors.orange);
+      return;
+    }
+
+    // Navigate to conversation screen
+    context.pushNamed(
+      'conversation',
+      queryParameters: {
+        'tripId': _trip!.id.toString(),
+        'tripOwnerId': _trip!.userId.toString(),
+        'tripTitle': 'Voyage ${_trip!.departureCity} → ${_trip!.arrivalCity}',
+      },
+    );
   }
 
   void _toggleFavorite() async {

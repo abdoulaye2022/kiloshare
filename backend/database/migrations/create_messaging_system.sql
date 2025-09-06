@@ -188,10 +188,6 @@ CREATE TABLE message_rate_limits (
 
 -- Insert initial data and triggers
 
--- System message templates
-INSERT INTO message_moderation_logs (message_id, action, reason, created_at) VALUES 
-(0, 'approved', 'System initialization', NOW());
-
 -- Create triggers for automatic conversation updates
 DELIMITER //
 

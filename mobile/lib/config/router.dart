@@ -23,6 +23,7 @@ import '../modules/trips/screens/trip_details_final.dart';
 import '../modules/trips/screens/search_trips_screen.dart';
 import '../modules/booking/screens/bookings_list_screen.dart';
 import '../modules/booking/screens/booking_details_screen.dart';
+import '../modules/messaging/screens/conversation_screen.dart';
 import '../modules/profile/screens/wallet_screen.dart';
 
 GoRouter createRouter() {
@@ -170,6 +171,22 @@ GoRouter createRouter() {
         builder: (context, state) {
           final bookingId = state.pathParameters['id']!;
           return BookingDetailsScreen(bookingId: bookingId);
+        },
+      ),
+      
+      // Messaging routes
+      GoRoute(
+        path: '/conversation',
+        name: 'conversation',
+        builder: (context, state) {
+          final tripId = state.uri.queryParameters['tripId']!;
+          final tripOwnerId = state.uri.queryParameters['tripOwnerId']!;
+          final tripTitle = state.uri.queryParameters['tripTitle'] ?? 'Conversation';
+          return ConversationScreen(
+            tripId: tripId,
+            tripOwnerId: tripOwnerId,
+            tripTitle: tripTitle,
+          );
         },
       ),
     ],

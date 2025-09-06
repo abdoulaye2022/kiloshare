@@ -80,7 +80,7 @@ class FirebaseNotificationService {
   /// ✅ NOUVELLE MÉTHODE: Initialisation complète après connexion
   Future<void> initializeAfterLogin() async {
     if (_isFullyInitialized) {
-      debugPrint('ℹ️ [KILOSHARE] Notifications déjà complètement initialisées');
+      debugPrint('ℹ️ [KILOSHARE] Notifications déjà complètement initialisées - skip');
       return;
     }
 
@@ -623,8 +623,12 @@ class FirebaseNotificationService {
 
   /// Initialiser après connexion (à appeler dans l'AuthBloc)
   Future<void> registerAfterLogin() async {
+    debugPrint('🔄 [KILOSHARE] registerAfterLogin called - fully initialized: $_isFullyInitialized');
+    
     if (!_isFullyInitialized) {
       await initializeAfterLogin();
+    } else {
+      debugPrint('ℹ️ [KILOSHARE] Already fully initialized, skipping init');
     }
 
     // Forcer l'enregistrement même si déjà initialisé

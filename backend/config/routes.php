@@ -250,6 +250,13 @@ return function (App $app) {
                 $favGroup->get('/trips/{id}/status', [FavoriteController::class, 'checkFavoriteStatus']);
             })->add(new AuthMiddleware());
 
+            // Conversation routes (new system)
+            $v1Group->group('/conversations', function (RouteCollectorProxy $convGroup) {
+                $convGroup->post('', [MessageController::class, 'createOrGetConversation']);
+                $convGroup->get('/{id}/messages', [MessageController::class, 'getConversationMessages']);
+                $convGroup->post('/{id}/messages', [MessageController::class, 'sendConversationMessage']);
+            })->add(new AuthMiddleware());
+
             // Message routes
             $v1Group->group('/messages', function (RouteCollectorProxy $msgGroup) {
                 // Conversations

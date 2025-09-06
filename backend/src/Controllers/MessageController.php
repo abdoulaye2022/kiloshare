@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KiloShare\Controllers;
 
 use KiloShare\Models\Booking;
-use KiloShare\Models\Conversation;
+use KiloShare\Models\ConversationModel;
 use KiloShare\Models\MessageModel;
 use KiloShare\Services\MessagingService;
 use KiloShare\Utils\Response;
@@ -31,12 +31,12 @@ class MessageController
             $limit = min((int)($queryParams['limit'] ?? 20), 50);
             $offset = (int)($queryParams['offset'] ?? 0);
 
-            $conversation = new Conversation();
-            $conversations = $conversation->getUserConversations($user->id, $limit, $offset);
+            $conversationModel = new ConversationModel();
+            $conversations = $conversationModel->getUserConversations($user->id, $limit, $offset);
 
             return Response::success([
                 'conversations' => $conversations,
-                'total_unread' => $conversation->getUnreadCount($user->id)
+                'total_unread' => count($conversations) // TODO: Implement proper unread count
             ]);
 
         } catch (\Exception $e) {
@@ -47,7 +47,7 @@ class MessageController
     public function getConversationMessages(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $conversationId = (int)$request->getAttribute('conversation_id');
+        $conversationId = (int)$request->getAttribute('id');
         $queryParams = $request->getQueryParams();
 
         try {
@@ -156,7 +156,7 @@ class MessageController
     public function sendQuickAction(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $conversationId = (int)$request->getAttribute('conversation_id');
+        $conversationId = (int)$request->getAttribute('id');
         $data = json_decode($request->getBody()->getContents(), true);
 
         try {
@@ -185,7 +185,7 @@ class MessageController
     public function shareLocation(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $conversationId = (int)$request->getAttribute('conversation_id');
+        $conversationId = (int)$request->getAttribute('id');
         $data = json_decode($request->getBody()->getContents(), true);
 
         try {
@@ -215,7 +215,7 @@ class MessageController
     public function sharePhoto(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $conversationId = (int)$request->getAttribute('conversation_id');
+        $conversationId = (int)$request->getAttribute('id');
         $data = json_decode($request->getBody()->getContents(), true);
 
         try {
@@ -284,11 +284,11 @@ class MessageController
     public function getConversationStats(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $conversationId = (int)$request->getAttribute('conversation_id');
+        $conversationId = (int)$request->getAttribute('id');
 
         try {
             // Verify user is participant
-            $conversation = new Conversation();
+            $conversation = new ConversationModel();
             if (!$conversation->isParticipant($conversationId, $user->id)) {
                 return Response::forbidden('Access denied');
             }
@@ -300,6 +300,94 @@ class MessageController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to get stats: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Create or get conversation for a trip
+     */
+    public function createOrGetConversation(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        try {
+            if (empty($data['trip_id']) || empty($data['trip_owner_id'])) {
+                return Response::validationError([
+                    'trip_id' => 'Trip ID is required',
+                    'trip_owner_id' => 'Trip owner ID is required'
+                ]);
+            }
+
+            $tripId = (int)$data['trip_id'];
+            $tripOwnerId = (int)$data['trip_owner_id'];
+
+            // Don't allow self-conversation
+            if ($user->id == $tripOwnerId) {
+                return Response::validationError(['error' => 'Cannot create conversation with yourself']);
+            }
+
+            $conversation = new ConversationModel();
+            $result = $conversation->getOrCreateForTrip($tripId, $user->id, $tripOwnerId);
+
+            if ($result) {
+                return Response::success([
+                    'conversation' => $result,
+                    'message' => 'Conversation ready'
+                ]);
+            } else {
+                return Response::serverError('Failed to create or get conversation');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to create conversation: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send message to conversation
+     */
+    public function sendConversationMessage(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $conversationId = (int)$request->getAttribute('id');
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        error_log("sendConversationMessage - User: " . ($user ? $user->id : 'null'));
+        error_log("sendConversationMessage - ConversationId: " . $conversationId);
+        error_log("sendConversationMessage - Data: " . json_encode($data));
+
+        try {
+            if (empty($data['content'])) {
+                return Response::validationError(['content' => 'Message content is required']);
+            }
+
+            if (strlen($data['content']) > 1000) {
+                return Response::validationError(['content' => 'Message too long (max 1000 characters)']);
+            }
+
+            // Verify user is participant
+            $conversation = new ConversationModel();
+            if (!$conversation->isParticipant($conversationId, $user->id)) {
+                return Response::forbidden('Access denied');
+            }
+
+            $result = $this->messagingService->sendMessage(
+                $conversationId,
+                $user->id,
+                $data['content'],
+                $data['message_type'] ?? MessageModel::TYPE_TEXT,
+                $data['metadata'] ?? []
+            );
+
+            if ($result['success']) {
+                return Response::success($result);
+            } else {
+                return Response::serverError($result['error'] ?? 'Failed to send message');
+            }
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to send message: ' . $e->getMessage());
         }
     }
 }

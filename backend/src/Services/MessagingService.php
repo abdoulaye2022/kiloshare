@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace KiloShare\Services;
 
-use KiloShare\Models\Conversation;
+use KiloShare\Models\ConversationModel;
 use KiloShare\Models\MessageModel;
 use KiloShare\Services\NotificationService;
+use KiloShare\Utils\Database;
 use Exception;
+use PDO;
 
 class MessagingService
 {
-    private Conversation $conversationModel;
+    private ConversationModel $conversationModel;
     private MessageModel $messageModel;
     private NotificationService $notificationService;
+    private PDO $db;
 
     public function __construct()
     {
-        $this->conversationModel = new Conversation();
+        $this->conversationModel = new ConversationModel();
         $this->messageModel = new MessageModel();
         $this->notificationService = new NotificationService();
+        $this->db = Database::getConnection()->getPdo();
     }
 
     public function createOrGetConversation(int $bookingId, int $userId): ?array
@@ -84,7 +88,7 @@ class MessagingService
             }
 
             // Send message
-            $messageId = $this->messageModel->sendMessage(
+            $result = $this->messageModel->sendMessage(
                 $conversationId,
                 $senderId,
                 $content,
@@ -92,9 +96,11 @@ class MessagingService
                 $metadata
             );
 
-            if (!$messageId) {
-                throw new Exception('Failed to send message');
+            if (!$result['success']) {
+                throw new Exception($result['error'] ?? 'Failed to send message');
             }
+
+            $messageId = $result['message_id'];
 
             // Get recipient for notifications
             $participants = $this->conversationModel->getParticipants($conversationId);
@@ -323,11 +329,10 @@ class MessagingService
 
     private function getUserName(int $userId): string
     {
-        global $pdo;
         $sql = "SELECT first_name, last_name FROM users WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
+        $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
-        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         return $user ? $user['first_name'] . ' ' . $user['last_name'] : 'Utilisateur';
     }

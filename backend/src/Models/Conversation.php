@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace KiloShare\Models;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Exception;
 
-class Conversation extends BaseModel
+class Conversation extends Model
 {
-    protected string $table = 'conversations';
+    protected $table = 'conversations';
 
     public const TYPE_NEGOTIATION = 'negotiation';
     public const TYPE_POST_PAYMENT = 'post_payment';
@@ -229,5 +232,72 @@ class Conversation extends BaseModel
         $stmt->execute([$userId, $userId, $userId]);
         
         return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Get or create conversation for a specific trip between user and trip owner
+     */
+    public function getOrCreateForTrip(int $tripId, int $userId, int $tripOwnerId): ?array
+    {
+        try {
+            // First check if a conversation already exists for this trip between these users
+            $sql = "
+                SELECT c.*, t.departure_city, t.arrival_city, t.departure_date
+                FROM conversations c
+                INNER JOIN trips t ON c.trip_id = t.id
+                INNER JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = ?
+                INNER JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id = ?
+                WHERE c.trip_id = ? AND c.status = 'active' AND cp1.is_active = TRUE AND cp2.is_active = TRUE
+                ORDER BY c.created_at DESC
+                LIMIT 1
+            ";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$userId, $tripOwnerId, $tripId]);
+            $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                return $existing;
+            }
+
+            // Create new conversation for trip
+            $this->db->beginTransaction();
+
+            $insertSql = "
+                INSERT INTO conversations (trip_id, type, status, created_at, updated_at) 
+                VALUES (?, 'trip_inquiry', 'active', NOW(), NOW())
+            ";
+
+            $stmt = $this->db->prepare($insertSql);
+            $stmt->execute([$tripId]);
+            $conversationId = (int)$this->db->lastInsertId();
+
+            // Add both participants
+            $this->addParticipant($conversationId, $userId, 'inquirer');
+            $this->addParticipant($conversationId, $tripOwnerId, 'trip_owner');
+
+            $this->db->commit();
+
+            // Return the created conversation with trip details
+            $sql = "
+                SELECT c.*, t.departure_city, t.arrival_city, t.departure_date
+                FROM conversations c
+                INNER JOIN trips t ON c.trip_id = t.id
+                WHERE c.id = ?
+            ";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$conversationId]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            return $result ?: null;
+
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log("Failed to create trip conversation: " . $e->getMessage());
+            return null;
+        }
     }
 }

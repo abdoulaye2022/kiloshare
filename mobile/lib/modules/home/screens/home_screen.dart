@@ -8,6 +8,7 @@ import '../../trips/bloc/trip_bloc.dart';
 import '../../trips/widgets/trip_card_widget.dart';
 import '../../booking/screens/bookings_list_screen.dart';
 import '../../trips/screens/my_trips_screen.dart';
+import '../../messaging/screens/conversations_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const _HomePage(),
     const _MyTripsPage(),
     const _BookingsPage(),
-    const _MessagesPage(),
+    const ConversationsListScreen(),
   ];
 
   @override

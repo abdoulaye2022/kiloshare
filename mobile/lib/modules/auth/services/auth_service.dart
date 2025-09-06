@@ -118,8 +118,10 @@ class AuthService {
     try {
       debugPrint('🔥 Initialisation FCM après connexion...');
       final firebaseService = FirebaseNotificationService();
-      await firebaseService.initializeAfterLogin();
-      debugPrint('🔥 FCM initialisé avec succès après connexion');
+      // ✅ OPTIMISATION: Utiliser registerAfterLogin au lieu de initializeAfterLogin
+      // pour éviter la double initialisation
+      await firebaseService.registerAfterLogin();
+      debugPrint('✅ [KILOSHARE] Notifications initialisées avec succès après connexion');
     } catch (e) {
       debugPrint('🔥 Erreur initialisation FCM: $e');
     }
