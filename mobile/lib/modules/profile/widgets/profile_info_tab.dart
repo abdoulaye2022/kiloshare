@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/user_profile.dart';
 import 'trust_badge_widget.dart';
+import '../../reviews/models/review_model.dart';
+import '../../reviews/services/review_service.dart';
+import '../../reviews/widgets/review_display_widget.dart';
+import '../../reviews/widgets/star_rating_widget.dart';
 
 class ProfileInfoTab extends StatelessWidget {
   final UserProfile profile;
@@ -29,6 +33,8 @@ class ProfileInfoTab extends StatelessWidget {
           _buildProfessionalSection(context),
           const SizedBox(height: 24),
           _buildTrustSection(context),
+          const SizedBox(height: 24),
+          _buildRatingSection(context),
           const SizedBox(height: 24),
           _buildEditButton(context),
         ],
@@ -390,5 +396,350 @@ class ProfileInfoTab extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Widget _buildRatingSection(BuildContext context) {
+    return _buildSection(
+      context,
+      title: 'Évaluations',
+      icon: Icons.star,
+      children: [
+        FutureBuilder<UserRatingModel>(
+          future: _getUserRating(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'Erreur lors du chargement des évaluations',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              );
+            }
+
+            if (!snapshot.hasData) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('Aucune donnée d\'évaluation'),
+                ),
+              );
+            }
+
+            final userRating = snapshot.data!;
+
+            if (userRating.totalReviews == 0) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.star_outline,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Pas encore d\'évaluations',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                // Rating Header compact
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      // Rating principal
+                      Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.star,
+                                color: Colors.amber[600],
+                                size: 24,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                userRating.averageRating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '/5',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${userRating.totalReviews} avis',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(width: 20),
+                      
+                      // Détails par rôle
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (userRating.asTravelerCount > 0)
+                              _buildRoleRating(
+                                'Voyageur',
+                                userRating.asTravelerRating,
+                                userRating.asTravelerCount,
+                              ),
+                            if (userRating.asSenderCount > 0)
+                              _buildRoleRating(
+                                'Expéditeur',
+                                userRating.asSenderRating,
+                                userRating.asSenderCount,
+                              ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Badge si applicable
+                      if (userRating.badges.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getBadgeColor(userRating.status),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            userRating.badges.first,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Bouton voir plus
+                TextButton(
+                  onPressed: () => _showAllReviews(context),
+                  child: const Text('Voir toutes les évaluations'),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleRating(String role, double rating, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Text(
+            '$role: ',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          StarRatingWidget(
+            rating: rating,
+            size: 12,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '($count)',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getBadgeColor(String status) {
+    switch (status) {
+      case 'super_traveler':
+        return Colors.green;
+      case 'warning':
+        return Colors.orange;
+      case 'suspended':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  Future<UserRatingModel> _getUserRating() async {
+    final reviewService = ReviewService();
+    reviewService.initialize();
+    return await reviewService.getUserRating(profile.id);
+  }
+
+  void _showAllReviews(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserReviewsScreen(
+          userId: profile.id,
+          userName: profile.displayName,
+        ),
+      ),
+    );
+  }
+}
+
+// Écran dédié pour afficher toutes les reviews d'un utilisateur
+class UserReviewsScreen extends StatefulWidget {
+  final int userId;
+  final String userName;
+
+  const UserReviewsScreen({
+    super.key,
+    required this.userId,
+    required this.userName,
+  });
+
+  @override
+  State<UserReviewsScreen> createState() => _UserReviewsScreenState();
+}
+
+class _UserReviewsScreenState extends State<UserReviewsScreen> {
+  final ReviewService _reviewService = ReviewService();
+  UserRatingModel? _userRating;
+  List<ReviewModel> _reviews = [];
+  bool _isLoading = true;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewService.initialize();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews({bool loadMore = false}) async {
+    if (!loadMore) {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 1;
+      });
+    }
+
+    try {
+      final result = await _reviewService.getUserReviews(
+        userId: widget.userId,
+        page: _currentPage,
+        limit: 10,
+      );
+
+      if (mounted) {
+        setState(() {
+          if (loadMore) {
+            _reviews.addAll(result['reviews']);
+          } else {
+            _userRating = result['user_rating'];
+            _reviews = result['reviews'];
+          }
+          _hasMore = result['has_more'];
+          _isLoading = false;
+          if (loadMore) _currentPage++;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Évaluations de ${widget.userName}'),
+      ),
+      body: _isLoading && _reviews.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Header avec rating global
+                  if (_userRating != null)
+                    UserRatingHeader(
+                      userRating: _userRating!,
+                      showDetails: true,
+                    ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Liste des reviews
+                  ReviewListWidget(
+                    reviews: _reviews,
+                    showLoadMore: _hasMore,
+                    onLoadMore: () => _loadReviews(loadMore: true),
+                    isLoading: _isLoading,
+                  ),
+                ],
+              ),
+            ),
+    );
   }
 }

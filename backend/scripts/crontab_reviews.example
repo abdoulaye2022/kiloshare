@@ -1,0 +1,83 @@
+# Configuration crontab pour les tâches automatiques des reviews KiloShare
+# 
+# Installation:
+# 1. Modifier les chemins selon votre environnement
+# 2. Copier les lignes ci-dessous dans votre crontab: crontab -e
+# 3. Vérifier les logs dans /var/log/kiloshare/
+
+# Variables d'environnement
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=admin@kiloshare.com
+
+# Répertoires (à adapter selon votre installation)
+PROJECT_DIR=/var/www/kiloshare/backend
+LOG_DIR=/var/log/kiloshare
+PHP_BIN=/usr/bin/php8.2
+
+# === TÂCHES QUOTIDIENNES ===
+
+# Tâche principale: toutes les reviews (tous les jours à 2h00)
+0 2 * * * cd $PROJECT_DIR && $PHP_BIN scripts/review_cron_jobs.php full >> $LOG_DIR/reviews_cron.log 2>&1
+
+# === TÂCHES SPÉCIALISÉES (optionnel si vous voulez les séparer) ===
+
+# Recalcul des ratings utilisateurs (tous les jours à 3h00)
+# 0 3 * * * cd $PROJECT_DIR && $PHP_BIN scripts/review_cron_jobs.php calculate-ratings >> $LOG_DIR/ratings_cron.log 2>&1
+
+# Publication automatique des reviews (tous les jours à 4h00)
+# 0 4 * * * cd $PROJECT_DIR && $PHP_BIN scripts/review_cron_jobs.php auto-publish >> $LOG_DIR/auto_publish_cron.log 2>&1
+
+# Envoi des rappels de review (tous les jours à 10h00)
+# 0 10 * * * cd $PROJECT_DIR && $PHP_BIN scripts/review_cron_jobs.php send-reminders >> $LOG_DIR/reminders_cron.log 2>&1
+
+# === MAINTENANCE ===
+
+# Nettoyage des anciens rappels (tous les dimanches à 1h00)
+0 1 * * 0 cd $PROJECT_DIR && $PHP_BIN scripts/review_cron_jobs.php cleanup >> $LOG_DIR/cleanup_cron.log 2>&1
+
+# Rotation des logs (tous les mois)
+0 0 1 * * find $LOG_DIR -name "*_cron.log" -type f -mtime +30 -delete
+
+# === MONITORING ===
+
+# Vérification que les tâches s'exécutent bien (optionnel)
+# 0 8 * * * if [ ! -f $LOG_DIR/reviews_cron.log ] || [ $(find $LOG_DIR/reviews_cron.log -mtime +1) ]; then echo "⚠️ Alerte: Tâche cron reviews non exécutée" | mail -s "KiloShare Cron Alert" admin@kiloshare.com; fi
+
+# === COMMANDES UTILES ===
+
+# Pour tester manuellement:
+# cd /var/www/kiloshare/backend && php scripts/review_cron_jobs.php full
+
+# Pour voir les logs en temps réel:
+# tail -f /var/log/kiloshare/reviews_cron.log
+
+# Pour vérifier les tâches cron actives:
+# crontab -l
+
+# === NOTES D'INSTALLATION ===
+
+# 1. Créer le répertoire de logs:
+#    sudo mkdir -p /var/log/kiloshare
+#    sudo chown www-data:www-data /var/log/kiloshare
+
+# 2. Tester le script manuellement avant de l'automatiser:
+#    cd /var/www/kiloshare/backend
+#    php scripts/review_cron_jobs.php full
+
+# 3. Vérifier que PHP CLI a accès à la base de données:
+#    php -r "require 'vendor/autoload.php'; use KiloShare\Utils\Database; $db = Database::getConnection(); echo 'DB OK';"
+
+# 4. Adapter les permissions si nécessaire:
+#    chmod +x scripts/review_cron_jobs.php
+
+# === FRÉQUENCES RECOMMANDÉES ===
+
+# Environnement de développement:
+# - Toutes les heures pendant les tests
+# - Une fois par jour en production
+
+# Environnement de production:
+# - Reviews complètes: 1x par jour (tôt le matin)
+# - Rappels: 1x par jour (en journée)
+# - Nettoyage: 1x par semaine

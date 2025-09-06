@@ -17,6 +17,7 @@ use KiloShare\Controllers\NotificationController;
 use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\StripeController;
 use KiloShare\Controllers\TrackingController;
+use KiloShare\Controllers\ReviewController;
 use KiloShare\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -346,6 +347,23 @@ return function (App $app) {
                 $legacyGroup->get('/utilisateur/favoris', [FavoriteController::class, 'getUserFavorites'])
                     ->add(new AuthMiddleware());
             });
+
+            // Review routes
+            $v1Group->group('/reviews', function (RouteCollectorProxy $reviewGroup) {
+                $reviewGroup->post('', [ReviewController::class, 'createReview']);
+                $reviewGroup->get('/pending', [ReviewController::class, 'getPendingReviews']);
+                $reviewGroup->get('/check/{booking_id}', [ReviewController::class, 'checkReviewEligibility']);
+            })->add(new AuthMiddleware());
+
+            // User ratings (public endpoints)
+            $v1Group->get('/users/{id}/rating', [ReviewController::class, 'getUserRating']);
+            $v1Group->get('/users/{id}/reviews', [ReviewController::class, 'getUserReviews']);
+
+            // Admin review management
+            $v1Group->group('/admin/reviews', function (RouteCollectorProxy $adminReviewGroup) {
+                $adminReviewGroup->post('/recalculate', [ReviewController::class, 'recalculateRatings']);
+                $adminReviewGroup->post('/auto-publish', [ReviewController::class, 'autoPublishReviews']);
+            })->add(new AuthMiddleware()); // TODO: Add admin middleware
         });
     });
 
