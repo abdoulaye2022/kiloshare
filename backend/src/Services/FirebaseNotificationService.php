@@ -135,30 +135,52 @@ class FirebaseNotificationService
     }
 
     /**
-     * Enregistrer un token FCM pour un utilisateur
+     * Enregistrer un token FCM pour un utilisateur (optimisé anti-duplicata)
      */
     public function registerToken(int $userId, string $token, string $platform = 'mobile'): bool
     {
         try {
-            // Vérifier si le token existe déjà
+            // ✅ OPTIMISATION: Vérifier si le token existe déjà ET est actif
             $existingToken = UserFCMToken::where('user_id', $userId)
                                         ->where('fcm_token', $token)
+                                        ->where('is_active', true)
                                         ->first();
             
             if ($existingToken) {
-                // Réactiver le token s'il était désactivé
-                $existingToken->is_active = true;
-                $existingToken->updated_at = date('Y-m-d H:i:s');
-                return $existingToken->save();
+                // ✅ Token déjà enregistré et actif, pas besoin de refaire quoi que ce soit
+                error_log("FCM Token already registered and active for user $userId: " . substr($token, 0, 20) . "...");
+                return true;
             }
             
+            // Vérifier s'il existe mais désactivé
+            $inactiveToken = UserFCMToken::where('user_id', $userId)
+                                        ->where('fcm_token', $token)
+                                        ->where('is_active', false)
+                                        ->first();
+            
+            if ($inactiveToken) {
+                // Réactiver le token s'il était désactivé
+                $inactiveToken->is_active = true;
+                $inactiveToken->updated_at = date('Y-m-d H:i:s');
+                error_log("FCM Token reactivated for user $userId: " . substr($token, 0, 20) . "...");
+                return $inactiveToken->save();
+            }
+            
+            // ✅ Désactiver les anciens tokens du même utilisateur sur la même plateforme
+            UserFCMToken::where('user_id', $userId)
+                       ->where('platform', $platform)
+                       ->update(['is_active' => false]);
+            
             // Créer un nouveau token
-            return UserFCMToken::create([
+            $newToken = UserFCMToken::create([
                 'user_id' => $userId,
                 'fcm_token' => $token,
                 'platform' => $platform,
                 'is_active' => true,
-            ]) !== null;
+            ]);
+            
+            error_log("New FCM Token registered for user $userId: " . substr($token, 0, 20) . "...");
+            return $newToken !== null;
         } catch (Exception $e) {
             error_log("Error registering FCM token: " . $e->getMessage());
             return false;

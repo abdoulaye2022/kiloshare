@@ -156,6 +156,13 @@ class FirebaseNotificationService {
       // Écouter les changements de token SEULEMENT si l'utilisateur est connecté
       _firebaseMessaging.onTokenRefresh.listen((fcmToken) async {
         debugPrint('🔄 [KILOSHARE] FCM Token refreshed: ${fcmToken.substring(0, 20)}...');
+        
+        // ✅ PROTECTION ANTI-BOUCLE: Vérifier si le token a vraiment changé
+        if (_currentToken == fcmToken) {
+          debugPrint('🔄 [KILOSHARE] Token refresh ignored - same token as current');
+          return;
+        }
+        
         _currentToken = fcmToken;
         await _storage.write(key: 'fcm_token', value: fcmToken);
 
@@ -163,17 +170,22 @@ class FirebaseNotificationService {
           await _tryGetAPNSTokenSafe();
         }
 
-        // ✅ OPTIMISATION: Enregistrer le token SEULEMENT si l'utilisateur est connecté
+        // ✅ OPTIMISATION: Enregistrer le token SEULEMENT si l'utilisateur est connecté ET si le token a changé
         final authToken = await _storage.read(key: 'access_token');
-        if (authToken != null && authToken.isNotEmpty) {
+        final lastRegisteredToken = await _storage.read(key: 'last_registered_token');
+        
+        if (authToken != null && authToken.isNotEmpty && lastRegisteredToken != fcmToken) {
+          debugPrint('🔄 [KILOSHARE] New token detected, registering...');
           await _registerDeviceWithToken();
+        } else {
+          debugPrint('🔄 [KILOSHARE] Token refresh ignored - user not connected or token already registered');
         }
       }).onError((error) {
         debugPrint('❌ [KILOSHARE] Token refresh error: $error');
       });
 
       await _getInitialTokenSafe();
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ [KILOSHARE] Error in _handlePushNotificationsToken: $e');
     }
   }
@@ -193,7 +205,7 @@ class FirebaseNotificationService {
       await Future.delayed(Duration(milliseconds: Platform.isAndroid ? 2000 : 8000));
 
       await _tryGetTokenSafely();
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ [KILOSHARE] Error in _getInitialTokenSafe: $e');
     }
   }
@@ -321,7 +333,7 @@ class FirebaseNotificationService {
     }
   }
 
-  /// ✅ NOUVELLE MÉTHODE: Enregistrement du device optimisé
+  /// ✅ NOUVELLE MÉTHODE: Enregistrement du device optimisé avec protection anti-boucle
   Future<void> _registerDeviceWithToken() async {
     if (_deviceRegistrationInProgress) {
       debugPrint('⏳ [KILOSHARE] Device registration already in progress');
@@ -330,6 +342,13 @@ class FirebaseNotificationService {
 
     if (_currentToken == null || _currentToken!.isEmpty) {
       debugPrint('⚠️ [KILOSHARE] No FCM token available for registration');
+      return;
+    }
+
+    // ✅ VÉRIFICATION ANTI-BOUCLE: Ne pas re-enregistrer le même token
+    final lastRegisteredToken = await _storage.read(key: 'last_registered_token');
+    if (lastRegisteredToken == _currentToken) {
+      debugPrint('🔄 [KILOSHARE] Token already registered, skipping duplicate registration');
       return;
     }
 
@@ -349,6 +368,7 @@ class FirebaseNotificationService {
       // Envoyer le token au backend KiloShare
       await _sendTokenToBackend(_currentToken!);
 
+      // ✅ MARQUER COMME ENREGISTRÉ pour éviter les duplicatas
       await _storage.write(key: 'last_registered_token', value: _currentToken!);
 
       debugPrint('✅ [KILOSHARE] Device registered successfully!');
@@ -402,7 +422,7 @@ class FirebaseNotificationService {
       }
 
       debugPrint('✅ [KILOSHARE] Message handlers configured');
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ [KILOSHARE] Error setting up message handlers: $e');
     }
   }
@@ -529,16 +549,26 @@ class FirebaseNotificationService {
     if (_context == null) return;
 
     try {
-      final type = data['type'] as String?;
-      final actionUrl = data['action_url'] as String?;
-      final tripId = data['trip_id'] as String?;
-      final bookingId = data['booking_id'] as String?;
-
       debugPrint('👆 [KILOSHARE] Handling notification tap: $data');
 
       // Navigation basée sur les données reçues
       // Implémentation de la navigation spécifique à KiloShare
       // (sera implémentée selon vos routes GoRouter)
+      
+      // TODO: Implementer la navigation selon les types de notifications
+      if (data.containsKey('type')) {
+        switch (data['type']) {
+          case 'booking_request':
+            // Naviguer vers les détails de booking
+            break;
+          case 'trip_update':
+            // Naviguer vers les détails de trip  
+            break;
+          default:
+            // Navigation par défaut
+            break;
+        }
+      }
       
     } catch (e) {
       debugPrint('❌ [KILOSHARE] Error handling notification tap: $e');
@@ -601,7 +631,7 @@ class FirebaseNotificationService {
     await _forceRegisterExistingToken();
   }
 
-  /// ✅ NOUVELLE MÉTHODE: Forcer l'enregistrement d'un token existant
+  /// ✅ NOUVELLE MÉTHODE: Forcer l'enregistrement d'un token existant SEULEMENT si nécessaire
   Future<void> _forceRegisterExistingToken() async {
     if (_currentToken == null || _currentToken!.isEmpty) {
       debugPrint('⚠️ [KILOSHARE] No FCM token available for registration after login');
@@ -614,6 +644,13 @@ class FirebaseNotificationService {
         debugPrint('❌ [KILOSHARE] Aucun token FCM disponible');
         return;
       }
+    }
+
+    // ✅ VÉRIFIER si le token a déjà été enregistré pour éviter la boucle
+    final lastRegistered = await _storage.read(key: 'last_registered_token');
+    if (lastRegistered == _currentToken) {
+      debugPrint('✅ [KILOSHARE] Token déjà enregistré, pas besoin de re-enregistrer');
+      return;
     }
 
     debugPrint('🔄 [KILOSHARE] Forçage de l\'enregistrement du token FCM...');

@@ -10,6 +10,7 @@ use DI\Container;
 use DI\Bridge\Slim\Bridge as SlimAppFactory;
 use KiloShare\Utils\Database;
 use KiloShare\Middleware\CorsMiddleware;
+use KiloShare\Middleware\JsonResponseMiddleware;
 use Slim\Middleware\ErrorMiddleware;
 use Dotenv\Dotenv;
 
@@ -44,6 +45,9 @@ $app = SlimAppFactory::create($container);
 // Configuration des middlewares globaux
 $app->addRoutingMiddleware();
 
+// Middleware pour forcer les réponses JSON
+$app->add(new JsonResponseMiddleware());
+
 // Middleware CORS
 $app->add(new CorsMiddleware($settings['cors']));
 
@@ -54,9 +58,30 @@ $errorMiddleware = $app->addErrorMiddleware(
     true
 );
 
-// Configuration du gestionnaire d'erreurs
+// Configuration du gestionnaire d'erreurs personnalisé pour forcer JSON
 $errorHandler = $errorMiddleware->getDefaultErrorHandler();
 $errorHandler->forceContentType('application/json');
+
+// Gestionnaire d'erreur personnalisé pour s'assurer que TOUTES les réponses sont JSON
+$errorHandler->setDefaultErrorRenderer('application/json', function ($exception, $displayErrorDetails) {
+    $error = [
+        'success' => false,
+        'message' => $exception->getMessage() ?: 'An error occurred',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'error_code' => 'SERVER_ERROR'
+    ];
+    
+    if ($displayErrorDetails) {
+        $error['details'] = [
+            'type' => get_class($exception),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $exception->getTraceAsString()
+        ];
+    }
+    
+    return json_encode($error, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+});
 
 // Chargement des routes
 $routes = require __DIR__ . '/../config/routes.php';

@@ -15,8 +15,8 @@ class Negotiation {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? expiresAt;
-  final Trip? trip;
-  final User? sender;
+  final NegotiationTrip? trip;
+  final NegotiationUser? sender;
 
   Negotiation({
     required this.id,
@@ -61,8 +61,8 @@ class Negotiation {
       expiresAt: json['expires_at'] != null 
           ? DateTime.parse(json['expires_at'] as String) 
           : null,
-      trip: json['trip'] != null ? Trip.fromJson(json['trip']) : null,
-      sender: json['sender'] != null ? User.fromJson(json['sender']) : null,
+      trip: json['trip'] != null ? NegotiationTrip.fromJson(json['trip']) : null,
+      sender: json['sender'] != null ? NegotiationUser.fromJson(json['sender']) : null,
     );
   }
 
@@ -144,7 +144,7 @@ class NegotiationMessage {
 }
 
 // Classes nécessaires (si elles n'existent pas déjà)
-class Trip {
+class NegotiationTrip {
   final int id;
   final String origin;
   final String destination;
@@ -152,9 +152,9 @@ class Trip {
   final double availableWeight;
   final double pricePerKg;
   final String status;
-  final User? user;
+  final NegotiationUser? user;
 
-  Trip({
+  NegotiationTrip({
     required this.id,
     required this.origin,
     required this.destination,
@@ -165,8 +165,8 @@ class Trip {
     this.user,
   });
 
-  factory Trip.fromJson(Map<String, dynamic> json) {
-    return Trip(
+  factory NegotiationTrip.fromJson(Map<String, dynamic> json) {
+    return NegotiationTrip(
       id: json['id'] as int,
       origin: json['origin'] as String,
       destination: json['destination'] as String,
@@ -174,7 +174,7 @@ class Trip {
       availableWeight: (json['available_weight'] as num).toDouble(),
       pricePerKg: (json['price_per_kg'] as num).toDouble(),
       status: json['status'] as String,
-      user: json['user'] != null ? User.fromJson(json['user']) : null,
+      user: json['user'] != null ? NegotiationUser.fromJson(json['user']) : null,
     );
   }
 
@@ -192,14 +192,14 @@ class Trip {
   }
 }
 
-class User {
+class NegotiationUser {
   final int id;
   final String firstName;
   final String lastName;
   final String email;
   final String? profilePicture;
 
-  User({
+  NegotiationUser({
     required this.id,
     required this.firstName,
     required this.lastName,
@@ -207,8 +207,8 @@ class User {
     this.profilePicture,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
+  factory NegotiationUser.fromJson(Map<String, dynamic> json) {
+    return NegotiationUser(
       id: json['id'] as int,
       firstName: json['first_name'] as String,
       lastName: json['last_name'] as String,

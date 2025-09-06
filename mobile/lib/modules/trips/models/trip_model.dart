@@ -268,12 +268,16 @@ class Trip {
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
+    print('🔥 Trip.fromJson: Starting to parse trip data...');
+    print('🔥 Trip.fromJson: Input data type: ${json.runtimeType}');
+    print('🔥 Trip.fromJson: Input data keys: ${json.keys.toList()}');
     
-    return Trip(
-      id: json['id']?.toString() ?? '',
-      uuid: json['uuid'] ?? '',
-      userId: json['user_id']?.toString() ?? '',
-      transportType: json['transport_type'] ?? 'car',
+    try {
+      return Trip(
+        id: json['id']?.toString() ?? '',
+        uuid: json['uuid'] ?? '',
+        userId: json['user_id']?.toString() ?? '',
+        transportType: json['transport_type'] ?? 'car',
       departureCity: json['departure_city'] ?? '',
       departureCountry: json['departure_country'] ?? '',
       departureAirportCode: json['departure_airport_code'],
@@ -282,7 +286,7 @@ class Trip {
       arrivalCountry: json['arrival_country'] ?? '',
       arrivalAirportCode: json['arrival_airport_code'],
       arrivalDate: _parseDateTime(json['arrival_date']) ?? DateTime.now(),
-      availableWeightKg: _parseDouble(json['available_weight']) ?? _parseDouble(json['max_weight']) ?? 0.0,
+      availableWeightKg: _parseDouble(json['available_weight_kg']) ?? _parseDouble(json['available_weight']) ?? _parseDouble(json['max_weight']) ?? 0.0,
       pricePerKg: _parseDouble(json['price_per_kg']),
       currency: json['currency'] ?? 'CAD',
       flightNumber: json['flight_number'],
@@ -369,9 +373,29 @@ class Trip {
           : null,
       restrictionNotes: json['restriction_notes'],
       images: json['images'] != null && json['images'] is List
-          ? List<TripImage>.from(json['images'].where((item) => item != null).map((item) => TripImage.fromJson(item)))
+          ? List<TripImage>.from(json['images'].where((item) => item != null).map((item) {
+              // Handle both string URLs and TripImage objects
+              if (item is String) {
+                // If it's a URL string, create a TripImage object
+                return TripImage(
+                  id: '', // ID not available from string URL
+                  url: item,
+                  altText: null,
+                );
+              } else if (item is Map<String, dynamic>) {
+                // If it's an object, parse normally
+                return TripImage.fromJson(item);
+              } else {
+                throw Exception('Invalid image data type: ${item.runtimeType}');
+              }
+            }))
           : null,
-    );
+      );
+    } catch (e) {
+      print('❌ Trip.fromJson: Error parsing trip: $e');
+      print('❌ Trip.fromJson: Error type: ${e.runtimeType}');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {

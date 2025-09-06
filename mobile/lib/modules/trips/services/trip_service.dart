@@ -176,13 +176,16 @@ class TripService {
 
   /// Get trip by ID
   Future<Trip> getTripById(String id) async {
+    print('🚀 TripService.getTripById: Starting for ID: $id');
+    
     try {
-      
       // Try to get token but don't fail if not available (public access)
       String? token;
       try {
         token = await _authService.getValidAccessToken();
+        print('🔐 TripService.getTripById: Token obtained: ${token != null ? "✅" : "❌"}');
       } catch (e) {
+        print('🔐 TripService.getTripById: No token available: $e');
         // Token not available or expired - continue without auth for public access
       }
       
@@ -190,6 +193,8 @@ class TripService {
       // This allows access to user's own draft trips
       if (token != null && token.isNotEmpty) {
         try {
+          print('👤 TripService.getTripById: Trying user-specific endpoint /user/trips/$id');
+          
           final userResponse = await _dio.get('/user/trips/$id',
             options: Options(
               headers: {
@@ -200,14 +205,27 @@ class TripService {
             ),
           );
           
+          print('👤 TripService.getTripById: User endpoint response status: ${userResponse.statusCode}');
+          print('👤 TripService.getTripById: User endpoint response data type: ${userResponse.data.runtimeType}');
+          
           if (userResponse.data['success'] == true && userResponse.data['data']?['trip'] != null) {
-            return Trip.fromJson(userResponse.data['data']['trip']);
+            print('👤 TripService.getTripById: User endpoint successful, parsing trip...');
+            try {
+              final trip = Trip.fromJson(userResponse.data['data']['trip']);
+              print('✅ TripService.getTripById: User endpoint trip parsed successfully');
+              return trip;
+            } catch (parseError) {
+              print('❌ TripService.getTripById: User endpoint parse error: $parseError');
+              throw parseError;
+            }
           }
         } catch (e) {
           // If user endpoint fails, fall back to public endpoint
           print('User trip endpoint failed, trying public: $e');
         }
       }
+      
+      print('🌍 TripService.getTripById: Trying public endpoint /trips/$id');
       
       // Fall back to public endpoint (for published trips or when not authenticated)
       final headers = <String, String>{
@@ -225,28 +243,62 @@ class TripService {
         ),
       );
       
+      print('🌍 TripService.getTripById: Public endpoint response status: ${response.statusCode}');
+      print('🌍 TripService.getTripById: Public endpoint response data type: ${response.data.runtimeType}');
+      print('🌍 TripService.getTripById: Public endpoint response keys: ${response.data is Map ? (response.data as Map).keys.toList() : "NOT A MAP"}');
+      
+      if (response.data is String) {
+        print('❌ TripService.getTripById: ERROR - Response data is a String: ${response.data}');
+        throw TripException('Server returned string instead of JSON object');
+      }
       
       if (response.data['success'] == true) {
+        print('🌍 TripService.getTripById: Public endpoint successful, checking data structure...');
+        
         // API returns data in response.data['data']['trip']
         final dataSection = response.data['data'];
+        print('🌍 TripService.getTripById: Data section type: ${dataSection.runtimeType}');
+        print('🌍 TripService.getTripById: Data section keys: ${dataSection is Map ? (dataSection as Map).keys.toList() : "NOT A MAP"}');
+        
         if (dataSection == null) {
           throw TripException('Invalid response format: missing data section');
         }
         
         final tripData = dataSection['trip'];
+        print('🌍 TripService.getTripById: Trip data type: ${tripData.runtimeType}');
+        print('🌍 TripService.getTripById: Trip data keys: ${tripData is Map ? (tripData as Map).keys.toList() : "NOT A MAP"}');
         
         if (tripData == null) {
           throw TripException('Trip not found');
         }
         
-        final trip = Trip.fromJson(tripData);
-        return trip;
+        if (tripData is! Map<String, dynamic>) {
+          print('❌ TripService.getTripById: ERROR - Trip data is not a Map<String, dynamic>: ${tripData.runtimeType}');
+          print('❌ TripService.getTripById: Trip data content: $tripData');
+          throw TripException('Invalid trip data format: expected Map but got ${tripData.runtimeType}');
+        }
+        
+        print('🌍 TripService.getTripById: About to parse trip with Trip.fromJson...');
+        try {
+          final trip = Trip.fromJson(tripData);
+          print('✅ TripService.getTripById: Trip parsed successfully');
+          return trip;
+        } catch (parseError) {
+          print('❌ TripService.getTripById: Parse error: $parseError');
+          print('❌ TripService.getTripById: Parse error type: ${parseError.runtimeType}');
+          print('❌ TripService.getTripById: Trip data that failed: $tripData');
+          throw parseError;
+        }
       } else {
+        print('❌ TripService.getTripById: API returned success: false');
         throw TripException(response.data['message'] ?? 'Trip not found');
       }
     } on DioException catch (e) {
+      print('❌ TripService.getTripById: DioException: $e');
       throw _handleDioException(e);
     } catch (e) {
+      print('❌ TripService.getTripById: Generic exception: $e');
+      print('❌ TripService.getTripById: Exception type: ${e.runtimeType}');
       rethrow;
     }
   }

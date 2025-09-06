@@ -16,6 +16,7 @@ use KiloShare\Controllers\MessageController;
 use KiloShare\Controllers\NotificationController;
 use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\StripeController;
+use KiloShare\Controllers\TrackingController;
 use KiloShare\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -316,6 +317,16 @@ return function (App $app) {
 
             // Stripe webhook (no auth required)
             $v1Group->post('/stripe/webhook', [StripeController::class, 'handleWebhook']);
+
+            // Simple tracking routes
+            $v1Group->group('/tracking', function (RouteCollectorProxy $trackingGroup) {
+                $trackingGroup->post('/pickup/confirm', [TrackingController::class, 'confirmPickup']);
+                $trackingGroup->post('/route/start', [TrackingController::class, 'startRoute']);
+                $trackingGroup->post('/delivery/confirm', [TrackingController::class, 'confirmDelivery']);
+                $trackingGroup->post('/issue/report', [TrackingController::class, 'reportIssue']);
+                $trackingGroup->get('/status/{booking_id}', [TrackingController::class, 'getTrackingStatus']);
+                $trackingGroup->post('/review', [TrackingController::class, 'createReview']);
+            })->add(new AuthMiddleware());
 
             // Legacy routes compatibility (if needed)
             $v1Group->group('/legacy', function (RouteCollectorProxy $legacyGroup) {

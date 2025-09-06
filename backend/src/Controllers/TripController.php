@@ -1119,44 +1119,160 @@ class TripController
     public function getPublicTripDetails(ServerRequestInterface $request): ResponseInterface
     {
         $tripId = (int) $request->getAttribute('id');
-
+        
+        error_log("TripController::getPublicTripDetails - Requested trip ID: $tripId");
+        
         try {
+            // Vérifier d'abord que l'ID est valide
+            if ($tripId <= 0) {
+                error_log("TripController::getPublicTripDetails - Invalid trip ID: $tripId");
+                return Response::error('Invalid trip ID', [], 400);
+            }
+            
             $trip = Trip::with(['user', 'images', 'bookings'])
                        ->find($tripId);
-
+                       
             if (!$trip) {
+                error_log("TripController::getPublicTripDetails - Trip not found for ID: $tripId");
                 return Response::notFound('Trip not found');
             }
 
-            return Response::success([
-                'trip' => [
-                    'id' => $trip->id,
-                    'uuid' => $trip->uuid,
-                    'user_id' => $trip->user_id,
-                    'title' => $trip->title,
-                    'description' => $trip->description,
-                    'departure_city' => $trip->departure_city,
-                    'departure_country' => $trip->departure_country,
-                    'arrival_city' => $trip->arrival_city,
-                    'arrival_country' => $trip->arrival_country,
-                    'departure_date' => $trip->departure_date,
-                    'arrival_date' => $trip->arrival_date,
-                    'available_weight_kg' => $trip->available_weight_kg,
-                    'price_per_kg' => $trip->price_per_kg,
-                    'currency' => $trip->currency,
-                    'status' => $trip->status,
-                    'user_name' => $trip->user->first_name . ' ' . $trip->user->last_name,
-                    'user_email' => $trip->user->email,
-                    'remaining_weight' => $trip->available_weight_kg, // Simplifié pour l'instant
-                    'images' => $trip->images->map(function ($image) {
-                        return $image->url;
-                    })->toArray(),
-                    'image_urls' => $trip->images->pluck('url')->toArray()
-                ]
-            ]);
+            error_log("TripController::getPublicTripDetails - Trip found: " . $trip->title);
 
+            // Préparer les images de manière sécurisée
+            $imageUrls = [];
+            try {
+                if ($trip->images && method_exists($trip->images, 'toArray')) {
+                    $imagesArray = $trip->images->toArray();
+                    foreach ($imagesArray as $image) {
+                        if (isset($image['url']) && !empty($image['url'])) {
+                            $imageUrls[] = (string) $image['url'];
+                        }
+                    }
+                }
+                error_log("TripController::getPublicTripDetails - Images processed: " . count($imageUrls));
+            } catch (\Exception $imageError) {
+                error_log("TripController::getPublicTripDetails - Image processing error: " . $imageError->getMessage());
+                $imageUrls = [];
+            }
+
+            // Vérifier que l'utilisateur existe
+            $userName = 'Utilisateur inconnu';
+            $userEmail = '';
+            try {
+                if ($trip->user) {
+                    $firstName = $trip->user->first_name ?? '';
+                    $lastName = $trip->user->last_name ?? '';
+                    $userName = trim($firstName . ' ' . $lastName);
+                    $userEmail = $trip->user->email ?? '';
+                    if (empty($userName)) {
+                        $userName = 'Utilisateur inconnu';
+                    }
+                }
+                error_log("TripController::getPublicTripDetails - User processed: $userName");
+            } catch (\Exception $userError) {
+                error_log("TripController::getPublicTripDetails - User processing error: " . $userError->getMessage());
+                $userName = 'Utilisateur inconnu';
+                $userEmail = '';
+            }
+
+            // Formater les dates de manière sécurisée
+            $departureDate = null;
+            $arrivalDate = null;
+            try {
+                if ($trip->departure_date) {
+                    if (is_string($trip->departure_date)) {
+                        $departureDate = $trip->departure_date;
+                    } elseif (method_exists($trip->departure_date, 'format')) {
+                        $departureDate = $trip->departure_date->format('Y-m-d H:i:s');
+                    } else {
+                        $departureDate = (string) $trip->departure_date;
+                    }
+                }
+                if ($trip->arrival_date) {
+                    if (is_string($trip->arrival_date)) {
+                        $arrivalDate = $trip->arrival_date;
+                    } elseif (method_exists($trip->arrival_date, 'format')) {
+                        $arrivalDate = $trip->arrival_date->format('Y-m-d H:i:s');
+                    } else {
+                        $arrivalDate = (string) $trip->arrival_date;
+                    }
+                }
+                error_log("TripController::getPublicTripDetails - Dates processed: $departureDate -> $arrivalDate");
+            } catch (\Exception $dateError) {
+                error_log("TripController::getPublicTripDetails - Date formatting error: " . $dateError->getMessage());
+                $departureDate = null;
+                $arrivalDate = null;
+            }
+
+            // Préparer les restrictions de manière sécurisée
+            $restrictions = null;
+            try {
+                if ($trip->restrictions) {
+                    if (is_string($trip->restrictions)) {
+                        $restrictions = json_decode($trip->restrictions, true);
+                    } else {
+                        $restrictions = $trip->restrictions;
+                    }
+                }
+            } catch (\Exception $restrictionsError) {
+                error_log("TripController::getPublicTripDetails - Restrictions processing error: " . $restrictionsError->getMessage());
+                $restrictions = null;
+            }
+
+            // Préparer les données utilisateur pour Flutter
+            $userData = null;
+            if ($trip->user) {
+                $userData = [
+                    'first_name' => $trip->user->first_name ?? '',
+                    'last_name' => $trip->user->last_name ?? '',
+                    'email' => $trip->user->email ?? '',
+                    'profile_picture' => $trip->user->profile_picture ?? null,
+                    'is_verified' => (bool) ($trip->user->is_verified ?? false)
+                ];
+            }
+
+            $tripData = [
+                'id' => (int) $trip->id,
+                'uuid' => (string) ($trip->uuid ?? ''),
+                'user_id' => (int) ($trip->user_id ?? 0),
+                'title' => (string) ($trip->title ?? ''),
+                'description' => (string) ($trip->description ?? ''),
+                'departure_city' => (string) ($trip->departure_city ?? ''),
+                'departure_country' => (string) ($trip->departure_country ?? ''),
+                'arrival_city' => (string) ($trip->arrival_city ?? ''),
+                'arrival_country' => (string) ($trip->arrival_country ?? ''),
+                'departure_date' => $departureDate,
+                'arrival_date' => $arrivalDate,
+                'available_weight_kg' => (float) ($trip->available_weight_kg ?? 0),
+                'price_per_kg' => (float) ($trip->price_per_kg ?? 0),
+                'currency' => (string) ($trip->currency ?? 'EUR'),
+                'status' => (string) ($trip->status ?? 'draft'),
+                'transport_type' => (string) ($trip->transport_type ?? 'flight'),
+                'remaining_weight' => (float) ($trip->available_weight_kg ?? 0),
+                'images' => $imageUrls,
+                'image_urls' => $imageUrls,
+                'restrictions' => $restrictions,
+                'special_notes' => $trip->special_notes ?? null,
+                'is_domestic' => (bool) ($trip->is_domestic ?? false),
+                'total_reward' => (float) ($trip->total_reward ?? 0),
+                // Structure utilisateur compatible Flutter
+                'user' => $userData,
+                // Backwards compatibility
+                'user_name' => $userName,
+                'user_email' => $userEmail
+            ];
+
+            error_log("TripController::getPublicTripDetails - Trip data prepared successfully for ID: $tripId");
+
+            return Response::success(['trip' => $tripData]);
+            
         } catch (\Exception $e) {
-            return Response::serverError('Failed to fetch trip details: ' . $e->getMessage());
+            error_log("TripController::getPublicTripDetails CRITICAL Error for ID $tripId: " . $e->getMessage());
+            error_log("TripController::getPublicTripDetails CRITICAL Stack: " . $e->getTraceAsString());
+            
+            // Retourner une réponse JSON structurée même en cas d'erreur
+            return Response::serverError('Failed to fetch trip details');
         }
     }
 
