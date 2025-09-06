@@ -9,6 +9,7 @@ class TripCardWidget extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showUserInfo;
   final bool isCompact;
+  final bool isAuthenticated;
 
   const TripCardWidget({
     super.key,
@@ -16,6 +17,7 @@ class TripCardWidget extends StatelessWidget {
     this.onTap,
     this.showUserInfo = true,
     this.isCompact = false,
+    this.isAuthenticated = false,
   });
 
   @override
@@ -149,6 +151,7 @@ class TripCardWidget extends StatelessWidget {
   Widget _buildMainInfo(BuildContext context) {
     final dateFormatter = DateFormat('dd MMM yyyy', 'fr_FR');
     final timeFormatter = DateFormat('HH:mm', 'fr_FR');
+    final monthYearFormatter = DateFormat('MMM yyyy', 'fr_FR');
     
     return Row(
       children: [
@@ -167,19 +170,22 @@ class TripCardWidget extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                dateFormatter.format(trip.departureDate.toLocal()),
+                isAuthenticated 
+                    ? dateFormatter.format(trip.departureDate.toLocal())
+                    : monthYearFormatter.format(trip.departureDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
-                timeFormatter.format(trip.departureDate.toLocal()),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
+              if (isAuthenticated)
+                Text(
+                  timeFormatter.format(trip.departureDate.toLocal()),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -217,19 +223,22 @@ class TripCardWidget extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                dateFormatter.format(trip.arrivalDate.toLocal()),
+                isAuthenticated 
+                    ? dateFormatter.format(trip.arrivalDate.toLocal())
+                    : monthYearFormatter.format(trip.arrivalDate.toLocal()),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
-                timeFormatter.format(trip.arrivalDate.toLocal()),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
+              if (isAuthenticated)
+                Text(
+                  timeFormatter.format(trip.arrivalDate.toLocal()),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -268,7 +277,7 @@ class TripCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${trip.availableWeightKg.toStringAsFixed(1)} kg',
+                  _getWeightDisplay(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -301,11 +310,11 @@ class TripCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${trip.pricePerKg.toStringAsFixed(2)} ${trip.currency}',
+                  _getPriceDisplay(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue[800],
+                    color: isAuthenticated ? Colors.blue[800] : Colors.orange[700],
                   ),
                 ),
               ],
@@ -334,11 +343,11 @@ class TripCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${trip.totalEarningsPotential.toStringAsFixed(0)} ${trip.currency}',
+                  _getMaxEarningsDisplay(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue[800],
+                    color: isAuthenticated ? Colors.blue[800] : Colors.orange[700],
                   ),
                 ),
               ],
@@ -355,12 +364,22 @@ class TripCardWidget extends StatelessWidget {
     return Row(
       children: [
         // Avatar
-        AvatarDisplayWidget(
-          avatarUrl: user.profilePicture,
-          userName: user.displayName,
-          size: 32,
-          borderWidth: 0,
-        ),
+        isAuthenticated
+            ? AvatarDisplayWidget(
+                avatarUrl: user.profilePicture,
+                userName: user.displayName,
+                size: 32,
+                borderWidth: 0,
+              )
+            : CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.grey[300],
+                child: Icon(
+                  Icons.person,
+                  size: 20,
+                  color: Colors.grey[600],
+                ),
+              ),
         
         const SizedBox(width: 8),
         
@@ -372,7 +391,7 @@ class TripCardWidget extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    user.displayName,
+                    isAuthenticated ? user.displayName : 'Transporteur vérifié',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -389,10 +408,10 @@ class TripCardWidget extends StatelessWidget {
                 ],
               ),
               Text(
-                'Transporteur',
+                isAuthenticated ? 'Transporteur' : 'Connectez-vous pour voir plus',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: isAuthenticated ? Colors.grey[600] : Colors.orange[600],
                 ),
               ),
             ],
@@ -558,5 +577,41 @@ class TripCardWidget extends StatelessWidget {
     if (days <= 3) return Colors.orange;
     if (days <= 7) return Colors.blue;
     return Colors.green;
+  }
+
+  String _getWeightDisplay() {
+    if (isAuthenticated) {
+      return '${trip.availableWeightKg.toStringAsFixed(1)} kg';
+    } else {
+      // Show weight range for non-authenticated users
+      final weight = trip.availableWeightKg;
+      if (weight <= 5) {
+        return '1-5 kg';
+      } else if (weight <= 10) {
+        return '5-10 kg';
+      } else if (weight <= 15) {
+        return '10-15 kg';
+      } else if (weight <= 20) {
+        return '15-20 kg';
+      } else {
+        return '20+ kg';
+      }
+    }
+  }
+
+  String _getPriceDisplay() {
+    if (isAuthenticated) {
+      return '${trip.pricePerKg.toStringAsFixed(2)} ${trip.currency}';
+    } else {
+      return 'Connectez-vous\npour voir le prix';
+    }
+  }
+
+  String _getMaxEarningsDisplay() {
+    if (isAuthenticated) {
+      return '${trip.totalEarningsPotential.toStringAsFixed(0)} ${trip.currency}';
+    } else {
+      return 'Prix\ndisponible';
+    }
   }
 }

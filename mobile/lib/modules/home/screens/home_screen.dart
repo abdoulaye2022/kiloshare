@@ -433,11 +433,17 @@ class _HomePage extends StatelessWidget {
                     children: state.trips
                         .map((trip) => Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: TripCardWidget(
-                                trip: trip,
-                                isCompact: true,
-                                showUserInfo: true,
-                                onTap: () => context.push('/trips/${trip.id}'),
+                              child: BlocBuilder<AuthBloc, AuthState>(
+                                builder: (context, authState) {
+                                  final isAuthenticated = authState is AuthAuthenticated;
+                                  return TripCardWidget(
+                                    trip: trip,
+                                    isCompact: true,
+                                    showUserInfo: true,
+                                    isAuthenticated: isAuthenticated,
+                                    onTap: () => context.push('/trips/${trip.id}'),
+                                  );
+                                }
                               ),
                             ))
                         .toList(),

@@ -238,6 +238,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
               TripCardWidget(
                 trip: trip,
                 showUserInfo: false,
+                isAuthenticated: true,
                 onTap: () => context.push('/trips/${trip.id}'),
               ),
               const SizedBox(height: 8),

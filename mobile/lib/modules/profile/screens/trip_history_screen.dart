@@ -274,6 +274,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
         children: [
           TripCardWidget(
             trip: trip,
+            isAuthenticated: true,
             onTap: () => context.push('/trips/${trip.id}'),
           ),
           _buildTripStatusBar(trip),
@@ -386,6 +387,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
         children: [
           TripCardWidget(
             trip: trip,
+            isAuthenticated: true,
             onTap: () => context.push('/trips/${trip.id}'),
           ),
           Container(
@@ -438,6 +440,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
         children: [
           TripCardWidget(
             trip: trip,
+            isAuthenticated: true,
             onTap: () => context.push('/trips/${trip.id}'),
           ),
           Container(

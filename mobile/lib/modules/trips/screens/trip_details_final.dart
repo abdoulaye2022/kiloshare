@@ -214,6 +214,18 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
             const SizedBox(height: 16),
             _buildDescription(),
           ],
+          
+          // Restrictions section
+          if (_trip!.restrictedCategories != null && _trip!.restrictedCategories!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildRestrictionsSection(),
+          ],
+          
+          // Special notes section
+          if (_trip!.specialNotes?.isNotEmpty == true) ...[
+            const SizedBox(height: 16),
+            _buildSpecialNotesSection(),
+          ],
 
           // Images section
           if (_trip!.hasImages) ...[
@@ -396,11 +408,46 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
               'Prix par kg',
               '${_trip!.pricePerKg.toStringAsFixed(2)} ${_trip!.currency}',
             ),
+            _buildDetailRow(
+              Icons.account_balance_wallet,
+              'Gain maximum',
+              '${_trip!.totalEarningsPotential.toStringAsFixed(0)} ${_trip!.currency}',
+            ),
+            _buildDetailRow(
+              Icons.schedule,
+              'Durée',
+              _trip!.durationDisplay,
+            ),
+            
+            const SizedBox(height: 16),
+            Text(
+              'Détails du voyage',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            _buildDetailRow(
+              Icons.calendar_today,
+              'Date de départ',
+              _formatDateTime(_trip!.departureDate),
+            ),
+            _buildDetailRow(
+              Icons.calendar_today,
+              'Date d\'arrivée',
+              _formatDateTime(_trip!.arrivalDate),
+            ),
+            _buildDetailRow(
+              Icons.flight,
+              'Transport',
+              _getTransportTypeName(_trip!.transportType),
+            ),
             
             if (_trip!.flightNumber?.isNotEmpty == true)
               _buildDetailRow(
                 Icons.airplane_ticket,
-                'Vol',
+                'Numéro de vol',
                 _trip!.flightNumber!,
               ),
               
@@ -410,6 +457,21 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                 'Compagnie',
                 _trip!.airline!,
               ),
+              
+            _buildDetailRow(
+              Icons.visibility,
+              'Vues',
+              _trip!.viewCount.toString(),
+            ),
+            
+            if (_trip!.ticketVerified)
+              _buildDetailRow(
+                Icons.verified,
+                'Billet vérifié',
+                'Oui',
+                valueColor: Colors.green,
+              ),
+              
           ],
         ),
       ),
@@ -441,7 +503,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
+  Widget _buildDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
@@ -449,7 +511,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
           Icon(icon, size: 20, color: Colors.grey[600]),
           const SizedBox(width: 12),
           SizedBox(
-            width: 100,
+            width: 120,
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -464,6 +526,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
               value,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
+                color: valueColor,
               ),
             ),
           ),
@@ -1450,6 +1513,135 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     }
   }
 
+  Widget _buildRestrictionsSection() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange[600], size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Restrictions',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_trip!.restrictedCategories != null && _trip!.restrictedCategories!.isNotEmpty) ...[
+              Text(
+                'Catégories interdites:',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _trip!.restrictedCategories!.map((category) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_trip!.restrictedItems != null && _trip!.restrictedItems!.isNotEmpty) ...[
+              Text(
+                'Objets interdits:',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ...(_trip!.restrictedItems!.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, size: 16, color: Colors.red[600]),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.red[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList()),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpecialNotesSection() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.note, color: Colors.blue[600], size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Notes spéciales',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Text(
+                _trip!.specialNotes!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.blue[800],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildImagesSection() {
     if (_trip?.images == null || _trip!.images!.isEmpty) {
       return const SizedBox.shrink();
@@ -1576,5 +1768,30 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         backgroundColor: color,
       ),
     );
+  }
+  
+  String _formatDateTime(DateTime dateTime) {
+    final months = [
+      '', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    
+    return '${dateTime.day} ${months[dateTime.month]} ${dateTime.year} à ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+  
+  String _getTransportTypeName(String transportType) {
+    switch (transportType.toLowerCase()) {
+      case 'plane':
+      case 'flight':
+        return 'Avion';
+      case 'train':
+        return 'Train';
+      case 'bus':
+        return 'Bus';
+      case 'car':
+        return 'Voiture';
+      default:
+        return transportType;
+    }
   }
 }

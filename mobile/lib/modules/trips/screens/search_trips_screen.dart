@@ -31,6 +31,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   List<Trip> _searchResults = [];
   bool _isLoading = false;
   bool _hasSearched = false;
+  bool _isAuthenticated = false;
   String? _error;
   
   // Sorting and filtering
@@ -39,6 +40,26 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   
   // Recent searches  
   // final List<Map<String, String>> _recentSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthenticationStatus();
+  }
+
+  Future<void> _checkAuthenticationStatus() async {
+    try {
+      await AuthTokenService.instance.loadToken();
+      final token = AuthTokenService.instance.currentToken;
+      setState(() {
+        _isAuthenticated = token != null && token.isNotEmpty;
+      });
+    } catch (e) {
+      setState(() {
+        _isAuthenticated = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +299,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
           final trip = _searchResults[index - 1];
           return TripCardWidget(
             trip: trip,
+            isAuthenticated: _isAuthenticated,
             onTap: () => context.push('/trips/${trip.id}'),
           );
         },

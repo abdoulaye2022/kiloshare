@@ -40,7 +40,7 @@ class MessagingService {
     } catch (e) {
       return {
         'success': false,
-        'message': 'Erreur de connexion: $e',
+        'error': 'Erreur de connexion: $e',
       };
     }
   }
@@ -75,18 +75,18 @@ class MessagingService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
-          'data': data,
+          'conversation': data['data']['conversation'],
         };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de la création de la conversation',
+          'error': data['message'] ?? 'Erreur lors de la création de la conversation',
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Erreur de connexion: $e',
+        'error': 'Erreur de connexion: $e',
       };
     }
   }
@@ -123,13 +123,13 @@ class MessagingService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors du chargement des messages',
+          'error': data['message'] ?? 'Erreur lors du chargement des messages',
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Erreur de connexion: $e',
+        'error': 'Erreur de connexion: $e',
       };
     }
   }
@@ -170,13 +170,13 @@ class MessagingService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de l\'envoi du message',
+          'error': data['message'] ?? 'Erreur lors de l\'envoi du message',
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Erreur de connexion: $e',
+        'error': 'Erreur de connexion: $e',
       };
     }
   }

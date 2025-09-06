@@ -17,7 +17,7 @@ class SearchController
         $queryParams = $request->getQueryParams();
 
         try {
-            $query = Trip::published()->notExpired()->with(['user', 'images']);
+            $query = Trip::active()->notExpired()->with(['user', 'images']);
 
             // Filtres de recherche
             // Support pour les anciens paramètres 'departure' et 'arrival'
@@ -155,7 +155,7 @@ class SearchController
                         'arrival_date' => $trip->arrival_date,
                         'transport_type' => $trip->transport_type,
                         'price_per_kg' => $trip->price_per_kg,
-                        'max_weight' => $trip->max_weight,
+                        'available_weight_kg' => $trip->available_weight_kg,
                         'available_weight' => $trip->available_weight,
                         'currency' => $trip->currency,
                         'is_domestic' => $trip->is_domestic,
@@ -199,7 +199,7 @@ class SearchController
 
         try {
             // Suggestions de villes de départ
-            $departureCities = Trip::published()
+            $departureCities = Trip::active()
                 ->whereRaw('LOWER(departure_city) LIKE ?', ['%' . strtolower($query) . '%'])
                 ->select('departure_city', 'departure_country')
                 ->distinct()
@@ -214,7 +214,7 @@ class SearchController
                 });
 
             // Suggestions de villes d'arrivée
-            $arrivalCities = Trip::published()
+            $arrivalCities = Trip::active()
                 ->whereRaw('LOWER(arrival_city) LIKE ?', ['%' . strtolower($query) . '%'])
                 ->select('arrival_city', 'arrival_country')
                 ->distinct()
@@ -246,7 +246,7 @@ class SearchController
     {
         try {
             // Routes les plus populaires basées sur le nombre de voyages
-            $popularRoutes = Trip::published()
+            $popularRoutes = Trip::active()
                 ->selectRaw('departure_city, departure_country, arrival_city, arrival_country, COUNT(*) as trip_count')
                 ->groupBy(['departure_city', 'departure_country', 'arrival_city', 'arrival_country'])
                 ->orderBy('trip_count', 'desc')

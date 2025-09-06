@@ -50,7 +50,7 @@ class TripController
                         'arrival_country' => $trip->arrival_country,
                         'arrival_date' => $trip->arrival_date,
                         'transport_type' => $trip->transport_type,
-                        'max_weight' => $trip->available_weight_kg,
+                        'available_weight_kg' => $trip->available_weight_kg,
                         'available_weight' => $trip->available_weight,
                         'price_per_kg' => $trip->price_per_kg,
                         'currency' => $trip->currency,
@@ -91,15 +91,29 @@ class TripController
         try {
             $queryParams = $request->getQueryParams();
             
-            $query = Trip::published()->notExpired()->with(['user', 'images']);
+            $query = Trip::active()->notExpired()->with(['user', 'images']);
 
-            // Filtres de recherche
+            // Filtres de recherche avec normalisation pour les accents et casse
             if (!empty($queryParams['departure'])) {
-                $query->where('departure_city', 'like', '%' . $queryParams['departure'] . '%');
+                $searchTerm = $queryParams['departure'];
+                $normalizedTerm = $this->normalizeCityName($searchTerm);
+                error_log("TripController::search - Departure search: '$searchTerm' normalized to: '$normalizedTerm'");
+                
+                $query->where(function ($q) use ($searchTerm, $normalizedTerm) {
+                    $q->whereRaw('LOWER(departure_city) LIKE LOWER(?)', ['%' . $searchTerm . '%'])
+                      ->orWhereRaw('LOWER(departure_city) LIKE LOWER(?)', ['%' . $normalizedTerm . '%']);
+                });
             }
 
             if (!empty($queryParams['arrival'])) {
-                $query->where('arrival_city', 'like', '%' . $queryParams['arrival'] . '%');
+                $searchTerm = $queryParams['arrival'];
+                $normalizedTerm = $this->normalizeCityName($searchTerm);
+                error_log("TripController::search - Arrival search: '$searchTerm' normalized to: '$normalizedTerm'");
+                
+                $query->where(function ($q) use ($searchTerm, $normalizedTerm) {
+                    $q->whereRaw('LOWER(arrival_city) LIKE LOWER(?)', ['%' . $searchTerm . '%'])
+                      ->orWhereRaw('LOWER(arrival_city) LIKE LOWER(?)', ['%' . $normalizedTerm . '%']);
+                });
             }
 
             if (!empty($queryParams['transport_type'])) {
@@ -124,12 +138,30 @@ class TripController
             $limit = (int) ($queryParams['limit'] ?? 20);
             $offset = ($page - 1) * $limit;
 
+            // Debug - lister toutes les villes de départ pour voir ce qu'on a
+            if (!empty($queryParams['debug_cities'])) {
+                $allCities = Trip::active()
+                    ->select('departure_city', 'arrival_city')
+                    ->distinct()
+                    ->get()
+                    ->flatMap(function($trip) {
+                        return [$trip->departure_city, $trip->arrival_city];
+                    })
+                    ->unique()
+                    ->sort()
+                    ->values();
+                
+                error_log("TripController::search - Available cities: " . implode(', ', $allCities->toArray()));
+            }
+
             $trips = $query->orderByRelevance()
                           ->skip($offset)
                           ->take($limit)
                           ->get();
 
             $total = $query->count();
+            
+            error_log("TripController::search - Found $total trips matching criteria");
 
             return Response::success([
                 'trips' => $trips->map(function ($trip) {
@@ -332,7 +364,7 @@ class TripController
                     'arrival_country' => $trip->arrival_country,
                     'arrival_date' => $trip->arrival_date,
                     'transport_type' => $trip->transport_type,
-                    'max_weight' => $trip->available_weight_kg,
+                    'available_weight_kg' => $trip->available_weight_kg,
                     'available_weight' => $trip->available_weight,
                     'price_per_kg' => $trip->price_per_kg,
                     'total_reward' => $trip->total_reward,
@@ -801,6 +833,85 @@ class TripController
         
         // Facteur par défaut
         return 1.0;
+    }
+
+    /**
+     * Normalise les noms de villes pour la recherche (enlève les accents et normalise)
+     */
+    private function normalizeCityName(string $cityName): string
+    {
+        // Convertir en minuscules et nettoyer
+        $normalized = strtolower(trim($cityName));
+        
+        // Enlever les accents et caractères spéciaux
+        $normalized = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+        
+        // Nettoyer les caractères non-alphabétiques restants
+        $normalized = preg_replace('/[^a-z\s-]/', '', $normalized);
+        
+        // Mapping de villes courantes avec leurs variantes (bidirectionnel)
+        $cityMappings = [
+            // Canada
+            'montreal' => ['montréal', 'montréal'],
+            'montréal' => ['montreal', 'montreal'],
+            'montral' => ['montréal', 'montreal'], // variante sans accent mal écrite
+            'québec' => ['quebec', 'quebec city'],
+            'quebec' => ['québec', 'quebec city'],
+            'toronto' => ['toronto'],
+            'vancouver' => ['vancouver'],
+            'ottawa' => ['ottawa'],
+            'calgary' => ['calgary'],
+            
+            // France
+            'paris' => ['paris'],
+            'lyon' => ['lyon'],
+            'marseille' => ['marseille'],
+            'nice' => ['nice'],
+            'toulouse' => ['toulouse'],
+            'strasbourg' => ['strasbourg'],
+            'nantes' => ['nantes'],
+            'bordeaux' => ['bordeaux'],
+            'lille' => ['lille'],
+            
+            // Autres pays francophones
+            'genève' => ['geneve', 'geneva'],
+            'geneve' => ['genève', 'geneva'],
+            'geneva' => ['genève', 'geneve'],
+            'bruxelles' => ['brussels', 'brussel'],
+            'brussels' => ['bruxelles', 'brussel'],
+            'brussel' => ['bruxelles', 'brussels'],
+            'zurich' => ['zürich', 'zurich'],
+            'zürich' => ['zurich'],
+            
+            // Maroc
+            'casablanca' => ['casablanca', 'casa'],
+            'casa' => ['casablanca'],
+            'rabat' => ['rabat'],
+            'marrakech' => ['marrakech', 'marrakesh'],
+            'marrakesh' => ['marrakech'],
+            'fès' => ['fes', 'fez'],
+            'fes' => ['fès', 'fez'],
+            'fez' => ['fès', 'fes'],
+        ];
+        
+        // Rechercher des correspondances exactes
+        if (isset($cityMappings[$normalized])) {
+            return $cityMappings[$normalized][0]; // Retourner la première alternative
+        }
+        
+        // Rechercher des correspondances partielles
+        foreach ($cityMappings as $key => $alternatives) {
+            if (strpos($normalized, $key) !== false || strpos($key, $normalized) !== false) {
+                return $key;
+            }
+            foreach ($alternatives as $alt) {
+                if (strpos($normalized, strtolower($alt)) !== false || strpos(strtolower($alt), $normalized) !== false) {
+                    return $alt;
+                }
+            }
+        }
+        
+        return $normalized;
     }
 
     /**
@@ -1310,7 +1421,7 @@ class TripController
                     'arrival_country' => $trip->arrival_country,
                     'arrival_date' => $trip->arrival_date,
                     'transport_type' => $trip->transport_type,
-                    'max_weight' => $trip->available_weight_kg,
+                    'available_weight_kg' => $trip->available_weight_kg,
                     'available_weight' => $trip->available_weight,
                     'price_per_kg' => $trip->price_per_kg,
                     'total_reward' => $trip->total_reward,
