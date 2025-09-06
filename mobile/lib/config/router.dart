@@ -10,7 +10,7 @@ import '../modules/auth/screens/reset_password_screen.dart';
 import '../modules/home/screens/home_screen.dart';
 import '../modules/profile/screens/user_settings_screen.dart';
 import '../modules/profile/screens/change_password_screen.dart';
-import '../modules/profile/screens/notification_settings_screen.dart';
+import '../modules/profile/screens/notification_settings_screen_enhanced.dart';
 import '../modules/profile/screens/privacy_settings_screen.dart';
 import '../modules/profile/screens/delete_account_screen.dart';
 import '../modules/profile/screens/linked_accounts_screen.dart';
@@ -93,7 +93,7 @@ GoRouter createRouter() {
       GoRoute(
         path: '/profile/notifications',
         name: 'notification-settings',
-        builder: (context, state) => const NotificationSettingsScreen(),
+        builder: (context, state) => const NotificationSettingsScreenEnhanced(),
       ),
       GoRoute(
         path: '/profile/privacy',

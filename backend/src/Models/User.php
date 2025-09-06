@@ -159,6 +159,11 @@ class User extends Model
         return $this->hasMany(UserToken::class);
     }
 
+    public function notificationPreferences(): HasOne
+    {
+        return $this->hasOne(UserNotificationPreferences::class);
+    }
+
     public function sentMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');

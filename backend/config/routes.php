@@ -18,6 +18,7 @@ use KiloShare\Controllers\SocialAuthController;
 use KiloShare\Controllers\StripeController;
 use KiloShare\Controllers\TrackingController;
 use KiloShare\Controllers\ReviewController;
+use KiloShare\Controllers\NotificationPreferencesController;
 use KiloShare\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -304,6 +305,21 @@ return function (App $app) {
                 // Test notification with new system
                 $notifGroup->post('/test', [NotificationController::class, 'sendTestNotification']);
             })->add(new AuthMiddleware());
+
+            // Notification Preferences routes
+            $v1Group->group('/notification-preferences', function (RouteCollectorProxy $prefGroup) {
+                // User preferences routes
+                $prefGroup->get('', [NotificationPreferencesController::class, 'getUserPreferences']);
+                $prefGroup->put('', [NotificationPreferencesController::class, 'updateUserPreferences']);
+                $prefGroup->post('/reset', [NotificationPreferencesController::class, 'resetToDefaults']);
+            })->add(new AuthMiddleware());
+
+            // Admin notification preferences routes
+            $v1Group->group('/admin/notification-preferences', function (RouteCollectorProxy $adminPrefGroup) {
+                $adminPrefGroup->get('/stats', [NotificationPreferencesController::class, 'getPreferencesStats']);
+                $adminPrefGroup->get('/{userId}', [NotificationPreferencesController::class, 'getAdminUserPreferences']);
+                $adminPrefGroup->put('/{userId}', [NotificationPreferencesController::class, 'updateAdminUserPreferences']);
+            })->add(new AuthMiddleware()); // TODO: Add admin middleware
 
             // Stripe Connect routes
             $v1Group->group('/stripe', function (RouteCollectorProxy $stripeGroup) {
