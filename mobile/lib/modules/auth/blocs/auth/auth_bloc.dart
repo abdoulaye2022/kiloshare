@@ -3,12 +3,14 @@ import 'package:kiloshare/modules/auth/services/auth_service.dart';
 import '../../services/phone_auth_service.dart';
 import '../../../../services/auth_token_service.dart';
 import '../../../../services/logout_service.dart';
+import '../../../notifications/services/firebase_notification_service.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthService _authService;
   final PhoneAuthService _phoneAuthService;
+  final FirebaseNotificationService _notificationService = FirebaseNotificationService();
 
   AuthBloc({
     required AuthService authService,
@@ -49,6 +51,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     return e.toString();
   }
 
+  /// ✅ NOUVELLE MÉTHODE: Initialiser les notifications FCM après connexion
+  Future<void> _initializeNotificationsAfterLogin() async {
+    try {
+      print('🔔 [KILOSHARE] Initialisation des notifications après connexion...');
+      // Attendre un délai pour que l'authentification soit complètement terminée
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Forcer l'enregistrement du token même s'il existe déjà
+      await _notificationService.registerAfterLogin();
+      
+      // Vérifier si le token existe et forcer l'envoi au backend
+      final currentToken = _notificationService.fcmToken;
+      if (currentToken != null && currentToken.isNotEmpty) {
+        print('🔥 [KILOSHARE] Token FCM disponible, envoi forcé au backend...');
+        await _notificationService.registerAfterLogin();
+      }
+      
+      print('✅ [KILOSHARE] Notifications initialisées avec succès après connexion');
+    } catch (e) {
+      print('⚠️ [KILOSHARE] Erreur lors de l\'initialisation des notifications: $e');
+      // Ne pas faire échouer l'authentification si les notifications échouent
+    }
+  }
+
   Future<void> _onAuthStarted(
       AuthStarted event, Emitter<AuthState> emit) async {
     try {
@@ -75,6 +101,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           user: user,
           accessToken: token,
         ));
+        
+        // ✅ Initialiser les notifications FCM après reconnexion automatique
+        _initializeNotificationsAfterLogin();
         return;
       }
       emit(AuthUnauthenticated());

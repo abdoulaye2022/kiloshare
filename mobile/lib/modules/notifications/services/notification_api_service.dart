@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../config/app_config.dart';
@@ -45,20 +46,31 @@ class NotificationApiService {
   }
 
   /// Enregistrer le token FCM
-  Future<void> registerFCMToken(String token) async {
+  Future<void> registerFCMToken(
+    String token, {
+    String platform = 'android',
+    Map<String, String>? deviceInfo,
+  }) async {
     try {
-
-      await _dio.post(
-        '/user/notifications/register-token',
+      final response = await _dio.post(
+        '/notifications/fcm/register-token',
         data: {
-          'fcm_token': token,
-          'platform': 'mobile',
-          'device_type': 'flutter',
+          'token': token,
+          'platform': platform,
+          'device_info': deviceInfo ?? {
+            'flutter_version': '3.0.0',
+            'platform': 'mobile',
+          }
         },
         options: await _getAuthHeaders(),
       );
+      
+      if (response.statusCode == 200) {
+        debugPrint('🔥 Token FCM enregistré avec succès sur le serveur');
+      }
 
     } catch (e) {
+      debugPrint('🔥 Erreur enregistrement token FCM: $e');
       rethrow;
     }
   }

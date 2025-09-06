@@ -1,14 +1,14 @@
+import 'dart:io';
 import 'dart:convert';
-import '../../../utils/platform_helper.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../../../utils/platform_helper.dart';
 import 'notification_api_service.dart';
 
 class FirebaseNotificationService {
@@ -21,71 +21,104 @@ class FirebaseNotificationService {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+  static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications = 
       FlutterLocalNotificationsPlugin();
-  
+
   final NotificationApiService _notificationApiService = NotificationApiService();
-  
-  bool _isInitialized = false;
-  String? _fcmToken;
-  BuildContext? _context;
+
+  static BuildContext? _context;
+  static String? _currentToken;
+  static String? _apnsToken;
+  static bool _isBasicInitialized = false;
+  static bool _isFullyInitialized = false;
+  static String? _lastRegisteredToken;
+  static bool _deviceRegistrationInProgress = false;
+  static bool _isSimulator = false;
 
   // Getters
-  bool get isInitialized => _isInitialized;
-  String? get fcmToken => _fcmToken;
-  
-  /// Obtenir le token FCM
-  Future<String?> getFCMToken() async {
+  bool get isInitialized => _isFullyInitialized;
+  String? get fcmToken => _currentToken;
+  static bool get isSimulator => _isSimulator;
+
+  /// ✅ NOUVELLE MÉTHODE: Initialisation basique au démarrage (sans permissions)
+  Future<void> initializeBasic([BuildContext? context]) async {
+    if (_isBasicInitialized) return;
+
+    debugPrint('🔔 [KILOSHARE] Initialisation basique des notifications...');
+
     try {
-      _fcmToken = await _firebaseMessaging.getToken();
-      if (_fcmToken != null) {
-        await _storage.write(key: 'fcm_token', value: _fcmToken!);
+      _context = context;
+
+      // 1. Détecter le simulateur
+      await _detectSimulator();
+      debugPrint('📱 [KILOSHARE] Device type: ${_isSimulator ? "Simulator" : "Physical"}');
+
+      // 2. Initialiser les notifications locales
+      debugPrint('🔔 [KILOSHARE] Initializing local notifications...');
+      await _configureLocalNotifications();
+
+      // 3. Configurer les handlers de messages
+      debugPrint('📨 [KILOSHARE] Setting up message handlers...');
+      await _setupMessageHandlers();
+
+      // 4. Récupérer le token en cache s'il existe
+      final cachedToken = await _storage.read(key: 'fcm_token');
+      if (cachedToken != null && cachedToken.isNotEmpty) {
+        _currentToken = cachedToken;
+        debugPrint('📱 [KILOSHARE] Token en cache trouvé: ${cachedToken.substring(0, 20)}...');
       }
-      return _fcmToken;
-    } catch (e) {
-      debugPrint('Erreur lors de l\'obtention du token FCM: $e');
-      return null;
+
+      _isBasicInitialized = true;
+      debugPrint('✅ [KILOSHARE] Initialisation basique terminée');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Erreur lors de l\'initialisation basique: $e');
+      debugPrint('📍 [KILOSHARE] Stack trace: $stackTrace');
     }
   }
 
-  /// Initialiser le service de notifications
-  Future<void> initialize({BuildContext? context}) async {
-    if (_isInitialized) return;
+  /// ✅ NOUVELLE MÉTHODE: Initialisation complète après connexion
+  Future<void> initializeAfterLogin() async {
+    if (_isFullyInitialized) {
+      debugPrint('ℹ️ [KILOSHARE] Notifications déjà complètement initialisées');
+      return;
+    }
 
-    _context = context;
-    
+    if (!_isBasicInitialized) {
+      await initializeBasic();
+    }
+
+    debugPrint('🔔 [KILOSHARE] Initialisation complète des notifications après connexion...');
+
     try {
-      // Initialiser Firebase si ce n'est pas fait
-      await Firebase.initializeApp();
-
-      // Demander les permissions
+      // 1. Demander les permissions
+      debugPrint('🔒 [KILOSHARE] Requesting permissions...');
       await requestPermissions();
 
-      // Configurer les notifications locales
-      await _configureLocalNotifications();
+      // 2. Gérer le token FCM
+      debugPrint('🔑 [KILOSHARE] Handling FCM token...');
+      await _handlePushNotificationsToken();
 
-      // Obtenir le token FCM
-      await _getFCMToken();
-
-      // Configurer les handlers de messages
-      await _configureMessageHandlers();
-
-      _isInitialized = true;
-
-    } catch (e) {
-      rethrow;
+      _isFullyInitialized = true;
+      debugPrint('✅ [KILOSHARE] Initialisation complète terminée!');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Erreur lors de l\'initialisation complète: $e');
+      debugPrint('📍 [KILOSHARE] Stack trace: $stackTrace');
     }
   }
 
   /// Demander les permissions de notification
   Future<bool> requestPermissions() async {
+    debugPrint('🔔 [KILOSHARE] Demande des permissions de notifications...');
+    
     if (PlatformHelper.isAndroid) {
       // Permissions Android 13+
       final status = await Permission.notification.request();
+      debugPrint('🔔 [KILOSHARE] Permissions Android: ${status.isGranted ? "Accordées" : "Refusées"}');
       return status.isGranted;
     } else if (PlatformHelper.isIOS) {
       // Permissions iOS
+      debugPrint('🔔 [KILOSHARE] Demande des permissions iOS...');
       final settings = await _firebaseMessaging.requestPermission(
         alert: true,
         badge: true,
@@ -95,9 +128,283 @@ class FirebaseNotificationService {
         carPlay: false,
         criticalAlert: false,
       );
-      return settings.authorizationStatus == AuthorizationStatus.authorized;
+      
+      debugPrint('🔔 [KILOSHARE] Status permission iOS: ${settings.authorizationStatus}');
+      debugPrint('🔔 [KILOSHARE] Alert: ${settings.alert}');
+      debugPrint('🔔 [KILOSHARE] Badge: ${settings.badge}');
+      debugPrint('🔔 [KILOSHARE] Sound: ${settings.sound}');
+      
+      bool isAuthorized = settings.authorizationStatus == AuthorizationStatus.authorized;
+      debugPrint('🔔 [KILOSHARE] Permissions iOS: ${isAuthorized ? "Accordées" : "Refusées"}');
+
+      await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      return isAuthorized;
     }
     return false;
+  }
+
+  /// ✅ MÉTHODE OPTIMISÉE: Token refresh uniquement lors de la connexion
+  Future<void> _handlePushNotificationsToken() async {
+    try {
+      debugPrint('🔄 [KILOSHARE] Setting up token refresh listener...');
+
+      // Écouter les changements de token SEULEMENT si l'utilisateur est connecté
+      _firebaseMessaging.onTokenRefresh.listen((fcmToken) async {
+        debugPrint('🔄 [KILOSHARE] FCM Token refreshed: ${fcmToken.substring(0, 20)}...');
+        _currentToken = fcmToken;
+        await _storage.write(key: 'fcm_token', value: fcmToken);
+
+        if (Platform.isIOS && !_isSimulator && _apnsToken == null) {
+          await _tryGetAPNSTokenSafe();
+        }
+
+        // ✅ OPTIMISATION: Enregistrer le token SEULEMENT si l'utilisateur est connecté
+        final authToken = await _storage.read(key: 'access_token');
+        if (authToken != null && authToken.isNotEmpty) {
+          await _registerDeviceWithToken();
+        }
+      }).onError((error) {
+        debugPrint('❌ [KILOSHARE] Token refresh error: $error');
+      });
+
+      await _getInitialTokenSafe();
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Error in _handlePushNotificationsToken: $e');
+    }
+  }
+
+  Future<void> _getInitialTokenSafe() async {
+    try {
+      debugPrint('🔍 [KILOSHARE] Getting initial FCM token...');
+
+      // Traitement spécial iOS pour APNS
+      if (Platform.isIOS && !_isSimulator) {
+        debugPrint('🍎 [KILOSHARE] Preparing APNS for iOS...');
+        await _prepareAPNSForIPhone();
+      }
+
+      // Attendre un délai puis essayer d'obtenir un nouveau token
+      debugPrint('⏳ [KILOSHARE] Waiting before token request...');
+      await Future.delayed(Duration(milliseconds: Platform.isAndroid ? 2000 : 8000));
+
+      await _tryGetTokenSafely();
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Error in _getInitialTokenSafe: $e');
+    }
+  }
+
+  Future<void> _tryGetTokenSafely() async {
+    const maxAttempts = 3;
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        debugPrint('🔄 [KILOSHARE] Attempting to get FCM token (attempt $attempt/$maxAttempts)');
+
+        final tokenFuture = _firebaseMessaging.getToken();
+        final token = await tokenFuture.timeout(
+          Duration(seconds: Platform.isAndroid ? 15 : 20),
+          onTimeout: () {
+            debugPrint('⏰ [KILOSHARE] Token request timeout on attempt $attempt');
+            return null;
+          },
+        );
+
+        if (token != null && token.isNotEmpty) {
+          _currentToken = token;
+          await _storage.write(key: 'fcm_token', value: token);
+
+          debugPrint('✅ [KILOSHARE] FCM token obtained: ${token.substring(0, 20)}...');
+          debugPrint('📱 [KILOSHARE] Full token length: ${token.length}');
+
+          if (Platform.isIOS && !_isSimulator && _apnsToken == null) {
+            await _tryGetAPNSTokenSafe();
+          }
+
+          // ✅ OPTIMISATION: Enregistrer le token SEULEMENT si l'utilisateur est connecté
+          final authToken = await _storage.read(key: 'access_token');
+          if (authToken != null && authToken.isNotEmpty) {
+            await _registerDeviceWithToken();
+          } else {
+            debugPrint('ℹ️ [KILOSHARE] Utilisateur non connecté, token stocké pour plus tard');
+          }
+          return;
+        } else {
+          debugPrint('⚠️ [KILOSHARE] Empty or null token received on attempt $attempt');
+        }
+      } catch (e) {
+        debugPrint('❌ [KILOSHARE] Error getting token (attempt $attempt): $e');
+
+        if (e.toString().contains('apns-token-not-set')) {
+          debugPrint('ℹ️ [KILOSHARE] APNS token not set, this is normal for Android');
+          if (attempt == maxAttempts) {
+            break;
+          }
+        }
+      }
+
+      if (attempt < maxAttempts) {
+        final delay = Duration(milliseconds: Platform.isAndroid ? 2000 : 3000);
+        debugPrint('⏳ [KILOSHARE] Waiting ${delay.inMilliseconds}ms before retry...');
+        await Future.delayed(delay);
+      }
+    }
+
+    debugPrint('❌ [KILOSHARE] Failed to get FCM token after $maxAttempts attempts');
+  }
+
+  Future<void> _prepareAPNSForIPhone() async {
+    if (_isSimulator || Platform.isAndroid) return;
+
+    try {
+      debugPrint('🍎 [KILOSHARE] Preparing APNS token...');
+      await Future.delayed(const Duration(milliseconds: 5000));
+
+      final apnsToken = await _firebaseMessaging.getAPNSToken().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+
+      if (apnsToken != null && apnsToken.isNotEmpty) {
+        _apnsToken = apnsToken;
+        await _storage.write(key: 'apns_token', value: apnsToken);
+        debugPrint('✅ [KILOSHARE] APNS token obtained: ${apnsToken.substring(0, 20)}...');
+      } else {
+        debugPrint('⚠️ [KILOSHARE] APNS token is null or empty');
+        debugPrint('🔥 ⚠️ CAUSES POSSIBLES:');
+        debugPrint('🔥 ⚠️ 1. Test sur simulateur iOS (non supporté)');
+        debugPrint('🔥 ⚠️ 2. Configuration APNS manquante dans Firebase Console');
+        debugPrint('🔥 ⚠️ 3. Permissions notifications non accordées');
+        debugPrint('🔥 ⚠️ 4. Premier lancement - permissions en attente');
+        debugPrint('🔥 ⚠️ SOLUTION: Utilisez un appareil iOS réel ou Android');
+      }
+    } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error getting APNS token: $e');
+    }
+  }
+
+  Future<void> _tryGetAPNSTokenSafe() async {
+    if (_isSimulator || Platform.isAndroid) return;
+
+    try {
+      debugPrint('🍎 [KILOSHARE] Trying to get APNS token safely...');
+      await Future.delayed(const Duration(milliseconds: 2000));
+
+      final apnsToken = await _firebaseMessaging.getAPNSToken().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('⏰ [KILOSHARE] APNS token request timeout');
+          return null;
+        },
+      );
+
+      if (apnsToken != null && apnsToken.isNotEmpty) {
+        _apnsToken = apnsToken;
+        await _storage.write(key: 'apns_token', value: apnsToken);
+
+        // ✅ OPTIMISATION: Enregistrer seulement si connecté
+        final authToken = await _storage.read(key: 'access_token');
+        if (authToken != null && authToken.isNotEmpty) {
+          await _registerDeviceWithToken();
+        }
+
+        debugPrint('✅ [KILOSHARE] APNS token updated: ${apnsToken.substring(0, 20)}...');
+      } else {
+        debugPrint('⚠️ [KILOSHARE] APNS token is null or empty');
+      }
+    } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error getting APNS token safely: $e');
+    }
+  }
+
+  /// ✅ NOUVELLE MÉTHODE: Enregistrement du device optimisé
+  Future<void> _registerDeviceWithToken() async {
+    if (_deviceRegistrationInProgress) {
+      debugPrint('⏳ [KILOSHARE] Device registration already in progress');
+      return;
+    }
+
+    if (_currentToken == null || _currentToken!.isEmpty) {
+      debugPrint('⚠️ [KILOSHARE] No FCM token available for registration');
+      return;
+    }
+
+    _deviceRegistrationInProgress = true;
+
+    try {
+      debugPrint('🔄 [KILOSHARE] Starting device registration...');
+
+      final authToken = await _storage.read(key: 'access_token');
+      if (authToken == null) {
+        debugPrint('⚠️ [KILOSHARE] No auth token, skipping device registration');
+        return;
+      }
+
+      debugPrint('🔄 [KILOSHARE] Registering device with FCM token: ${_currentToken!.substring(0, 20)}...');
+
+      // Envoyer le token au backend KiloShare
+      await _sendTokenToBackend(_currentToken!);
+
+      await _storage.write(key: 'last_registered_token', value: _currentToken!);
+
+      debugPrint('✅ [KILOSHARE] Device registered successfully!');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Device registration failed: $e');
+      debugPrint('📍 [KILOSHARE] Stack trace: $stackTrace');
+    } finally {
+      _deviceRegistrationInProgress = false;
+    }
+  }
+
+  /// Envoyer le token au backend
+  Future<void> _sendTokenToBackend(String token) async {
+    try {
+      debugPrint('🔥 [KILOSHARE] Envoi du token FCM au backend: ${token.substring(0, 20)}...');
+      
+      final deviceInfo = await _getDeviceInfo();
+      
+      await _notificationApiService.registerFCMToken(
+        token,
+        platform: Platform.isIOS ? 'ios' : 'android',
+        deviceInfo: deviceInfo,
+      );
+      
+      debugPrint('🔥 [KILOSHARE] Token FCM envoyé avec succès au backend');
+    } catch (e) {
+      debugPrint('🔥 [KILOSHARE] Erreur lors de l\'envoi du token FCM: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _setupMessageHandlers() async {
+    try {
+      // Handler pour les messages en premier plan
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+        debugPrint('📨 [KILOSHARE] Foreground message received: ${message.notification?.title}');
+        debugPrint('📨 [KILOSHARE] Message data: ${message.data}');
+        await _showLocalNotification(message);
+      });
+
+      // Handler pour l'ouverture de notification
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+        debugPrint('👆 [KILOSHARE] Notification opened app: ${message.notification?.title}');
+        _handleNotificationTap(message.data);
+      });
+
+      // Vérifier si l'app a été ouverte via une notification (terminated)
+      final RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleNotificationTap(initialMessage.data);
+      }
+
+      debugPrint('✅ [KILOSHARE] Message handlers configured');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [KILOSHARE] Error setting up message handlers: $e');
+    }
   }
 
   /// Configurer les notifications locales
@@ -107,9 +414,9 @@ class FirebaseNotificationService {
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+      requestAlertPermission: false, // Ne pas demander maintenant
+      requestBadgePermission: false,
+      requestSoundPermission: false,
     );
 
     const InitializationSettings initializationSettings = InitializationSettings(
@@ -117,9 +424,18 @@ class FirebaseNotificationService {
       iOS: initializationSettingsIOS,
     );
 
-    await _flutterLocalNotificationsPlugin.initialize(
+    await _localNotifications.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null) {
+          try {
+            final data = jsonDecode(response.payload!);
+            _handleNotificationTap(data);
+          } catch (e) {
+            debugPrint('❌ [KILOSHARE] Error parsing notification payload: $e');
+          }
+        }
+      },
     );
 
     // Créer le canal de notification Android
@@ -147,97 +463,16 @@ class FirebaseNotificationService {
       playSound: true,
     );
 
-    await _flutterLocalNotificationsPlugin
+    await _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(highImportanceChannel);
 
-    await _flutterLocalNotificationsPlugin
+    await _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(normalImportanceChannel);
   }
 
-  /// Obtenir le token FCM
-  Future<void> _getFCMToken() async {
-    try {
-      final token = await _firebaseMessaging.getToken();
-      if (token != null) {
-        _fcmToken = token;
-        await _storage.write(key: 'fcm_token', value: token);
-        
-        // Envoyer le token au backend
-        await _sendTokenToBackend(token);
-      }
-
-      // Écouter les changements de token
-      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
-        _fcmToken = newToken;
-        await _storage.write(key: 'fcm_token', value: newToken);
-        await _sendTokenToBackend(newToken);
-      });
-    } catch (e) {
-    }
-  }
-
-  /// Envoyer le token au backend
-  Future<void> _sendTokenToBackend(String token) async {
-    try {
-      await _notificationApiService.registerFCMToken(token);
-    } catch (e) {
-    }
-  }
-
-  /// Configurer les handlers de messages
-  Future<void> _configureMessageHandlers() async {
-    // Messages reçus quand l'app est en foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      _showLocalNotification(message);
-    });
-
-    // Messages qui ont ouvert l'app (background/terminated)
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleNotificationTap(message.data);
-    });
-
-    // Vérifier si l'app a été ouverte via une notification (terminated)
-    final RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleNotificationTap(initialMessage.data);
-    }
-  }
-
-  /// Afficher une notification locale (publique pour les tests)
-  Future<void> showLocalNotification(String title, String body, {String? payload}) async {
-    const androidDetails = AndroidNotificationDetails(
-      'test_channel',
-      'Notifications de test',
-      channelDescription: 'Notifications de test KiloShare',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-      icon: '@mipmap/ic_launcher',
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const platformDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      platformDetails,
-      payload: payload,
-    );
-  }
-
-  /// Afficher une notification locale (privée)
+  /// Afficher une notification locale
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
     final data = message.data;
@@ -279,24 +514,13 @@ class FirebaseNotificationService {
         iOS: iosDetails,
       );
 
-      await _flutterLocalNotificationsPlugin.show(
+      await _localNotifications.show(
         message.hashCode,
         notification.title,
         notification.body,
         platformDetails,
         payload: jsonEncode(data),
       );
-    }
-  }
-
-  /// Gérer le tap sur une notification locale
-  void _onNotificationTapped(NotificationResponse response) {
-    if (response.payload != null) {
-      try {
-        final data = jsonDecode(response.payload!);
-        _handleNotificationTap(data);
-      } catch (e) {
-      }
     }
   }
 
@@ -310,43 +534,122 @@ class FirebaseNotificationService {
       final tripId = data['trip_id'] as String?;
       final bookingId = data['booking_id'] as String?;
 
-      if (actionUrl != null) {
-        // Navigation personnalisée via URL
-        GoRouter.of(_context!).push(actionUrl);
-      } else if (type != null) {
-        // Navigation basée sur le type
-        switch (type) {
-          case 'trip_booked':
-          case 'trip_confirmed':
-          case 'trip_cancelled':
-            if (tripId != null) {
-              GoRouter.of(_context!).push('/trips/$tripId');
-            }
-            break;
-          case 'booking_confirmed':
-          case 'booking_cancelled':
-            if (bookingId != null) {
-              GoRouter.of(_context!).push('/bookings/$bookingId');
-            }
-            break;
-          case 'message_received':
-            GoRouter.of(_context!).push('/messages');
-            break;
-          case 'payment_received':
-          case 'payment_processed':
-            GoRouter.of(_context!).push('/wallet');
-            break;
-          default:
-            GoRouter.of(_context!).push('/notifications');
-            break;
-        }
+      debugPrint('👆 [KILOSHARE] Handling notification tap: $data');
+
+      // Navigation basée sur les données reçues
+      // Implémentation de la navigation spécifique à KiloShare
+      // (sera implémentée selon vos routes GoRouter)
+      
+    } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error handling notification tap: $e');
+    }
+  }
+
+  // ✅ MÉTHODES UTILITAIRES
+
+  Future<void> _detectSimulator() async {
+    try {
+      if (Platform.isIOS) {
+        final deviceInfo = DeviceInfoPlugin();
+        final iosInfo = await deviceInfo.iosInfo;
+        _isSimulator = !iosInfo.isPhysicalDevice;
       } else {
-        // Navigation par défaut vers la liste des notifications
-        GoRouter.of(_context!).push('/notifications');
+        _isSimulator = false;
       }
     } catch (e) {
-      // Fallback vers les notifications
-      GoRouter.of(_context!).push('/notifications');
+      _isSimulator = false;
+    }
+  }
+
+  Future<Map<String, String>> _getDeviceInfo() async {
+    final deviceInfo = DeviceInfoPlugin();
+    final packageInfo = await PackageInfo.fromPlatform();
+
+    String deviceId = '';
+    String osVersion = '';
+    String deviceModel = '';
+
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      deviceId = androidInfo.id;
+      osVersion = androidInfo.version.release;
+      deviceModel = '${androidInfo.manufacturer} ${androidInfo.model}';
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      deviceId = iosInfo.identifierForVendor ?? '';
+      osVersion = iosInfo.systemVersion;
+      deviceModel = _isSimulator ? '${iosInfo.model} (Simulator)' : iosInfo.model;
+    }
+
+    return {
+      'device_id': deviceId,
+      'app_version': packageInfo.version,
+      'os_version': osVersion,
+      'device_model': deviceModel,
+    };
+  }
+
+  // ✅ MÉTHODES PUBLIQUES
+
+  /// Initialiser après connexion (à appeler dans l'AuthBloc)
+  Future<void> registerAfterLogin() async {
+    if (!_isFullyInitialized) {
+      await initializeAfterLogin();
+    }
+
+    // Forcer l'enregistrement même si déjà initialisé
+    await _forceRegisterExistingToken();
+  }
+
+  /// ✅ NOUVELLE MÉTHODE: Forcer l'enregistrement d'un token existant
+  Future<void> _forceRegisterExistingToken() async {
+    if (_currentToken == null || _currentToken!.isEmpty) {
+      debugPrint('⚠️ [KILOSHARE] No FCM token available for registration after login');
+      // Essayer de récupérer le token du cache
+      final cachedToken = await _storage.read(key: 'fcm_token');
+      if (cachedToken != null && cachedToken.isNotEmpty) {
+        _currentToken = cachedToken;
+        debugPrint('🔍 [KILOSHARE] Token récupéré du cache: ${cachedToken.substring(0, 20)}...');
+      } else {
+        debugPrint('❌ [KILOSHARE] Aucun token FCM disponible');
+        return;
+      }
+    }
+
+    debugPrint('🔄 [KILOSHARE] Forçage de l\'enregistrement du token FCM...');
+    await _registerDeviceWithToken();
+  }
+
+  /// Mettre à jour le contexte
+  void updateContext(BuildContext context) {
+    _context = context;
+  }
+
+  /// Nettoyer les données
+  Future<void> clearDeviceData() async {
+    const keysToRemove = [
+      'fcm_token',
+      'last_registered_token',
+      'apns_token',
+    ];
+
+    for (final key in keysToRemove) {
+      await _storage.delete(key: key);
+    }
+
+    _currentToken = null;
+    _apnsToken = null;
+    _lastRegisteredToken = null;
+    _isBasicInitialized = false;
+    _isFullyInitialized = false;
+    _deviceRegistrationInProgress = false;
+
+    if (Platform.isAndroid) {
+      try {
+        await _firebaseMessaging.deleteToken();
+      } catch (e) {
+        debugPrint('❌ [KILOSHARE] Error deleting FCM token: $e');
+      }
     }
   }
 
@@ -355,6 +658,7 @@ class FirebaseNotificationService {
     try {
       await _notificationApiService.markAsRead(notificationId);
     } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error marking notification as read: $e');
     }
   }
 
@@ -363,6 +667,7 @@ class FirebaseNotificationService {
     try {
       return await _notificationApiService.getUnreadCount();
     } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error getting unread count: $e');
       return 0;
     }
   }
@@ -371,7 +676,9 @@ class FirebaseNotificationService {
   Future<void> subscribeToTopic(String topic) async {
     try {
       await _firebaseMessaging.subscribeToTopic(topic);
+      debugPrint('✅ [KILOSHARE] Subscribed to topic: $topic');
     } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error subscribing to topic: $e');
     }
   }
 
@@ -379,31 +686,32 @@ class FirebaseNotificationService {
   Future<void> unsubscribeFromTopic(String topic) async {
     try {
       await _firebaseMessaging.unsubscribeFromTopic(topic);
+      debugPrint('✅ [KILOSHARE] Unsubscribed from topic: $topic');
     } catch (e) {
+      debugPrint('❌ [KILOSHARE] Error unsubscribing from topic: $e');
     }
   }
 
   /// Effacer toutes les notifications locales
   Future<void> clearAllNotifications() async {
-    await _flutterLocalNotificationsPlugin.cancelAll();
+    await _localNotifications.cancelAll();
   }
 
   /// Effacer une notification spécifique
   Future<void> clearNotification(int id) async {
-    await _flutterLocalNotificationsPlugin.cancel(id);
+    await _localNotifications.cancel(id);
   }
 
   /// Dispose des ressources
   void dispose() {
-    // Cleanup si nécessaire
+    _isBasicInitialized = false;
+    _isFullyInitialized = false;
+    _deviceRegistrationInProgress = false;
   }
 }
 
 /// Handler pour les messages en background (doit être une fonction top-level)
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  
-  
-  // Traitement des messages en background si nécessaire
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint('📨 [KILOSHARE] Background message: ${message.notification?.title}');
 }

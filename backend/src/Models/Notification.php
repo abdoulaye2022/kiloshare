@@ -6,22 +6,15 @@ namespace KiloShare\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 
 class Notification extends Model
 {
     use SoftDeletes;
 
     protected $table = 'notifications';
-
-    const TYPE_BOOKING_REQUEST = 'booking_request';
-    const TYPE_BOOKING_ACCEPTED = 'booking_accepted';
-    const TYPE_BOOKING_REJECTED = 'booking_rejected';
-    const TYPE_TRIP_APPROVED = 'trip_approved';
-    const TYPE_TRIP_REJECTED = 'trip_rejected';
-    const TYPE_PAYMENT_RECEIVED = 'payment_received';
-    const TYPE_REVIEW_RECEIVED = 'review_received';
-    const TYPE_MESSAGE_RECEIVED = 'message_received';
 
     protected $fillable = [
         'user_id',
@@ -30,21 +23,21 @@ class Notification extends Model
         'message',
         'data',
         'is_read',
-        'read_at',
-        'action_url',
+        'priority',
+        'expires_at',
     ];
 
     protected $casts = [
         'user_id' => 'integer',
         'data' => 'array',
         'is_read' => 'boolean',
-        'read_at' => 'datetime',
+        'expires_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
-    protected $dates = ['deleted_at', 'read_at'];
+    protected $dates = ['deleted_at', 'expires_at'];
 
     public function user(): BelongsTo
     {
@@ -66,18 +59,37 @@ class Notification extends Model
         return $query->where('type', $type);
     }
 
-    public function markAsRead(): bool
+    public function scopePriority($query, string $priority)
     {
-        $this->is_read = true;
-        $this->read_at = now();
-        return $this->save();
+        return $query->where('priority', $priority);
     }
 
-    public function markAsUnread(): bool
+    public function scopeNotExpired($query)
     {
-        $this->is_read = false;
-        $this->read_at = null;
-        return $this->save();
+        return $query->where(function ($q) {
+            $q->whereNull('expires_at')
+              ->orWhere('expires_at', '>', now());
+        });
+    }
+
+    public function markAsRead(): bool
+    {
+        return $this->update(['is_read' => true]);
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    public function isCritical(): bool
+    {
+        return $this->priority === 'critical';
+    }
+
+    public function getAgeAttribute(): string
+    {
+        return $this->created_at->diffForHumans();
     }
 
     public static function createForUser(
@@ -86,7 +98,8 @@ class Notification extends Model
         string $title,
         string $message,
         array $data = [],
-        string $actionUrl = null
+        string $priority = 'normal',
+        ?Carbon $expiresAt = null
     ): self {
         return self::create([
             'user_id' => $userId,
@@ -94,7 +107,28 @@ class Notification extends Model
             'title' => $title,
             'message' => $message,
             'data' => $data,
-            'action_url' => $actionUrl,
+            'priority' => $priority,
+            'expires_at' => $expiresAt,
         ]);
     }
+
+    // Constants pour les types de notifications
+    public const TYPES = [
+        'trip_submitted' => 'trip_submitted',
+        'trip_approved' => 'trip_approved', 
+        'trip_rejected' => 'trip_rejected',
+        'new_booking_request' => 'new_booking_request',
+        'booking_accepted' => 'booking_accepted',
+        'booking_rejected' => 'booking_rejected',
+        'payment_confirmed' => 'payment_confirmed',
+        'package_delivered' => 'package_delivered',
+        'security_alert' => 'security_alert',
+    ];
+
+    public const PRIORITIES = [
+        'low' => 'low',
+        'normal' => 'normal', 
+        'high' => 'high',
+        'critical' => 'critical'
+    ];
 }

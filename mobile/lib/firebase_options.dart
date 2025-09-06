@@ -3,7 +3,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
-import 'config/environment.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -41,46 +40,49 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static FirebaseOptions get web => FirebaseOptions(
-    apiKey: Environment.firebaseApiKey,
-    appId: Environment.firebaseAppId.isEmpty ? '1:${Environment.firebaseSenderId}:web:kiloshare-web' : Environment.firebaseAppId,
-    messagingSenderId: Environment.firebaseSenderId,
-    projectId: Environment.firebaseProjectId,
-    authDomain: '${Environment.firebaseProjectId}.firebaseapp.com',
-    storageBucket: '${Environment.firebaseProjectId}.firebasestorage.app',
-    measurementId: 'G-MEASUREMENT_ID',
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:web:abe80a47c7c1fb421537ef',
+    messagingSenderId: '450200476606',
+    projectId: 'kiloshare-8f7fa',
+    authDomain: 'kiloshare-8f7fa.firebaseapp.com',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
+    measurementId: 'G-XXXXXXXXXX',
   );
 
-  static FirebaseOptions get android => FirebaseOptions(
-    apiKey: Environment.firebaseApiKey,
-    appId: Environment.firebaseAppId.isEmpty ? '1:${Environment.firebaseSenderId}:android:abe80a47c7c1fb421537ef' : Environment.firebaseAppId,
-    messagingSenderId: Environment.firebaseSenderId,
-    projectId: Environment.firebaseProjectId,
-    storageBucket: '${Environment.firebaseProjectId}.firebasestorage.app',
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:android:abe80a47c7c1fb421537ef',
+    messagingSenderId: '450200476606',
+    projectId: 'kiloshare-8f7fa',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
   );
 
-  static FirebaseOptions get ios => FirebaseOptions(
-    apiKey: Environment.firebaseApiKey,
-    appId: Environment.firebaseAppId.isEmpty ? '1:${Environment.firebaseSenderId}:ios:kiloshare-ios' : Environment.firebaseAppId,
-    messagingSenderId: Environment.firebaseSenderId,
-    projectId: Environment.firebaseProjectId,
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyAG1J6SHm9JP5cGPkvigANdCvKjzkvwQtk',
+    appId: '1:450200476606:ios:bfb94e1002d559061537ef',
+    messagingSenderId: '450200476606',
+    projectId: 'kiloshare-8f7fa',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
     iosBundleId: 'com.m2atech.kiloshare',
-    storageBucket: '${Environment.firebaseProjectId}.firebasestorage.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBZlgmN3PnUZzQ7YAm1cJzFdnA_example',
-    appId: '1:123456789012:macos:abcdef123456789012345',
-    messagingSenderId: '123456789012',
+    apiKey: 'AIzaSyBvOws_DGV7YTnUFPT-VoNGHEL8yG1NOOM',
+    appId: '1:450200476606:ios:abe80a47c7c1fb421537ef',
+    messagingSenderId: '450200476606',
     projectId: 'kiloshare-8f7fa',
-    storageBucket: 'kiloshare-8f7fa.appspot.com',
-    iosBundleId: 'com.kiloshare.app',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
+    iosBundleId: 'com.m2atech.kiloshare',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBZlgmN3PnUZzQ7YAm1cJzFdnA_example',
-    appId: '1:123456789012:windows:abcdef123456789012345',
-    messagingSenderId: '123456789012',
+    apiKey: 'AIzaSyAos_M9aCOATa0GXDPqwDqVjSYXQrnb9IY',
+    appId: '1:450200476606:web:abe80a47c7c1fb421537ef',
+    messagingSenderId: '450200476606',
     projectId: 'kiloshare-8f7fa',
+    authDomain: 'kiloshare-8f7fa.firebaseapp.com',
+    storageBucket: 'kiloshare-8f7fa.firebasestorage.app',
+    measurementId: 'G-XXXXXXXXXX',
   );
 }

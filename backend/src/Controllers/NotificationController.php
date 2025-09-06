@@ -6,13 +6,23 @@ namespace KiloShare\Controllers;
 
 use KiloShare\Models\Notification;
 use KiloShare\Models\UserFCMToken;
+use KiloShare\Models\UserNotificationPreference;
 use KiloShare\Services\FirebaseNotificationService;
+use KiloShare\Services\NotificationService;
 use KiloShare\Utils\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-class NotificationController
+class NotificationController extends BaseController
 {
+    private NotificationService $notificationService;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->notificationService = new NotificationService();
+    }
+
     public function getUserNotifications(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
@@ -191,7 +201,7 @@ class NotificationController
     public function registerFCMToken(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $data = $request->getParsedBody();
+        $data = json_decode($request->getBody()->getContents(), true);
 
         try {
             $token = $data['token'] ?? null;
@@ -227,7 +237,7 @@ class NotificationController
 
     public function unregisterFCMToken(ServerRequestInterface $request): ResponseInterface
     {
-        $data = $request->getParsedBody();
+        $data = json_decode($request->getBody()->getContents(), true);
 
         try {
             $token = $data['token'] ?? null;
@@ -255,21 +265,63 @@ class NotificationController
     public function sendTestNotification(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
+        $data = json_decode($request->getBody()->getContents(), true);
 
         try {
-            $firebaseService = new FirebaseNotificationService();
-            $success = $firebaseService->sendTestNotification($user->id);
+            $type = $data['type'] ?? 'test';
+            $channels = $data['channels'] ?? ['push', 'in_app'];
+            $variables = $data['variables'] ?? [];
 
-            if ($success) {
-                return Response::success([
-                    'message' => 'Test notification sent successfully'
-                ]);
-            } else {
-                return Response::serverError('Failed to send test notification');
-            }
+            $result = $this->notificationService->send($user->id, $type, $variables, [
+                'force_channels' => $channels,
+                'priority' => 'normal'
+            ]);
+
+            return Response::success([
+                'data' => $result
+            ]);
 
         } catch (\Exception $e) {
             return Response::serverError('Error sending test notification: ' . $e->getMessage());
+        }
+    }
+
+    public function getPreferences(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        try {
+            $preferences = new UserNotificationPreference();
+            $userPrefs = $preferences->getUserPreferences($user->id);
+
+            return Response::success([
+                'data' => $userPrefs
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error fetching preferences: ' . $e->getMessage());
+        }
+    }
+
+    public function updatePreferences(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $data = json_decode($request->getBody()->getContents(), true);
+
+        try {
+            if (!$data) {
+                return Response::validationError(['data' => 'Invalid JSON data']);
+            }
+
+            $preferences = new UserNotificationPreference();
+            $success = $preferences->updateUserPreferences($user->id, $data);
+
+            return Response::success([
+                'message' => $success ? 'Preferences updated' : 'Failed to update preferences'
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error updating preferences: ' . $e->getMessage());
         }
     }
 
@@ -283,6 +335,23 @@ class NotificationController
 
         } catch (\Exception $e) {
             return Response::serverError('Error getting FCM stats: ' . $e->getMessage());
+        }
+    }
+
+    public function getNotificationStats(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        try {
+            $notification = new Notification();
+            $stats = $notification->getUserStats($user->id);
+
+            return Response::success([
+                'data' => $stats
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Error getting notification stats: ' . $e->getMessage());
         }
     }
 }

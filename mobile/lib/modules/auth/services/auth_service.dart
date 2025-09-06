@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import 'simple_social_auth_service.dart';
 import '../../../config/app_config.dart';
+import '../../notifications/services/firebase_notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   static AuthService? _instance;
@@ -103,8 +105,23 @@ class AuthService {
           _storage.write(key: 'refresh_token', value: tokens.refreshToken!),
         _storage.write(key: 'token_expires_at', value: tokens.expiryDate.toIso8601String()),
       ]);
+
+      // Initialiser les notifications FCM après une connexion réussie
+      await _initializeFirebaseNotifications();
     } catch (e) {
       rethrow;
+    }
+  }
+
+  // Initialiser Firebase Notifications après connexion
+  Future<void> _initializeFirebaseNotifications() async {
+    try {
+      debugPrint('🔥 Initialisation FCM après connexion...');
+      final firebaseService = FirebaseNotificationService();
+      await firebaseService.initializeAfterLogin();
+      debugPrint('🔥 FCM initialisé avec succès après connexion');
+    } catch (e) {
+      debugPrint('🔥 Erreur initialisation FCM: $e');
     }
   }
 
@@ -409,6 +426,9 @@ class AuthService {
       }
       
       await _saveUser(authResponse.user);
+
+      // Initialiser FCM après rafraîchissement des tokens
+      await _initializeFirebaseNotifications();
 
       return authResponse;
     } on DioException catch (e) {

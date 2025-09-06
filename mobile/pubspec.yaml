@@ -62,6 +62,7 @@ dependencies:
   
   # Package info pour obtenir les infos de l'app
   package_info_plus: ^8.3.1
+  device_info_plus: ^10.1.2
   bloc: ^8.1.4
   
   # Firebase et notifications

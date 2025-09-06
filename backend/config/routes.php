@@ -266,11 +266,21 @@ return function (App $app) {
                 $notifGroup->post('/read-all', [NotificationController::class, 'markAllAsRead']);
                 $notifGroup->delete('/{id}', [NotificationController::class, 'deleteNotification']);
                 
+                // Notification preferences
+                $notifGroup->get('/preferences', [NotificationController::class, 'getPreferences']);
+                $notifGroup->put('/preferences', [NotificationController::class, 'updatePreferences']);
+                
+                // Notification statistics
+                $notifGroup->get('/stats', [NotificationController::class, 'getNotificationStats']);
+                
                 // FCM token management
                 $notifGroup->post('/fcm/register-token', [NotificationController::class, 'registerFCMToken']);
                 $notifGroup->post('/fcm/unregister-token', [NotificationController::class, 'unregisterFCMToken']);
                 $notifGroup->post('/fcm/test', [NotificationController::class, 'sendTestNotification']);
                 $notifGroup->get('/fcm/stats', [NotificationController::class, 'getFCMStats']);
+                
+                // Test notification with new system
+                $notifGroup->post('/test', [NotificationController::class, 'sendTestNotification']);
             })->add(new AuthMiddleware());
 
             // Stripe Connect routes

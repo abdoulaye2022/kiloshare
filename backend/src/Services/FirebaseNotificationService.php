@@ -25,8 +25,9 @@ class FirebaseNotificationService
             $factory = new Factory();
             
             // Si on a un chemin vers le service account key file
-            if (!empty($firebaseConfig['credentials_path']) && file_exists($firebaseConfig['credentials_path'])) {
-                $factory = $factory->withServiceAccount($firebaseConfig['credentials_path']);
+            $credentialsPath = __DIR__ . '/../../' . $firebaseConfig['credentials_path'];
+            if (!empty($firebaseConfig['credentials_path']) && file_exists($credentialsPath)) {
+                $factory = $factory->withServiceAccount($credentialsPath);
             } else {
                 // Configuration via project ID seulement
                 $factory = $factory->withProjectId($firebaseConfig['project_id'] ?? 'kiloshare-8f7fa');
