@@ -250,9 +250,20 @@ class AuthService {
         throw const FormatException('Invalid JSON response from server');
       }
       
-      // Check if this is a requires_email_verification response
-      if (responseData['requires_email_verification'] == true) {
-        final user = User.fromJson(responseData['user'] as Map<String, dynamic>);
+      // Vérifier le succès de la réponse
+      if (responseData['success'] != true) {
+        throw AuthException(responseData['message'] ?? 'Registration failed');
+      }
+
+      // Parser les données d'auth
+      final authData = responseData['data'] as Map<String, dynamic>?;
+      if (authData == null) {
+        throw const AuthException('No auth data in response');
+      }
+
+      // Check if this requires email verification (nouvelle structure)
+      if (authData['requires_email_verification'] == true) {
+        final user = User.fromJson(authData['user'] as Map<String, dynamic>);
         await _saveUser(user);
         
         // Create an AuthResponse without tokens for email verification
@@ -266,18 +277,8 @@ class AuthService {
           ),
         );
       }
-      
-      // Vérifier le succès de la réponse
-      if (responseData['success'] != true) {
-        throw AuthException(responseData['message'] ?? 'Registration failed');
-      }
 
-      // Parser directement les données d'auth
-      final authData = responseData['data'] as Map<String, dynamic>?;
-      if (authData == null) {
-        throw const AuthException('No auth data in response');
-      }
-
+      // Normal registration with tokens (if email verification is disabled)
       final authResponse = AuthResponse.fromJson(authData);
       await _saveTokens(authResponse.tokens);
       await _saveUser(authResponse.user);
@@ -443,7 +444,7 @@ class AuthService {
       throw const AuthCancelledException('Google Sign-In was cancelled by user');
     }
     
-    // Sauvegarder les tokens et l'utilisateur
+    // Sauvegarder les tokens et l'utilisateur (SSO = toujours vérifié)
     await _saveTokens(socialResponse.tokens);
     await _saveUser(socialResponse.user);
     
@@ -456,7 +457,7 @@ class AuthService {
       throw const AuthCancelledException('Apple Sign-In was cancelled by user');
     }
     
-    // Sauvegarder les tokens et l'utilisateur
+    // Sauvegarder les tokens et l'utilisateur (SSO = toujours vérifié)
     await _saveTokens(socialResponse.tokens);
     await _saveUser(socialResponse.user);
     
