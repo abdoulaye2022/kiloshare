@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/connectivity_service.dart';
 
-enum CacheDataType { myTrips, myBookings, lastSearch }
+enum CacheDataType { myTrips, myBookings, sentBookings, receivedBookings, lastSearch }
 
 class CachedDataWrapper<T> extends StatefulWidget {
   final Future<T> Function() onlineDataLoader;

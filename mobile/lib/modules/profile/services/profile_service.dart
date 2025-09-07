@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../config/app_config.dart';
 import '../models/user_profile.dart';
@@ -60,10 +59,6 @@ class ProfileService {
         // L'API renvoie les données utilisateur dans data.user
         final userData = response.data['data']['user'];
         if (userData != null) {
-          // Debug: afficher les données reçues de l'API
-          debugPrint('👤 ProfileService - User data: $userData');
-          debugPrint('📷 ProfileService - Profile picture: ${userData['profile_picture']}');
-          
           // Adapter toutes les données utilisateur au format UserProfile
           return UserProfile.fromJson({
             'first_name': userData['first_name'],

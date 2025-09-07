@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/booking_service.dart';
 import '../models/booking_model.dart';
-import '../../auth/services/auth_service.dart';
 import '../../../services/offline_bookings_service.dart';
 import '../../../widgets/offline_indicator.dart';
 import '../../../widgets/cached_data_wrapper.dart';
@@ -16,29 +15,13 @@ class BookingsListScreenCached extends StatefulWidget {
 
 class _BookingsListScreenCachedState extends State<BookingsListScreenCached> with SingleTickerProviderStateMixin {
   final OfflineBookingsService _bookingsService = OfflineBookingsService();
-  final AuthService _authService = AuthService.instance;
   
   late TabController _tabController;
-  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadCurrentUser();
-  }
-
-  Future<void> _loadCurrentUser() async {
-    try {
-      final user = await _authService.getCurrentUser();
-      if (user != null) {
-        setState(() {
-          _currentUserId = user.uuid;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading current user: $e');
-    }
   }
 
   @override
@@ -75,18 +58,16 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
               children: [
                 // Onglet Réservations Envoyées avec Cache
                 CachedDataWrapper<List<BookingModel>>(
-                  onlineDataLoader: () => _bookingsService.getMyBookings(),
-                  cachedDataLoader: () => _bookingsService.getCachedBookings(),
+                  onlineDataLoader: () => _bookingsService.getSentBookings(),
+                  cachedDataLoader: () => _bookingsService.getCachedSentBookings(),
                   onDataLoaded: (bookings) {
                     // Callback appelé quand les données sont chargées avec succès
                   },
-                  cacheType: CacheDataType.myBookings,
+                  cacheType: CacheDataType.sentBookings,
                   builder: (context, bookings, isLoading, error) {
-                    final sentBookings = bookings?.where((b) => 
-                      b.senderId == _currentUserId).toList() ?? [];
                     return _buildBookingsTab(
                       context, 
-                      sentBookings, 
+                      bookings ?? [], 
                       isLoading, 
                       error, 
                       'Aucune réservation envoyée',
@@ -97,18 +78,16 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
                 
                 // Onglet Réservations Reçues avec Cache
                 CachedDataWrapper<List<BookingModel>>(
-                  onlineDataLoader: () => _bookingsService.getMyBookings(),
-                  cachedDataLoader: () => _bookingsService.getCachedBookings(),
+                  onlineDataLoader: () => _bookingsService.getReceivedBookings(),
+                  cachedDataLoader: () => _bookingsService.getCachedReceivedBookings(),
                   onDataLoaded: (bookings) {
                     // Callback appelé quand les données sont chargées avec succès
                   },
-                  cacheType: CacheDataType.myBookings,
+                  cacheType: CacheDataType.receivedBookings,
                   builder: (context, bookings, isLoading, error) {
-                    final receivedBookings = bookings?.where((b) => 
-                      b.receiverId == _currentUserId).toList() ?? [];
                     return _buildBookingsTab(
                       context, 
-                      receivedBookings, 
+                      bookings ?? [], 
                       isLoading, 
                       error, 
                       'Aucune réservation reçue',

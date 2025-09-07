@@ -26,8 +26,8 @@ class BookingController
             'trip_id' => Validator::required()->intType(),
             'weight' => Validator::required()->positive(),
             'package_description' => Validator::required()->stringType()->length(5, 500),
-            'pickup_address' => Validator::required()->stringType(),
-            'delivery_address' => Validator::required()->stringType(),
+            'pickup_address' => Validator::optional(Validator::stringType()),
+            'delivery_address' => Validator::optional(Validator::stringType()),
             'requested_pickup_date' => Validator::optional(Validator::date()),
             'requested_delivery_date' => Validator::optional(Validator::date()),
         ];
@@ -62,8 +62,8 @@ class BookingController
                 'weight_kg' => (float) $data['weight'],
                 'proposed_price' => $totalPrice,
                 'package_description' => $data['package_description'],
-                'pickup_address' => $data['pickup_address'],
-                'delivery_address' => $data['delivery_address'],
+                'pickup_address' => $data['pickup_address'] ?? '',
+                'delivery_address' => $data['delivery_address'] ?? '',
                 'special_instructions' => ($data['pickup_notes'] ?? '') . ' ' . ($data['delivery_notes'] ?? ''),
                 'pickup_date' => isset($data['requested_pickup_date']) 
                     ? Carbon::parse($data['requested_pickup_date']) : null,

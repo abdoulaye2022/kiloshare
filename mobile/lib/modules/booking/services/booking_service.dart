@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
+import '../models/booking_model.dart';
 
 class BookingService {
   static final BookingService _instance = BookingService._internal();
@@ -76,6 +77,38 @@ class BookingService {
         'success': false,
         'error': 'Erreur de connexion: $e',
       };
+    }
+  }
+
+  /// Récupérer les réservations envoyées par l'utilisateur
+  Future<List<BookingModel>> getSentBookings() async {
+    try {
+      final result = await getUserBookings(role: 'sender');
+      if (result['success']) {
+        final bookingsData = result['bookings'] as List;
+        return bookingsData.map((data) => BookingModel.fromJson(data)).toList();
+      } else {
+        throw Exception(result['error']);
+      }
+    } catch (e) {
+      print('Erreur BookingService.getSentBookings: $e');
+      rethrow;
+    }
+  }
+
+  /// Récupérer les réservations reçues par l'utilisateur
+  Future<List<BookingModel>> getReceivedBookings() async {
+    try {
+      final result = await getUserBookings(role: 'receiver');
+      if (result['success']) {
+        final bookingsData = result['bookings'] as List;
+        return bookingsData.map((data) => BookingModel.fromJson(data)).toList();
+      } else {
+        throw Exception(result['error']);
+      }
+    } catch (e) {
+      print('Erreur BookingService.getReceivedBookings: $e');
+      rethrow;
     }
   }
 

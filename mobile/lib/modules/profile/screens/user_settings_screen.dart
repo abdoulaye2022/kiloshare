@@ -8,8 +8,6 @@ import '../../auth/blocs/auth/auth_event.dart';
 import '../../auth/blocs/auth/auth_state.dart';
 import '../../auth/models/user_model.dart';
 import '../../../themes/modern_theme.dart';
-import '../../../utils/debug_storage_cleaner.dart';
-import '../../../services/logout_service.dart';
 import '../widgets/avatar_picker_widget.dart';
 
 class UserSettingsScreen extends StatefulWidget {
@@ -97,11 +95,6 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
                   child: _buildDangerSection(context),
                 ),
                 const SizedBox(height: ModernTheme.spacing16),
-                FadeInSlideUp(
-                  delay: const Duration(milliseconds: 650),
-                  child: _buildDebugSection(context),
-                ),
-                const SizedBox(height: ModernTheme.spacing24),
                 FadeInSlideUp(
                   delay: const Duration(milliseconds: 700),
                   child: _buildAppInfo(context),
@@ -536,61 +529,6 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     );
   }
 
-  Widget _buildDebugSection(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.blue.withValues(alpha: 0.05),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '🛠️ Debug Tools',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[700],
-              ),
-            ),
-          ),
-          _buildSettingsItem(
-            icon: Icons.storage,
-            title: 'Inspecter le stockage',
-            subtitle: 'Voir le contenu du stockage local',
-            titleColor: Colors.blue[700],
-            onTap: () async {
-              await DebugStorageCleaner.debugSecureStorage();
-              await DebugStorageCleaner.debugSharedPreferences();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Debug info affichée dans la console'),
-                    backgroundColor: Colors.blue,
-                  ),
-                );
-              }
-            },
-          ),
-          const Divider(height: 1),
-          _buildSettingsItem(
-            icon: Icons.cleaning_services,
-            title: 'Nettoyer le stockage',
-            subtitle: 'Supprimer toutes les sessions persistantes',
-            titleColor: Colors.blue[700],
-            onTap: () => _showClearStorageDialog(context),
-          ),
-          const Divider(height: 1),
-          _buildSettingsItem(
-            icon: Icons.logout_outlined,
-            title: 'Test déconnexion complète',
-            subtitle: 'Tester le nettoyage des états persistés',
-            titleColor: Colors.orange[700],
-            onTap: () => _showLogoutTestDialog(context),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildDangerSection(BuildContext context) {
     return Card(
@@ -744,130 +682,6 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
     }
   }
 
-  void _showClearStorageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('🧹 Nettoyer le stockage'),
-        content: const Text(
-          'Cela va supprimer toutes les données stockées localement, y compris les sessions persistantes. Vous devrez vous reconnecter.\n\nÊtes-vous sûr de vouloir continuer ?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              
-              try {
-                // Nettoyer le stockage
-                await DebugStorageCleaner.clearAllStorage();
-                
-                // Forcer une déconnexion du Bloc
-                if (context.mounted) {
-                  context.read<AuthBloc>().add(AuthLogoutRequested());
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Stockage nettoyé avec succès'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('❌ Erreur lors du nettoyage: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Nettoyer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogoutTestDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('🧪 Test de Déconnexion Complète'),
-        content: const Text(
-          'Ceci va tester le nettoyage complet de tous les états persistés '
-          'comme lors d\'une vraie déconnexion, mais à des fins de test.\n\n'
-          'Tous les tokens, données cachées et préférences seront supprimés.\n\n'
-          'Voulez-vous continuer ?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              
-              // Afficher un loader
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Test de déconnexion en cours...'),
-                      ],
-                    ),
-                    duration: Duration(seconds: 4),
-                  ),
-                );
-              }
-              
-              try {
-                // Effectuer le test de déconnexion complète
-                await LogoutService.performCompleteLogout();
-                
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Test de déconnexion complète réussi !'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  
-                  // Déclencher la déconnexion dans l'interface
-                  context.read<AuthBloc>().add(AuthLogoutRequested());
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('❌ Erreur lors du test: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Tester'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(

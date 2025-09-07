@@ -10,7 +10,6 @@ import '../widgets/verification_tab.dart';
 import '../widgets/trust_badge_widget.dart';
 import '../widgets/avatar_picker_widget.dart';
 import '../../auth/services/auth_service.dart';
-import '../../../utils/profile_debug_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -412,8 +411,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           children: [
             Column(
               children: [
-                // Widget de debug temporaire
-                ProfileDebugWidget(profile: profile),
                 Expanded(
                   child: ProfileInfoTab(
                     profile: profile,
@@ -564,11 +561,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAvatar(profile) {
-    // Debug: afficher les informations de l'avatar
-    debugPrint('🖼️ Avatar Debug - Profile: $profile');
-    debugPrint('🖼️ Avatar Debug - AvatarUrl: ${profile?.avatarUrl}');
-    debugPrint('🖼️ Avatar Debug - Profile type: ${profile.runtimeType}');
-    
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -579,7 +571,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         size: 80,
         isEditable: _isAuthenticated,
         onAvatarChanged: (newAvatarUrl) {
-          debugPrint('🔄 Avatar changed to: $newAvatarUrl');
           // Recharger le profil pour refléter les changements
           if (mounted) {
             context.read<ProfileBloc>().add(const GetUserProfile());

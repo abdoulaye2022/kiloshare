@@ -1257,51 +1257,56 @@ class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Accepter la réservation'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Colis: ${widget.booking.packageDescription}'),
-          Text('Poids: ${widget.booking.weightKg} kg'),
-          const SizedBox(height: 16),
-          
-          Text(
-            'Prix proposé: ${widget.booking.proposedPrice.toStringAsFixed(2)} CAD',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          CheckboxListTile(
-            title: const Text('Accepter le prix proposé'),
-            value: _useOriginalPrice,
-            onChanged: (value) {
-              setState(() {
-                _useOriginalPrice = value ?? true;
-                if (_useOriginalPrice) {
-                  _priceController.text = widget.booking.proposedPrice.toStringAsFixed(2);
-                }
-              });
-            },
-            contentPadding: EdgeInsets.zero,
-          ),
-          
-          if (!_useOriginalPrice) ...[
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _priceController,
-              decoration: const InputDecoration(
-                labelText: 'Votre prix (CAD)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.attach_money),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Colis: ${widget.booking.packageDescription}'),
+              Text('Poids: ${widget.booking.weightKg} kg'),
+              const SizedBox(height: 16),
+              
+              Text(
+                'Prix proposé: ${widget.booking.proposedPrice.toStringAsFixed(2)} CAD',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}$')),
+              
+              const SizedBox(height: 16),
+              
+              CheckboxListTile(
+                title: const Text('Accepter le prix proposé'),
+                value: _useOriginalPrice,
+                onChanged: (value) {
+                  setState(() {
+                    _useOriginalPrice = value ?? true;
+                    if (_useOriginalPrice) {
+                      _priceController.text = widget.booking.proposedPrice.toStringAsFixed(2);
+                    }
+                  });
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              
+              if (!_useOriginalPrice) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Votre prix (CAD)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.attach_money),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}$')),
+                  ],
+                ),
               ],
-            ),
-          ],
-        ],
+            ],
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -1457,44 +1462,49 @@ class _PaymentConfirmationDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Confirmer le paiement'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Détails du paiement :',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          _buildPaymentRow('Montant total', '${amount.toStringAsFixed(2)} CAD', isTotal: true),
-          const SizedBox(height: 8),
-          _buildPaymentRow('Commission KiloShare (15%)', '-${commissionAmount.toStringAsFixed(2)} CAD'),
-          const SizedBox(height: 8),
-          _buildPaymentRow('Montant pour le voyageur', '${netAmount.toStringAsFixed(2)} CAD'),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Les fonds seront retenus en escrow jusqu\'à la livraison confirmée.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Détails du paiement :',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              _buildPaymentRow('Montant total', '${amount.toStringAsFixed(2)} CAD', isTotal: true),
+              const SizedBox(height: 8),
+              _buildPaymentRow('Commission KiloShare (15%)', '-${commissionAmount.toStringAsFixed(2)} CAD'),
+              const SizedBox(height: 8),
+              _buildPaymentRow('Montant pour le voyageur', '${netAmount.toStringAsFixed(2)} CAD'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Les fonds seront retenus en escrow jusqu\'à la livraison confirmée.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1517,19 +1527,26 @@ class _PaymentConfirmationDialog extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-            fontSize: isTotal ? 16 : 14,
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
+              fontSize: isTotal ? 16 : 14,
+            ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: isTotal ? 16 : 14,
-            color: isTotal ? Colors.blue.shade800 : null,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: isTotal ? 16 : 14,
+              color: isTotal ? Colors.blue.shade800 : null,
+            ),
+            textAlign: TextAlign.right,
           ),
         ),
       ],

@@ -12,6 +12,8 @@ class CacheService {
 
   static const String _myTripsKey = 'cached_my_trips';
   static const String _myBookingsKey = 'cached_my_bookings';
+  static const String _sentBookingsKey = 'cached_sent_bookings';
+  static const String _receivedBookingsKey = 'cached_received_bookings';
   static const String _lastSearchKey = 'cached_last_search';
   static const String _cacheTimestampKey = 'cache_timestamp_';
   
@@ -95,6 +97,82 @@ class CacheService {
       return bookingsList.map((json) => BookingModel.fromJson(json)).toList();
     } catch (e) {
       debugPrint('❌ Error loading cached bookings: $e');
+      return null;
+    }
+  }
+
+  // CACHE RESERVATIONS ENVOYÉES
+  Future<void> cacheSentBookings(List<BookingModel> bookings) async {
+    if (_connectivity.isOffline) return;
+    
+    try {
+      final prefs = await _prefs;
+      final limitedBookings = bookings.take(maxBookings).toList();
+      final bookingsJson = limitedBookings.map((booking) => booking.toJson()).toList();
+      
+      await prefs.setString(_sentBookingsKey, json.encode(bookingsJson));
+      await _setCacheTimestamp(_sentBookingsKey);
+      
+      debugPrint('✅ ${limitedBookings.length} sent bookings cached');
+    } catch (e) {
+      debugPrint('❌ Error caching sent bookings: $e');
+    }
+  }
+
+  Future<List<BookingModel>?> getCachedSentBookings() async {
+    try {
+      final prefs = await _prefs;
+      
+      if (!_isCacheValid(_sentBookingsKey, prefs)) {
+        await _clearCache(_sentBookingsKey, prefs);
+        return null;
+      }
+
+      final bookingsJson = prefs.getString(_sentBookingsKey);
+      if (bookingsJson == null) return null;
+
+      final List<dynamic> bookingsList = json.decode(bookingsJson);
+      return bookingsList.map((json) => BookingModel.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('❌ Error loading cached sent bookings: $e');
+      return null;
+    }
+  }
+
+  // CACHE RESERVATIONS REÇUES
+  Future<void> cacheReceivedBookings(List<BookingModel> bookings) async {
+    if (_connectivity.isOffline) return;
+    
+    try {
+      final prefs = await _prefs;
+      final limitedBookings = bookings.take(maxBookings).toList();
+      final bookingsJson = limitedBookings.map((booking) => booking.toJson()).toList();
+      
+      await prefs.setString(_receivedBookingsKey, json.encode(bookingsJson));
+      await _setCacheTimestamp(_receivedBookingsKey);
+      
+      debugPrint('✅ ${limitedBookings.length} received bookings cached');
+    } catch (e) {
+      debugPrint('❌ Error caching received bookings: $e');
+    }
+  }
+
+  Future<List<BookingModel>?> getCachedReceivedBookings() async {
+    try {
+      final prefs = await _prefs;
+      
+      if (!_isCacheValid(_receivedBookingsKey, prefs)) {
+        await _clearCache(_receivedBookingsKey, prefs);
+        return null;
+      }
+
+      final bookingsJson = prefs.getString(_receivedBookingsKey);
+      if (bookingsJson == null) return null;
+
+      final List<dynamic> bookingsList = json.decode(bookingsJson);
+      return bookingsList.map((json) => BookingModel.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('❌ Error loading cached received bookings: $e');
       return null;
     }
   }

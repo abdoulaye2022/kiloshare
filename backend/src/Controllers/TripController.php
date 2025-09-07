@@ -434,7 +434,7 @@ class TripController
                         'arrival_city' => $trip->arrival_city,
                         'departure_date' => $trip->departure_date,
                         'price_per_kg' => $trip->price_per_kg,
-                        'available_weight' => $trip->available_weight,
+                        'available_weight_kg' => $trip->available_weight_kg,
                         'bookings_count' => $trip->bookings->count(),
                         'created_at' => $trip->created_at,
                     ];

@@ -44,6 +44,62 @@ class OfflineBookingsService {
     return await _cache.getCachedMyBookings();
   }
 
+  /// Récupérer les réservations envoyées par l'utilisateur
+  Future<List<BookingModel>> getSentBookings() async {
+    if (_connectivity.isOnline) {
+      try {
+        final bookings = await _bookingService.getSentBookings();
+        await _cache.cacheSentBookings(bookings);
+        _connectivity.markSyncSuccessful();
+        return bookings;
+      } catch (e) {
+        // Si l'API échoue, utiliser le cache
+        final cached = await _cache.getCachedSentBookings();
+        if (cached != null) {
+          return cached;
+        }
+        rethrow;
+      }
+    } else {
+      // Mode offline, utiliser uniquement le cache
+      final cached = await _cache.getCachedSentBookings();
+      return cached ?? [];
+    }
+  }
+
+  /// Récupérer les réservations reçues par l'utilisateur
+  Future<List<BookingModel>> getReceivedBookings() async {
+    if (_connectivity.isOnline) {
+      try {
+        final bookings = await _bookingService.getReceivedBookings();
+        await _cache.cacheReceivedBookings(bookings);
+        _connectivity.markSyncSuccessful();
+        return bookings;
+      } catch (e) {
+        // Si l'API échoue, utiliser le cache
+        final cached = await _cache.getCachedReceivedBookings();
+        if (cached != null) {
+          return cached;
+        }
+        rethrow;
+      }
+    } else {
+      // Mode offline, utiliser uniquement le cache
+      final cached = await _cache.getCachedReceivedBookings();
+      return cached ?? [];
+    }
+  }
+
+  /// Cache des réservations envoyées
+  Future<List<BookingModel>?> getCachedSentBookings() async {
+    return await _cache.getCachedSentBookings();
+  }
+
+  /// Cache des réservations reçues
+  Future<List<BookingModel>?> getCachedReceivedBookings() async {
+    return await _cache.getCachedReceivedBookings();
+  }
+
   Future<void> refreshBookings() async {
     if (_connectivity.isOnline) {
       final result = await _bookingService.getUserBookings();

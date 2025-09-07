@@ -61,4 +61,15 @@ class UserStripeAccount extends Model
             'transfers' => $this->payouts_enabled ? 'active' : 'inactive',
         ];
     }
+
+    /**
+     * Check if the account can accept payments
+     */
+    public function canAcceptPayments(): bool
+    {
+        return $this->isActive() && 
+               $this->details_submitted && 
+               $this->charges_enabled && 
+               $this->payouts_enabled;
+    }
 }
