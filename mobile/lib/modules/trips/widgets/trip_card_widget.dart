@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:kiloshare/widgets/ellipsis_button.dart';
 import '../models/trip_model.dart';
 import '../../../widgets/optimized_cloudinary_image.dart';
 import '../../profile/widgets/avatar_display_widget.dart';
@@ -10,6 +11,7 @@ class TripCardWidget extends StatelessWidget {
   final bool showUserInfo;
   final bool isCompact;
   final bool isAuthenticated;
+  final Widget? trailing;
 
   const TripCardWidget({
     super.key,
@@ -18,6 +20,7 @@ class TripCardWidget extends StatelessWidget {
     this.showUserInfo = true,
     this.isCompact = false,
     this.isAuthenticated = false,
+    this.trailing,
   });
 
   @override
@@ -144,6 +147,12 @@ class TripCardWidget extends StatelessWidget {
               ],
             ),
           ),
+        
+        // Trailing widget (e.g., menu button)
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ],
       ],
     );
   }

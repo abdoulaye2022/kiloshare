@@ -14,7 +14,7 @@ use Exception;
 
 class FirebaseNotificationService
 {
-    private Messaging $messaging;
+    private ?Messaging $messaging;
     
     public function __construct()
     {
@@ -42,15 +42,17 @@ class FirebaseNotificationService
                 ];
                 
                 $factory = $factory->withServiceAccount($serviceAccountConfig);
+                $this->messaging = $factory->createMessaging();
             } else {
-                // Configuration via project ID seulement (fallback)
-                $factory = $factory->withProjectId($firebaseConfig['project_id'] ?? 'kiloshare-8f7fa');
+                error_log("Firebase credentials not configured, notifications will be disabled");
+                $this->messaging = null;
+                return; // Exit constructor without throwing error
             }
-            
-            $this->messaging = $factory->createMessaging();
         } catch (Exception $e) {
             error_log("Firebase initialization error: " . $e->getMessage());
-            throw $e;
+            $this->messaging = null;
+            // Don't throw the exception, just disable notifications
+            return;
         }
     }
 
@@ -59,6 +61,12 @@ class FirebaseNotificationService
      */
     public function sendToUser(int $userId, string $title, string $body, array $data = []): bool
     {
+        // Vérifier si Firebase est initialisé
+        if ($this->messaging === null) {
+            error_log("Firebase not initialized, cannot send notification to user $userId");
+            return false;
+        }
+        
         try {
             // Récupérer tous les tokens FCM de l'utilisateur
             $tokens = UserFCMToken::where('user_id', $userId)
@@ -83,6 +91,12 @@ class FirebaseNotificationService
      */
     public function sendToTokens(array $tokens, string $title, string $body, array $data = []): bool
     {
+        // Vérifier si Firebase est initialisé
+        if ($this->messaging === null) {
+            error_log("Firebase not initialized, cannot send notification to tokens");
+            return false;
+        }
+        
         try {
             if (empty($tokens)) {
                 return false;
@@ -185,7 +199,7 @@ class FirebaseNotificationService
                        ->where('platform', $platform)
                        ->update(['is_active' => false]);
             
-            // Créer un nouveau token
+            // Créer un nouveau token (même si Firebase n'est pas initialisé)
             $newToken = UserFCMToken::create([
                 'user_id' => $userId,
                 'fcm_token' => $token,

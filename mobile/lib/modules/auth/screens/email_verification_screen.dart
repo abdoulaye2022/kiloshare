@@ -84,7 +84,7 @@ class EmailVerificationScreen extends StatelessWidget {
                   // Resend button
                   OutlinedButton(
                     onPressed: state is AuthLoading ? null : () {
-                      // TODO: Implement resend email functionality
+                      context.read<AuthBloc>().add(AuthResendVerificationRequested());
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Email de vérification renvoyé'),
@@ -99,17 +99,6 @@ class EmailVerificationScreen extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Renvoyer l\'email'),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Skip for now button (development only)
-                  TextButton(
-                    onPressed: () {
-                      // For development purposes - skip verification
-                      // In production, this should be removed
-                      context.go('/home');
-                    },
-                    child: const Text('Ignorer pour le moment (Dev)'),
                   ),
                   const SizedBox(height: 32),
                   

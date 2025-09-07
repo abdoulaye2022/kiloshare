@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../models/trip_model.dart';
 import '../widgets/trip_card_widget.dart';
 import '../widgets/trip_status_widget.dart';
-import '../../../widgets/ellipsis_button.dart';
 import '../../../widgets/offline_indicator.dart';
 import '../../../widgets/cached_data_wrapper.dart';
 import '../../../services/offline_my_trips_service.dart';
@@ -186,14 +185,33 @@ class _MyTripsScreenCachedState extends State<MyTripsScreenCached>
           child: TripCardWidget(
             trip: trip,
             isAuthenticated: true,
-            trailing: isOffline ? null : EllipsisButton(
-              onEdit: () {
-                context.push('/edit-trip/${trip.uuid}');
+            trailing: isOffline ? null : PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') {
+                  context.push('/edit-trip/${trip.uuid}');
+                } else if (value == 'delete') {
+                  _showDeleteConfirmation(context, trip);
+                }
               },
-              onDelete: () {
-                _showDeleteConfirmation(context, trip);
-              },
-              isOnline: !isOffline,
+              itemBuilder: (context) => [
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit),
+                    title: Text('Modifier'),
+                    dense: true,
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete, color: Colors.red),
+                    title: Text('Supprimer'),
+                    dense: true,
+                  ),
+                ),
+              ],
+              child: const Icon(Icons.more_vert),
             ),
           ),
         );

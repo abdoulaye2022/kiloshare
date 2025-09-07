@@ -19,11 +19,26 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
   final AuthService _authService = AuthService.instance;
   
   late TabController _tabController;
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      if (user != null) {
+        setState(() {
+          _currentUserId = user.uuid;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading current user: $e');
+    }
   }
 
   @override
@@ -68,7 +83,7 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
                   cacheType: CacheDataType.myBookings,
                   builder: (context, bookings, isLoading, error) {
                     final sentBookings = bookings?.where((b) => 
-                      b.senderId == _authService.currentUser?.uuid).toList() ?? [];
+                      b.senderId == _currentUserId).toList() ?? [];
                     return _buildBookingsTab(
                       context, 
                       sentBookings, 
@@ -90,7 +105,7 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
                   cacheType: CacheDataType.myBookings,
                   builder: (context, bookings, isLoading, error) {
                     final receivedBookings = bookings?.where((b) => 
-                      b.receiverId == _authService.currentUser?.uuid).toList() ?? [];
+                      b.receiverId == _currentUserId).toList() ?? [];
                     return _buildBookingsTab(
                       context, 
                       receivedBookings, 
@@ -220,8 +235,8 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
     switch (status) {
       case BookingStatus.pending:
         return 'En attente';
-      case BookingStatus.confirmed:
-        return 'Confirmée';
+      case BookingStatus.accepted:
+        return 'Acceptée';
       case BookingStatus.cancelled:
         return 'Annulée';
       case BookingStatus.completed:
@@ -235,7 +250,7 @@ class _BookingsListScreenCachedState extends State<BookingsListScreenCached> wit
     switch (status) {
       case BookingStatus.pending:
         return const Icon(Icons.schedule, color: Colors.orange, size: 20);
-      case BookingStatus.confirmed:
+      case BookingStatus.accepted:
         return const Icon(Icons.check_circle, color: Colors.green, size: 20);
       case BookingStatus.cancelled:
         return const Icon(Icons.cancel, color: Colors.red, size: 20);

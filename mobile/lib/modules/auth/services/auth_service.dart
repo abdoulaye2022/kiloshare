@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import 'simple_social_auth_service.dart';
@@ -20,6 +21,7 @@ class AuthService {
 
   final Dio _dio;
   late final SimpleSocialAuthService _socialAuthService;
+  User? _cachedUser; // Cache for synchronous access
   
   Dio get dio => _dio;
 
@@ -128,6 +130,7 @@ class AuthService {
       await firebaseService.registerAfterLogin();
     } catch (e) {
       // Silent catch - notification errors shouldn't block login
+      debugPrint('Firebase notification init failed: $e');
     }
   }
 
@@ -185,11 +188,13 @@ class AuthService {
       _storage.delete(key: 'token_expires_at'),
       _storage.delete(key: 'user_data'),
     ]);
+    _cachedUser = null; // Clear cache
   }
 
   // User data management
   Future<void> _saveUser(User user) async {
     await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
+    _cachedUser = user; // Update cache
   }
 
   Future<void> saveUser(User user) async {
@@ -201,10 +206,17 @@ class AuthService {
     if (userData == null) return null;
     
     try {
-      return User.fromJson(jsonDecode(userData));
+      final user = User.fromJson(jsonDecode(userData));
+      _cachedUser = user; // Update cache
+      return user;
     } catch (e) {
       return null;
     }
+  }
+
+  // Synchronous getter for currentUser - returns cached user if available
+  User? get currentUser {
+    return _cachedUser;
   }
 
   // Auth API calls
@@ -238,6 +250,23 @@ class AuthService {
         throw const FormatException('Invalid JSON response from server');
       }
       
+      // Check if this is a requires_email_verification response
+      if (responseData['requires_email_verification'] == true) {
+        final user = User.fromJson(responseData['user'] as Map<String, dynamic>);
+        await _saveUser(user);
+        
+        // Create an AuthResponse without tokens for email verification
+        return AuthResponse(
+          user: user,
+          tokens: const AuthTokens(
+            accessToken: '',
+            refreshToken: null,
+            tokenType: 'bearer',
+            expiresIn: 0,
+          ),
+        );
+      }
+      
       // Vérifier le succès de la réponse
       if (responseData['success'] != true) {
         throw AuthException(responseData['message'] ?? 'Registration failed');
@@ -267,6 +296,23 @@ class AuthService {
     try {
       final response = await _dio.post('/auth/login', data: request.toJson());
       
+      // Check if this is an email verification required response
+      if (response.statusCode == 403 && response.data['requires_email_verification'] == true) {
+        final user = User.fromJson(response.data['user'] as Map<String, dynamic>);
+        await _saveUser(user);
+        
+        // Create an AuthResponse without tokens for email verification
+        return AuthResponse(
+          user: user,
+          tokens: const AuthTokens(
+            accessToken: '',
+            refreshToken: null,
+            tokenType: 'bearer',
+            expiresIn: 0,
+          ),
+        );
+      }
+      
       final apiResponse = ApiResponse.fromJson(
         response.data,
         (json) => AuthResponse.fromJson(json as Map<String, dynamic>),
@@ -283,6 +329,24 @@ class AuthService {
 
       return authResponse;
     } on DioException catch (e) {
+      // Handle 403 status code for email verification requirement
+      if (e.response?.statusCode == 403 && 
+          e.response?.data is Map &&
+          e.response?.data['requires_email_verification'] == true) {
+        final user = User.fromJson(e.response!.data['user'] as Map<String, dynamic>);
+        await _saveUser(user);
+        
+        // Create an AuthResponse without tokens for email verification
+        return AuthResponse(
+          user: user,
+          tokens: const AuthTokens(
+            accessToken: '',
+            refreshToken: null,
+            tokenType: 'bearer',
+            expiresIn: 0,
+          ),
+        );
+      }
       throw _handleDioException(e);
     } catch (e) {
       throw AuthException('Login failed: $e');
@@ -539,6 +603,22 @@ class AuthService {
       throw _handleDioException(e);
     } catch (e) {
       throw AuthException('Failed to get user data: $e');
+    }
+  }
+
+  // Resend email verification
+  Future<void> resendEmailVerification(String email) async {
+    try {
+      await _dio.post(
+        '/api/v1/auth/resend-verification',
+        data: {
+          'email': email,
+        },
+      );
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    } catch (e) {
+      throw AuthException('Failed to resend verification email: $e');
     }
   }
 

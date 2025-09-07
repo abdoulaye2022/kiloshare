@@ -32,6 +32,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthTokenRefreshRequested>(_onAuthTokenRefreshRequested);
     on<AuthUserUpdated>(_onAuthUserUpdated);
     on<AuthErrorCleared>(_onAuthErrorCleared);
+    on<AuthResendVerificationRequested>(_onAuthResendVerificationRequested);
     on<SocialSignInRequested>(_onSocialSignInRequested);
     
     // Nouveaux handlers pour l'authentification par téléphone
@@ -381,6 +382,39 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   void _onAuthErrorCleared(AuthErrorCleared event, Emitter<AuthState> emit) {
     if (state is AuthError) {
       emit(AuthUnauthenticated());
+    }
+  }
+
+  Future<void> _onAuthResendVerificationRequested(
+    AuthResendVerificationRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      // Get the current user's email
+      String? userEmail;
+      if (state is AuthEmailVerificationRequired) {
+        userEmail = (state as AuthEmailVerificationRequired).user.email;
+      }
+      
+      if (userEmail == null) {
+        emit(const AuthError(message: 'No user email found'));
+        return;
+      }
+      
+      emit(AuthLoading());
+      await _authService.resendEmailVerification(userEmail);
+      
+      // Keep the current email verification state but show success
+      if (state is AuthEmailVerificationRequired) {
+        final currentState = state as AuthEmailVerificationRequired;
+        emit(AuthEmailVerificationRequired(
+          user: currentState.user,
+          accessToken: currentState.accessToken,
+          refreshToken: currentState.refreshToken,
+        ));
+      }
+    } catch (e) {
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 

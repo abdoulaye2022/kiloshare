@@ -119,6 +119,8 @@ class AuthUserUpdated extends AuthEvent {
 
 class AuthErrorCleared extends AuthEvent {}
 
+class AuthResendVerificationRequested extends AuthEvent {}
+
 final class SocialSignInRequested extends AuthEvent {
   final String provider;
   

@@ -324,6 +324,12 @@ class FirebaseNotificationService {
       );
       
     } catch (e) {
+      // Ne pas relancer l'erreur si c'est un problème de Firebase credentials
+      if (e.toString().contains('Unable to create an API client without credentials') ||
+          e.toString().contains('Firebase initialization error')) {
+        debugPrint('Firebase credentials not configured, skipping FCM registration: $e');
+        return;
+      }
       rethrow;
     }
   }

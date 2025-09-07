@@ -25,7 +25,7 @@ export default function VerifyEmailPage() {
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [isResending, setIsResending] = useState(false);
   
-  const token = searchParams.get('token');
+  const token = searchParams.get('token') || searchParams.get('code');
   
   useEffect(() => {
     if (!token) {
@@ -46,7 +46,7 @@ export default function VerifyEmailPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: verificationToken
+          code: verificationToken
         })
       });
       

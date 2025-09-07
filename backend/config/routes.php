@@ -50,6 +50,7 @@ return function (App $app) {
                 $authGroup->post('/forgot-password', [AuthController::class, 'forgotPassword']);
                 $authGroup->post('/reset-password', [AuthController::class, 'resetPassword']);
                 $authGroup->get('/verify-email', [AuthController::class, 'verifyEmail']);
+                $authGroup->post('/verify-email', [AuthController::class, 'verifyEmail']); // Support POST aussi
                 $authGroup->post('/resend-verification', [AuthController::class, 'resendEmailVerification']);
                 
                 // Protected auth routes

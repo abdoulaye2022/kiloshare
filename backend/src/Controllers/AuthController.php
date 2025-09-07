@@ -69,16 +69,8 @@ class AuthController
                 'role' => 'user',
             ]);
 
-            // Générer les tokens
-            $tokens = $this->generateTokens($user);
-
-            // Stocker le refresh token
-            UserToken::create([
-                'user_id' => $user->id,
-                'token' => $tokens['refresh_token'],
-                'type' => 'refresh',
-                'expires_at' => Carbon::now()->addSeconds($this->getJWTConfig()['refresh_token_expiry']),
-            ]);
+            // Ne pas générer de tokens pour les utilisateurs non vérifiés
+            // Les tokens seront générés seulement après la vérification de l'email
 
             // Créer une vérification d'email et envoyer l'email
             try {
@@ -116,8 +108,8 @@ class AuthController
                     'role' => $user->role,
                     'is_verified' => $user->is_verified,
                 ],
-                'tokens' => $tokens
-            ], $message ?? 'User registered successfully');
+                'requires_email_verification' => true
+            ], $message ?? 'User registered successfully. Please verify your email before logging in.');
 
         } catch (\Exception $e) {
             return Response::serverError('Registration failed: ' . $e->getMessage());
@@ -126,8 +118,18 @@ class AuthController
 
     public function verifyEmail(ServerRequestInterface $request): ResponseInterface
     {
+        // Support GET (query params) et POST (body)
         $queryParams = $request->getQueryParams();
-        $code = $queryParams['code'] ?? '';
+        $bodyParams = [];
+        
+        if ($request->getMethod() === 'POST') {
+            $body = $request->getBody()->getContents();
+            if (!empty($body)) {
+                $bodyParams = json_decode($body, true) ?? [];
+            }
+        }
+        
+        $code = $queryParams['code'] ?? $bodyParams['code'] ?? '';
 
         if (empty($code)) {
             return Response::error('Verification code is required', [], 400);
@@ -185,6 +187,41 @@ class AuthController
             // Vérifier le statut
             if (!$user->isActive()) {
                 return Response::unauthorized('Votre compte n\'est pas actif');
+            }
+
+            // Vérifier si l'email est vérifié
+            if (!$user->is_verified) {
+                // Envoyer automatiquement un nouvel email de vérification
+                try {
+                    $emailVerification = EmailVerification::createForUser($user->id);
+                    $emailService = new EmailService();
+                    
+                    $userName = $user->first_name ? "{$user->first_name} {$user->last_name}" : $user->email;
+                    $emailService->sendEmailVerification(
+                        $user->email,
+                        $userName,
+                        $emailVerification->code
+                    );
+                } catch (\Exception $e) {
+                    // Log l'erreur mais continue
+                    error_log("Failed to resend verification email: " . $e->getMessage());
+                }
+                
+                return Response::json([
+                    'success' => false,
+                    'message' => 'Email verification required. A new verification email has been sent.',
+                    'user' => [
+                        'id' => $user->id,
+                        'uuid' => $user->uuid,
+                        'email' => $user->email,
+                        'first_name' => $user->first_name,
+                        'last_name' => $user->last_name,
+                        'phone' => $user->phone,
+                        'role' => $user->role,
+                        'is_verified' => $user->is_verified,
+                    ],
+                    'requires_email_verification' => true
+                ], 403);
             }
 
             // Mettre à jour la dernière connexion
@@ -365,6 +402,86 @@ class AuthController
 
         } catch (\Exception $e) {
             return Response::serverError('Logout failed: ' . $e->getMessage());
+        }
+    }
+
+    public function resendEmailVerification(ServerRequestInterface $request): ResponseInterface
+    {
+        $data = json_decode($request->getBody()->getContents(), true);
+        
+        // Validation
+        $validator = new Validator();
+        $rules = [
+            'email' => Validator::required()->email(),
+        ];
+
+        if (!$validator->validate($data, $rules)) {
+            return Response::validationError($validator->getErrors());
+        }
+
+        try {
+            // Trouver l'utilisateur
+            $user = User::withEmail($data['email'])->first();
+
+            if (!$user) {
+                return Response::error('Email not found', [], 404);
+            }
+
+            // Vérifier si l'utilisateur est déjà vérifié
+            if ($user->is_verified) {
+                return Response::error('Email is already verified', [], 400);
+            }
+
+            // Contrôleur de débit - Vérifier les tentatives récentes
+            $recentAttempts = EmailVerification::where('user_id', $user->id)
+                ->where('created_at', '>', Carbon::now()->subMinutes(5))
+                ->count();
+
+            if ($recentAttempts >= 3) {
+                return Response::error(
+                    'Too many verification attempts. Please wait 5 minutes before trying again.', 
+                    [], 
+                    429
+                );
+            }
+
+            // Vérifier la dernière tentative (pas plus d'une par minute)
+            $lastAttempt = EmailVerification::where('user_id', $user->id)
+                ->where('created_at', '>', Carbon::now()->subMinute())
+                ->first();
+
+            if ($lastAttempt) {
+                $waitSeconds = 60 - Carbon::now()->diffInSeconds($lastAttempt->created_at);
+                return Response::error(
+                    "Please wait {$waitSeconds} seconds before requesting another verification email.", 
+                    [], 
+                    429
+                );
+            }
+
+            // Créer une nouvelle vérification d'email
+            $emailVerification = EmailVerification::createForUser($user->id);
+            $emailService = new EmailService();
+            
+            $userName = $user->first_name ? "{$user->first_name} {$user->last_name}" : $user->email;
+            $emailSent = $emailService->sendEmailVerification(
+                $user->email,
+                $userName,
+                $emailVerification->code
+            );
+            
+            if (!$emailSent) {
+                return Response::serverError('Failed to send verification email');
+            }
+
+            return Response::success(
+                [], 
+                'Verification email sent successfully'
+            );
+
+        } catch (\Exception $e) {
+            error_log("Resend verification email failed: " . $e->getMessage());
+            return Response::serverError('Failed to send verification email: ' . $e->getMessage());
         }
     }
 

@@ -88,12 +88,12 @@ class EmailService
     }
 
     /**
-     * Construire l'URL de vérification
+     * Construire l'URL de vérification - Redirige vers la plateforme Next.js
      */
     private function buildVerificationUrl(string $code): string
     {
-        $baseUrl = $_ENV['API_BASE_URL'] ?? 'http://localhost:8080';
-        return "{$baseUrl}/api/v1/auth/verify-email?code={$code}";
+        $frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:3000';
+        return "{$frontendUrl}/verify-email?code={$code}";
     }
 
     /**
