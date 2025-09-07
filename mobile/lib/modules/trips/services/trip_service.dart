@@ -33,6 +33,13 @@ class TripService {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
+  /// Format DateTime for backend (PHP expects Y-m-d H:i:s format)
+  String formatDateForBackend(DateTime date) {
+    // Convert to UTC and format as Y-m-d H:i:s (no microseconds, no timezone)
+    final utc = date.toUtc();
+    return '${utc.year.toString().padLeft(4, '0')}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')} ${utc.hour.toString().padLeft(2, '0')}:${utc.minute.toString().padLeft(2, '0')}:${utc.second.toString().padLeft(2, '0')}';
+  }
+
   /// Create a new trip
   Future<Trip> createTrip({
     required String transportType,
@@ -75,11 +82,11 @@ class TripService {
         'departure_city': departureCity,
         'departure_country': departureCountry,
         'departure_airport_code': departureAirportCode,
-        'departure_date': departureDate.toUtc().toIso8601String(), // Format avec heure complète
+        'departure_date': formatDateForBackend(departureDate), // Format accepté par PHP
         'arrival_city': arrivalCity,
         'arrival_country': arrivalCountry,
         'arrival_airport_code': arrivalAirportCode,
-        'arrival_date': arrivalDate.toUtc().toIso8601String(), // Format avec heure complète
+        'arrival_date': formatDateForBackend(arrivalDate), // Format accepté par PHP
         'available_weight_kg': availableWeightKg, // Corrigé pour correspondre aux règles de validation backend
         'price_per_kg': pricePerKg,
         'currency': currency,

@@ -611,7 +611,7 @@ class AuthService {
   Future<void> resendEmailVerification(String email) async {
     try {
       await _dio.post(
-        '/api/v1/auth/resend-verification',
+        '/auth/resend-verification',
         data: {
           'email': email,
         },

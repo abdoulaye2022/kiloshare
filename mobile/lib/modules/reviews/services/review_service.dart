@@ -14,7 +14,7 @@ class ReviewService {
 
   void initialize() {
     _dio = Dio(BaseOptions(
-      baseUrl: '${AppConfig.baseUrl}/api/v1',
+      baseUrl: AppConfig.baseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
