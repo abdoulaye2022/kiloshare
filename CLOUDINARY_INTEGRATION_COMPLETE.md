@@ -40,9 +40,9 @@ L'intégration complète du système de gestion d'images Cloudinary pour KiloSha
 ### ✅ 3. Frontend Flutter
 
 **📁 Fichiers créés :**
-- `mobile/lib/services/cloudinary_image_service.dart` - Service Flutter avec compression et cache
-- `mobile/lib/widgets/optimized_cloudinary_image.dart` - Widget d'affichage optimisé
-- `mobile/lib/modules/admin/widgets/cloudinary_monitoring_dashboard.dart` - Dashboard admin
+- `app/lib/services/cloudinary_image_service.dart` - Service Flutter avec compression et cache
+- `app/lib/widgets/optimized_cloudinary_image.dart` - Widget d'affichage optimisé
+- `app/lib/modules/admin/widgets/cloudinary_monitoring_dashboard.dart` - Dashboard admin
 
 **🎨 Fonctionnalités :**
 - Compression automatique selon type d'image

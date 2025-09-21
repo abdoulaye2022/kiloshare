@@ -8,7 +8,7 @@
 
 ### Problème Identifié
 GitGuardian a détecté des clés API Cloudinary hardcodées dans le code source, spécifiquement dans :
-- `mobile/lib/services/direct_cloudinary_service.dart`
+- `app/lib/services/direct_cloudinary_service.dart`
 
 ### Actions Correctives Appliquées
 
@@ -29,7 +29,7 @@ static String get apiSecret => Environment.cloudinaryApiSecret;
 ```
 
 #### 2. ✅ Système de Configuration Environnementale
-Créé `mobile/lib/config/environment.dart` pour centraliser toutes les variables :
+Créé `app/lib/config/environment.dart` pour centraliser toutes les variables :
 - Configuration Cloudinary
 - Configuration Firebase  
 - Configuration Stripe

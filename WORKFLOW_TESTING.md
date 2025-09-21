@@ -37,7 +37,7 @@ Le workflow complet des annonces KiloShare a été implémenté selon le cycle d
 ### 1. Préparation
 ```bash
 # Appliquer la migration de base de données
-mysql -u kiloshare -p kiloshare < backend/database/migrations/2024_12_01_update_trips_workflow.sql
+mysql -u kiloshare -p kiloshare < api/database/migrations/2024_12_01_update_trips_workflow.sql
 
 # Démarrer les serveurs
 cd backend && php -S 127.0.0.1:8080 -t public &
@@ -237,7 +237,7 @@ SELECT * FROM trip_status_history WHERE trip_id = 123 ORDER BY created_at DESC;
 1. **Notifications** : Email/Push sur changements d'état
 2. **Automatisation** : Jobs CRON pour expirations
 3. **Analytics** : Dashboard des métriques workflow
-4. **Tests unitaires** : Coverage backend/frontend
+4. **Tests unitaires** : Coverage api/frontend
 5. **Documentation** : Guide utilisateur final
 
 ---

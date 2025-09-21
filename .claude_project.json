@@ -9,8 +9,8 @@
     "always_create_branch": true
   },
   "structure": {
-    "mobile_app": "./mobile",
-    "backend_api": "./backend",
+    "mobile_app": "./app",
+    "backend_api": "./api",
     "database": "./database"
   },
   "languages": ["dart", "php", "sql"],

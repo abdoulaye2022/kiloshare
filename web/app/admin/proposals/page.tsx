@@ -166,7 +166,7 @@ export default function ProposalsPage() {
                 Mes propositions
               </h1>
               <p className="text-gray-600 mt-1">
-                Gérez vos demandes de transport et négociations
+                Gérez vos demandes de transport
               </p>
             </div>
             <button

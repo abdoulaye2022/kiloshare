@@ -23,7 +23,7 @@ Le système de confiance KiloShare implémente un workflow d'approbation automat
 
 ### Backend (PHP/Slim)
 ```
-backend/
+api/
 ├── src/modules/trips/
 │   ├── controllers/TripController.php
 │   └── models/Trip.php
@@ -34,7 +34,7 @@ backend/
 
 ### Mobile (Flutter)
 ```
-mobile/lib/
+app/lib/
 ├── modules/auth/models/user_model.dart
 ├── modules/trips/
 │   ├── models/trip_model.dart

@@ -37,50 +37,9 @@ export function useBooking() {
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
 
-  const acceptNegotiation = useCallback(async (
-    bookingId: number, 
-    negotiationId: number
-  ): Promise<AcceptNegotiationResponse | null> => {
-    if (!token) {
-      setError('Non authentifié');
-      return null;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/negotiations/${negotiationId}/accept`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'acceptation de la négociation');
-      }
-
-      return data;
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMessage);
-      console.error('Erreur acceptNegotiation:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
 
   const acceptBooking = useCallback(async (
-    bookingId: number, 
+    bookingId: number,
     finalPrice?: number
   ): Promise<AcceptNegotiationResponse | null> => {
     if (!token) {
@@ -95,7 +54,7 @@ export function useBooking() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/accept`,
         {
-          method: 'PUT',
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -116,6 +75,49 @@ export function useBooking() {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(errorMessage);
       console.error('Erreur acceptBooking:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const rejectBooking = useCallback(async (
+    bookingId: number,
+    reason?: string
+  ): Promise<AcceptNegotiationResponse | null> => {
+    if (!token) {
+      setError('Non authentifié');
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/reject`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: reason ? JSON.stringify({ reason }) : undefined
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors du rejet de la réservation');
+      }
+
+      return data;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+      setError(errorMessage);
+      console.error('Erreur rejectBooking:', err);
       return null;
     } finally {
       setLoading(false);
@@ -201,8 +203,8 @@ export function useBooking() {
   return {
     loading,
     error,
-    acceptNegotiation,
     acceptBooking,
+    rejectBooking,
     getBooking,
     getUserBookings,
     clearError: () => setError(null)

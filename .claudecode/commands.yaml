@@ -5,7 +5,7 @@
       "steps": [
         "git checkout -b claude/init-$(date +%Y%m%d-%H%M%S)",
         "echo 'Initialisation du projet KiloShare'",
-        "mkdir -p mobile/lib backend/src database",
+        "mkdir -p app/lib api/src database",
         "git add .",
         "git commit -m '[Claude] Initial project setup'"
       ]
@@ -32,19 +32,19 @@
       "description": "Créer l'application Flutter",
       "steps": [
         "git checkout -b claude/flutter-setup-$(date +%Y%m%d)",
-        "cd mobile && flutter create . --org com.kiloshare --project-name kiloshare",
+        "cd app && flutter create . --org com.kiloshare --project-name kiloshare",
         "git add .",
         "git commit -m '[Claude] Flutter app initialized'"
       ]
     },
-    "create-backend": {
-      "description": "Créer le backend PHP",
+    "create-api": {
+      "description": "Créer l'API PHP",
       "steps": [
-        "git checkout -b claude/backend-setup-$(date +%Y%m%d)",
-        "cd backend && composer init --name=kiloshare/api --type=project",
+        "git checkout -b claude/api-setup-$(date +%Y%m%d)",
+        "cd api && composer init --name=kiloshare/api --type=project",
         "composer require slim/slim:^4.0 slim/psr7 vlucas/phpdotenv",
         "git add .",
-        "git commit -m '[Claude] Backend Slim PHP initialized'"
+        "git commit -m '[Claude] API Slim PHP initialized'"
       ]
     }
   }

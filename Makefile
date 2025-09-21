@@ -1,6 +1,6 @@
 # KiloShare Project Makefile
 
-.PHONY: help install start stop backend mobile database clean
+.PHONY: help install start stop api app database clean
 
 # Default target
 help:
@@ -8,25 +8,25 @@ help:
 	@echo "  install   - Install all dependencies"
 	@echo "  start     - Start all services"
 	@echo "  stop      - Stop all services"
-	@echo "  backend   - Start backend server only"
-	@echo "  mobile    - Start Flutter mobile app"
+	@echo "  api   - Start api server only"
+	@echo "  app    - Start Flutter app app"
 	@echo "  database  - Setup database"
 	@echo "  clean     - Clean all build files"
 
 # Install all dependencies
 install:
-	@echo "Installing backend dependencies..."
-	cd backend && composer install
-	@echo "Installing mobile dependencies..."
-	cd mobile && flutter pub get
+	@echo "Installing api dependencies..."
+	cd api && composer install
+	@echo "Installing app dependencies..."
+	cd app && flutter pub get
 	@echo "All dependencies installed!"
 
 # Start all services
 start:
-	@echo "Starting backend server..."
-	cd backend && php -S localhost:8080 -t public &
+	@echo "Starting api server..."
+	cd api && php -S localhost:8080 -t public &
 	@echo "Backend started on http://localhost:8080"
-	@echo "To start mobile app, run: make mobile"
+	@echo "To start app app, run: make app"
 
 # Stop services
 stop:
@@ -34,16 +34,16 @@ stop:
 	pkill -f "php -S localhost:8080" || true
 	@echo "Services stopped!"
 
-# Start backend only
-backend:
-	@echo "Starting backend server..."
-	cd backend && php -S localhost:8080 -t public
+# Start api only
+api:
+	@echo "Starting api server..."
+	cd api && php -S localhost:8080 -t public
 	@echo "Backend started on http://localhost:8080"
 
-# Start Flutter mobile app
-mobile:
-	@echo "Starting Flutter mobile app..."
-	cd mobile && flutter run
+# Start Flutter app app
+app:
+	@echo "Starting Flutter app app..."
+	cd app && flutter run
 
 # Setup database
 database:
@@ -54,37 +54,37 @@ database:
 
 # Clean build files
 clean:
-	@echo "Cleaning backend..."
-	cd backend && rm -rf vendor/ composer.lock
-	@echo "Cleaning mobile..."
-	cd mobile && flutter clean
+	@echo "Cleaning api..."
+	cd api && rm -rf vendor/ composer.lock
+	@echo "Cleaning app..."
+	cd app && flutter clean
 	@echo "Clean complete!"
 
 # Development helpers
 dev-setup: install database
 	@echo "Development environment ready!"
-	@echo "Run 'make start' to start the backend"
-	@echo "Run 'make mobile' to start the Flutter app"
+	@echo "Run 'make start' to start the api"
+	@echo "Run 'make app' to start the Flutter app"
 
 # Backend composer commands
 composer-install:
-	cd backend && composer install
+	cd api && composer install
 
 composer-update:
-	cd backend && composer update
+	cd api && composer update
 
 # Flutter commands
 flutter-clean:
-	cd mobile && flutter clean
+	cd app && flutter clean
 
 flutter-get:
-	cd mobile && flutter pub get
+	cd app && flutter pub get
 
 flutter-build-android:
-	cd mobile && flutter build apk
+	cd app && flutter build apk
 
 flutter-build-ios:
-	cd mobile && flutter build ios
+	cd app && flutter build ios
 
 # Database management
 db-reset: database
@@ -96,4 +96,4 @@ db-backup:
 
 # Logs
 logs:
-	tail -f backend/logs/app.log
+	tail -f api/logs/app.log

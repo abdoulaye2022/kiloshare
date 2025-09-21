@@ -6,7 +6,7 @@ KiloShare est une application mobile permettant aux voyageurs de partager leur e
 
 ```
 kiloshare-project/
-├── mobile/                    # Application Flutter (iOS + Android)
+├── app/                       # Application Flutter (iOS + Android)
 │   ├── lib/
 │   │   ├── config/           # Configuration et thèmes
 │   │   ├── models/           # Modèles de données
@@ -19,7 +19,7 @@ kiloshare-project/
 │   ├── assets/               # Ressources (images, icônes, etc.)
 │   └── pubspec.yaml
 │
-├── backend/                   # API REST en Slim PHP 4
+├── api/                       # API REST en Slim PHP 4
 │   ├── public/
 │   │   └── index.php         # Point d'entrée API
 │   ├── src/
@@ -51,13 +51,13 @@ kiloshare-project/
 - **Mot de passe**: (vide)
 - **Type**: MySQL avec charset utf8mb4
 
-### Backend (Slim PHP 4)
+### API (Slim PHP 4)
 - Framework: Slim 4 avec PHP-DI
 - Authentification: JWT avec Firebase PHP-JWT
 - Upload: FTP local avec sécurisation
 - CORS: Configuré pour le développement
 
-### Mobile (Flutter)
+### App (Flutter)
 - Version Flutter: >=3.10.0
 - Dart SDK: >=3.0.0
 - Gestion d'état: Riverpod
@@ -66,10 +66,10 @@ kiloshare-project/
 
 ## Installation
 
-### 1. Backend
+### 1. API
 
 ```bash
-cd backend
+cd api
 composer install
 php -S localhost:8080 -t public
 ```
@@ -80,10 +80,10 @@ php -S localhost:8080 -t public
 mysql -u root < ../database/schema.sql
 ```
 
-### 3. Mobile
+### 3. App
 
 ```bash
-cd mobile
+cd app
 flutter pub get
 flutter run
 ```

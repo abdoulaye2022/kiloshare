@@ -128,7 +128,7 @@ static const int cacheDurationDays = 7; // Cache valide 7 jours
 - `lib/modules/booking/screens/bookings_list_screen_cached.dart`
 
 ### Tests
-- `mobile/test_cache_system.dart`
+- `app/test_cache_system.dart`
 
 ## 🎨 Interface Utilisateur
 

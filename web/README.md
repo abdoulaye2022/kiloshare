@@ -28,7 +28,7 @@ Site web Next.js 15 pour KiloShare - Plateforme de partage d'espace bagages
 Pour tester la vérification email :
 
 1. Créez un compte via l'app mobile Flutter
-2. Récupérez le token depuis `backend/logs/dev_emails.json`
+2. Récupérez le token depuis `api/logs/dev_emails.json`
 3. Accédez à : `http://localhost:3000/verify-email?token=VOTRE_TOKEN`
 
 ## 🛠️ Scripts disponibles
