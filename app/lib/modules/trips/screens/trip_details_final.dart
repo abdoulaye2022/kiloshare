@@ -1623,7 +1623,8 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   }
 
   Widget _buildImagesSection() {
-    if (_trip?.images == null || _trip!.images!.isEmpty) {
+    final uniqueImages = _trip?.uniqueImages;
+    if (uniqueImages == null || uniqueImages.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -1644,9 +1645,9 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.zero,
-              itemCount: _trip!.images!.length,
+              itemCount: uniqueImages.length,
               itemBuilder: (context, index) {
-                final image = _trip!.images![index];
+                final image = uniqueImages[index];
                 return Container(
                   width: 300,
                   margin: EdgeInsets.only(right: 12),

@@ -90,8 +90,8 @@ class ReviewNotificationService {
         ),
         duration: const Duration(seconds: 8),
         backgroundColor: Colors.blue[700],
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
+        behavior: SnackBarBehavior.fixed,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -141,8 +141,8 @@ class ReviewNotificationService {
         ),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
+        behavior: SnackBarBehavior.fixed,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

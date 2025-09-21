@@ -8,7 +8,6 @@ use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\AdminController;
 use KiloShare\Controllers\TripController;
 use KiloShare\Controllers\BookingController;
-use KiloShare\Controllers\BookingNegotiationController;
 use KiloShare\Controllers\SearchController;
 use KiloShare\Controllers\UserProfileController;
 use KiloShare\Controllers\FavoriteController;
@@ -220,7 +219,6 @@ return function (App $app) {
                 $bookingGroup->put('/{id}/accept', [BookingController::class, 'acceptBooking']);
                 $bookingGroup->post('/{id}/reject', [BookingController::class, 'rejectBooking']);
                 $bookingGroup->put('/{id}/reject', [BookingController::class, 'rejectBooking']);
-                $bookingGroup->post('/{id}/negotiate', [BookingController::class, 'addNegotiation']);
                 $bookingGroup->post('/{id}/payment-ready', [BookingController::class, 'markPaymentReady']);
                 $bookingGroup->post('/{id}/photos', [BookingController::class, 'addPackagePhoto']);
 
@@ -236,18 +234,13 @@ return function (App $app) {
                 $bookingGroup->get('/{id}/cancellation-check', [BookingController::class, 'checkBookingCancellation']);
                 $bookingGroup->post('/{id}/cancel', [BookingController::class, 'cancelBooking']);
                 $bookingGroup->post('/{id}/no-show', [BookingController::class, 'markAsNoShow']);
+
+                // Routes pour le nouveau système de capture différée
+                $bookingGroup->post('/{id}/payment/confirm', [BookingController::class, 'confirmPayment']);
+                $bookingGroup->post('/{id}/payment/capture', [BookingController::class, 'capturePayment']);
+                $bookingGroup->get('/{id}/payment/status', [BookingController::class, 'getPaymentStatus']);
             })->add(new AuthMiddleware());
 
-            // Booking negotiation routes
-            $v1Group->group('/negotiations', function (RouteCollectorProxy $negotiationGroup) {
-                $negotiationGroup->post('', [BookingNegotiationController::class, 'createNegotiation']);
-                $negotiationGroup->get('/my', [BookingNegotiationController::class, 'getMyNegotiations']);
-                $negotiationGroup->get('/trip/{trip_id}', [BookingNegotiationController::class, 'getNegotiationsForTrip']);
-                $negotiationGroup->post('/{negotiation_id}/accept', [BookingNegotiationController::class, 'acceptNegotiation']);
-                $negotiationGroup->post('/{negotiation_id}/reject', [BookingNegotiationController::class, 'rejectNegotiation']);
-                $negotiationGroup->post('/{negotiation_id}/counter', [BookingNegotiationController::class, 'counterPropose']);
-                $negotiationGroup->post('/{negotiation_id}/message', [BookingNegotiationController::class, 'addMessage']);
-            })->add(new AuthMiddleware());
 
             // User profile routes
             $v1Group->group('/user', function (RouteCollectorProxy $userGroup) {

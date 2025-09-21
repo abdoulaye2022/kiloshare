@@ -9,7 +9,6 @@ use Psr\Http\Message\ServerRequestInterface;
 use KiloShare\Models\User;
 use KiloShare\Models\UserStripeAccount;
 use KiloShare\Models\Booking;
-use KiloShare\Models\BookingNegotiation;
 use KiloShare\Models\Trip;
 use KiloShare\Models\EscrowAccount;
 use KiloShare\Models\Transaction;
@@ -357,110 +356,18 @@ class StripeController
     /**
      * Créer un Payment Intent pour une réservation
      */
+    /**
+     * DEPRECATED: Cette méthode utilise l'ancien système de paiement immédiat.
+     * Utilisez maintenant le système de capture différée via PaymentAuthorizationService.
+     * Les nouvelles réservations passent automatiquement par le nouveau système.
+     */
     public function createPaymentIntent(ServerRequestInterface $request): ResponseInterface
     {
-        try {
-            $user = $request->getAttribute('user');
-            
-            // Lire le body JSON correctement
-            $rawBody = $request->getBody()->getContents();
-            $data = json_decode($rawBody, true);
-            
-            // Debug temporaire
-            error_log("StripeController.createPaymentIntent - Raw body: " . $rawBody);
-            error_log("StripeController.createPaymentIntent - Parsed data: " . json_encode($data));
-            
-            // Fallback si le JSON parsing échoue
-            if ($data === null) {
-                $data = $request->getParsedBody() ?: [];
-                error_log("StripeController.createPaymentIntent - Fallback to getParsedBody: " . json_encode($data));
-            }
-            
-            $bookingId = $data['booking_id'] ?? null;
-
-            // Validation plus stricte
-            if (!$bookingId || $bookingId === 0 || $bookingId === '0' || empty($bookingId)) {
-                error_log("StripeController.createPaymentIntent - BookingId is missing, null, zero or empty: " . var_export($bookingId, true));
-                return Response::error('Booking ID requis et doit être valide', [], 400);
-            }
-
-            // S'assurer que c'est un entier
-            $bookingId = (int) $bookingId;
-            if ($bookingId <= 0) {
-                error_log("StripeController.createPaymentIntent - BookingId must be positive integer: " . $bookingId);
-                return Response::error('Booking ID doit être un entier positif', [], 400);
-            }
-
-            // Récupérer la réservation
-            $booking = Booking::with(['trip.user', 'sender', 'receiver'])
-                ->where('id', $bookingId)
-                ->first();
-
-            if (!$booking) {
-                return Response::error('Réservation non trouvée', [], 404);
-            }
-
-            // Vérifier que l'utilisateur est l'expéditeur
-            if ($booking->sender_id !== $user->id) {
-                return Response::error('Non autorisé - vous devez être l\'expéditeur', [], 403);
-            }
-
-            // Vérifier que la réservation est confirmée mais pas encore payée
-            if ($booking->status !== Booking::STATUS_CONFIRMED) {
-                return Response::error('La réservation doit être confirmée pour procéder au paiement', [], 400);
-            }
-
-            if ($booking->payment_status === 'paid') {
-                return Response::error('Cette réservation a déjà été payée', [], 400);
-            }
-
-            // Vérifier que le voyageur a un compte Stripe actif
-            $receiverStripeAccount = UserStripeAccount::where('user_id', $booking->receiver_id)->first();
-            if (!$receiverStripeAccount || !$receiverStripeAccount->canAcceptPayments()) {
-                return Response::error('Le voyageur doit configurer son compte Stripe pour recevoir les paiements', [], 400);
-            }
-
-            // Calculer les montants
-            $finalPrice = $booking->final_price ?? $booking->proposed_price;
-            $commissionRate = $booking->commission_rate ?? 15.00;
-            $commissionAmount = ($finalPrice * $commissionRate) / 100;
-            $amount = (int)($finalPrice * 100); // Montant en centimes pour Stripe
-
-            Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
-
-            // Créer le Payment Intent
-            $paymentIntent = PaymentIntent::create([
-                'amount' => $amount,
-                'currency' => 'cad',
-                'automatic_payment_methods' => ['enabled' => true],
-                'metadata' => [
-                    'booking_id' => $booking->id,
-                    'sender_id' => $booking->sender_id,
-                    'receiver_id' => $booking->receiver_id,
-                    'trip_id' => $booking->trip_id,
-                    'commission_amount' => $commissionAmount,
-                ],
-                'description' => "KiloShare - Transport de {$booking->package_description} de {$booking->trip->departure_city} à {$booking->trip->arrival_city}",
-            ]);
-
-            // Mettre à jour la réservation
-            $booking->update([
-                'payment_status' => 'pending',
-                'commission_amount' => $commissionAmount
-            ]);
-
-            return Response::success([
-                'client_secret' => $paymentIntent->client_secret,
-                'payment_intent_id' => $paymentIntent->id,
-                'amount' => $finalPrice,
-                'commission_amount' => $commissionAmount,
-                'net_amount' => $finalPrice - $commissionAmount
-            ], 'Payment Intent créé avec succès');
-
-        } catch (Exception $e) {
-            error_log("Erreur création Payment Intent: " . $e->getMessage());
-            return Response::error('Erreur lors de la création du paiement', [], 500);
-        }
+        return Response::error(
+            'Cette méthode de paiement est obsolète. Le nouveau système de capture différée est maintenant utilisé automatiquement lors de l\'acceptation des réservations.',
+            ['redirect_to' => 'booking_flow'],
+            410
+        );
     }
 
     /**
@@ -511,7 +418,7 @@ class StripeController
             }
 
             // Récupérer la réservation avec toutes les relations nécessaires
-            $booking = Booking::with(['trip', 'sender', 'receiver', 'negotiation'])
+            $booking = Booking::with(['trip', 'sender', 'receiver'])
                 ->where('id', $bookingId)
                 ->first();
 
@@ -568,10 +475,7 @@ class StripeController
                 'status' => Booking::STATUS_PAID
             ]);
 
-            // ÉTAPE 5: Mettre à jour la négociation associée (si elle existe)
-            if ($booking->negotiation) {
-                $booking->negotiation->update(['status' => 'completed']);
-            }
+            // ÉTAPE 5: Paiement confirmé - pas de négociation à mettre à jour
 
             // ÉTAPE 6: Gérer la mise à jour du voyage et du poids disponible
             $trip = $booking->trip;

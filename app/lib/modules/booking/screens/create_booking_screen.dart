@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/booking_service.dart';
 import '../../trips/models/trip_model.dart';
+import '../../../utils/toast_utils.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final Trip trip;
@@ -457,10 +458,23 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     });
 
     try {
+      // Validation supplémentaire avant parsing
+      final weightText = _weightController.text.trim();
+      if (weightText.isEmpty) {
+        ToastUtils.showError(context, 'Le poids est requis');
+        return;
+      }
+
+      final weight = double.tryParse(weightText);
+      if (weight == null || weight <= 0) {
+        ToastUtils.showError(context, 'Veuillez entrer un poids valide');
+        return;
+      }
+
       final result = await _bookingService.createBookingRequest(
         tripId: widget.trip.id.toString(),
         packageDescription: _packageDescriptionController.text.trim(),
-        weight: double.parse(_weightController.text),
+        weight: weight,
         dimensionsCm: _dimensionsController.text.trim().isNotEmpty 
           ? _dimensionsController.text.trim() 
           : null,
@@ -478,12 +492,9 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       if (result['success'] == true) {
         // Succès - retourner à l'écran précédent avec résultat
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Demande de réservation envoyée avec succès!'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
+          ToastUtils.showSuccess(
+            context,
+            result['message'] ?? 'Demande de réservation envoyée avec succès!',
           );
           
           Navigator.of(context).pop(true); // Indique le succès
@@ -491,23 +502,17 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       } else {
         // Erreur
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Erreur lors de l\'envoi de la demande'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
+          ToastUtils.showError(
+            context,
+            result['error'] ?? 'Erreur lors de l\'envoi de la demande',
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur inattendue: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
+        ToastUtils.showError(
+          context,
+          'Erreur inattendue: $e',
         );
       }
     } finally {

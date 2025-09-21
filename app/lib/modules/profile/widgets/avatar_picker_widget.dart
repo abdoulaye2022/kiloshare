@@ -235,7 +235,8 @@ class _AvatarPickerWidgetState extends State<AvatarPickerWidget> {
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
+          behavior: SnackBarBehavior.fixed,
+          margin: EdgeInsets.zero,
         ),
       );
     }
@@ -247,7 +248,8 @@ class _AvatarPickerWidgetState extends State<AvatarPickerWidget> {
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
+          behavior: SnackBarBehavior.fixed,
+          margin: EdgeInsets.zero,
         ),
       );
     }

@@ -129,6 +129,15 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
+                if (_booking!.isAccepted && _isSender)
+                  const PopupMenuItem(
+                    value: 'cancel',
+                    child: ListTile(
+                      leading: Icon(Icons.cancel, color: Colors.red),
+                      title: Text('Annuler la réservation'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 const PopupMenuItem(
                   value: 'refresh',
                   child: ListTile(
@@ -628,12 +637,30 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     if (_booking!.isPending && _isReceiver) {
       return _buildPendingReceiverActions();
     }
-    
-    // Bouton de paiement pour réservations acceptées (expéditeur)
-    if (_booking!.isAccepted && _isSender) {
-      return _buildPaymentActions();
+
+    // Actions pour l'expéditeur selon le statut
+    if (_isSender) {
+      if (_booking!.isAccepted) {
+        return _buildPaymentActions();
+      } else if (_booking!.isPaymentAuthorized) {
+        return _buildPaymentConfirmationActions();
+      } else if (_booking!.isPaymentConfirmed) {
+        return _buildPaymentConfirmedInfo();
+      }
     }
-    
+
+    // Actions pour le transporteur selon le statut
+    if (_isReceiver) {
+      if (_booking!.canCapturePayment) {
+        return _buildCapturePaymentActions();
+      }
+    }
+
+    // Bouton d'annulation pour les statuts appropriés
+    if (_booking!.canCancelBeforePayment && _isSender) {
+      return _buildCancellationActions();
+    }
+
     return const SizedBox.shrink();
   }
   
@@ -770,7 +797,225 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _cancelBooking(),
+            icon: const Icon(Icons.cancel),
+            label: const Text('Annuler la réservation'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: BorderSide(color: Colors.red.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  /// Actions pour confirmer le paiement (expéditeur, après acceptation)
+  Widget _buildPaymentConfirmationActions() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Confirmation de paiement requise',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vous avez 4 heures pour confirmer ce paiement, sinon il sera automatiquement annulé.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _confirmPayment(),
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Confirmer le paiement'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _cancelBooking(),
+            icon: const Icon(Icons.cancel),
+            label: const Text('Annuler maintenant (gratuit)'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: BorderSide(color: Colors.red.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Informations pour paiement confirmé (expéditeur)
+  Widget _buildPaymentConfirmedInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info, color: Colors.blue.shade600, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Paiement confirmé',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Votre paiement sera capturé automatiquement 72h avant le départ ou à la collecte du colis.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Actions pour capturer le paiement (transporteur)
+  Widget _buildCapturePaymentActions() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.account_balance_wallet, color: Colors.green.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Paiement prêt à être capturé',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vous pouvez maintenant capturer le paiement ou attendre la capture automatique.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _capturePayment(),
+            icon: const Icon(Icons.monetization_on),
+            label: const Text('Capturer le paiement'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Actions d'annulation simple
+  Widget _buildCancellationActions() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _cancelBooking(),
+        icon: const Icon(Icons.cancel),
+        label: const Text('Annuler la réservation'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red,
+          side: BorderSide(color: Colors.red.shade300),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
     );
   }
 
@@ -878,6 +1123,50 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     return _currentUserId.toString() == _booking!.senderId;
   }
 
+  Future<void> _cancelBooking() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler la réservation'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
+          'Note: Des frais d\'annulation peuvent s\'appliquer selon les conditions.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Retour'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Annuler la réservation'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _showLoader();
+
+      try {
+        final cancelResult = await _bookingService.cancelBooking(_booking!.id.toString());
+
+        _hideLoader();
+
+        if (cancelResult['success'] == true) {
+          _showSuccessSnackBar('Réservation annulée avec succès');
+          _loadBookingDetails();
+        } else {
+          _showErrorSnackBar(cancelResult['error'] ?? 'Erreur lors de l\'annulation');
+        }
+      } catch (e) {
+        _hideLoader();
+        _showErrorSnackBar('Erreur: $e');
+      }
+    }
+  }
+
   String _getStatusDescription(BookingStatus status) {
     switch (status) {
       case BookingStatus.pending:
@@ -909,6 +1198,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         break;
       case 'payment-ready':
         _markPaymentReady();
+        break;
+      case 'cancel':
+        _cancelBooking();
         break;
       case 'refresh':
         _loadBookingDetails();
@@ -1154,6 +1446,119 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   String _formatDateTime(DateTime date) {
     return '${_formatDate(date)} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// Confirmer le paiement (nouveau système de capture différée)
+  Future<void> _confirmPayment() async {
+    try {
+      final result = await _bookingService.confirmPayment(widget.bookingId);
+
+      if (result['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Paiement confirmé avec succès'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.fixed,
+              margin: EdgeInsets.zero,
+            ),
+          );
+          _loadBookingDetails(); // Recharger les détails
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Erreur lors de la confirmation'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.fixed,
+              margin: EdgeInsets.zero,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de connexion: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.fixed,
+            margin: EdgeInsets.zero,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Capturer le paiement manuellement (transporteur)
+  Future<void> _capturePayment() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Capturer le paiement'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir capturer le paiement maintenant ? '
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Capturer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final result = await _bookingService.capturePayment(widget.bookingId);
+
+      if (result['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Paiement capturé avec succès'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.fixed,
+              margin: EdgeInsets.zero,
+            ),
+          );
+          _loadBookingDetails(); // Recharger les détails
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Erreur lors de la capture'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.fixed,
+              margin: EdgeInsets.zero,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de connexion: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.fixed,
+            margin: EdgeInsets.zero,
+          ),
+        );
+      }
+    }
   }
 }
 

@@ -167,6 +167,21 @@ class BookingModel {
   bool get isCompleted => status == BookingStatus.completed;
   bool get isCancelled => status == BookingStatus.cancelled;
 
+  // Nouveaux helpers pour le système de capture différée
+  bool get isPaymentAuthorized => status == BookingStatus.paymentAuthorized;
+  bool get isPaymentConfirmed => status == BookingStatus.paymentConfirmed;
+  bool get needsPaymentConfirmation => status == BookingStatus.paymentAuthorized;
+  bool get canConfirmPayment => status == BookingStatus.paymentAuthorized;
+  bool get canCapturePayment =>
+      status == BookingStatus.paymentConfirmed ||
+      status == BookingStatus.inTransit ||
+      status == BookingStatus.delivered;
+  bool get canCancelBeforePayment =>
+      status == BookingStatus.pending ||
+      status == BookingStatus.accepted ||
+      status == BookingStatus.paymentAuthorized ||
+      status == BookingStatus.paymentConfirmed;
+
   String get statusDisplayText {
     switch (status) {
       case BookingStatus.pending:
@@ -177,6 +192,10 @@ class BookingModel {
         return 'Rejetée';
       case BookingStatus.paymentPending:
         return 'Paiement requis';
+      case BookingStatus.paymentAuthorized:
+        return 'Paiement autorisé';
+      case BookingStatus.paymentConfirmed:
+        return 'Paiement confirmé';
       case BookingStatus.paid:
         return 'Payée';
       case BookingStatus.inTransit:
@@ -203,6 +222,8 @@ enum BookingStatus {
   accepted('accepted'),
   rejected('rejected'),
   paymentPending('payment_pending'),
+  paymentAuthorized('payment_authorized'),
+  paymentConfirmed('payment_confirmed'),
   paid('paid'),
   inTransit('in_transit'),
   delivered('delivered'),

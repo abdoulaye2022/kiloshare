@@ -200,11 +200,53 @@ export function useBooking() {
     }
   }, [token]);
 
+  const cancelBooking = useCallback(async (
+    bookingId: number
+  ): Promise<AcceptNegotiationResponse | null> => {
+    if (!token) {
+      setError('Non authentifié');
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/cancel`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'annulation de la réservation');
+      }
+
+      return data;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+      setError(errorMessage);
+      console.error('Erreur cancelBooking:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
   return {
     loading,
     error,
     acceptBooking,
     rejectBooking,
+    cancelBooking,
     getBooking,
     getUserBookings,
     clearError: () => setError(null)

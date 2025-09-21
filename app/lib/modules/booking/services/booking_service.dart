@@ -39,6 +39,13 @@ class BookingService {
   }) async {
     try {
       final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
       final body = json.encode({
         'trip_id': int.parse(tripId),
         'package_description': packageDescription,
@@ -57,18 +64,28 @@ class BookingService {
       );
 
 
-      final responseData = json.decode(response.body);
+      // Vérifier si la réponse est du JSON valide
+      Map<String, dynamic> responseData;
+      try {
+        responseData = json.decode(response.body);
+      } catch (e) {
+        print('Erreur décodage JSON response: ${response.body}');
+        return {
+          'success': false,
+          'error': 'Réponse serveur invalide (status: ${response.statusCode})',
+        };
+      }
 
       if (response.statusCode == 201) {
         return {
           'success': true,
-          'booking': responseData['data']['booking'],
-          'message': responseData['message'],
+          'booking': responseData['data']?['booking'],
+          'message': responseData['message'] ?? 'Réservation créée avec succès',
         };
       } else {
         return {
           'success': false,
-          'error': responseData['message'] ?? 'Erreur lors de la création de la réservation',
+          'error': responseData['message'] ?? 'Erreur lors de la création de la réservation (${response.statusCode})',
         };
       }
     } catch (e) {
@@ -300,6 +317,38 @@ class BookingService {
     }
   }
 
+  /// Annuler une réservation (par l'expéditeur)
+  Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/cancel'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Réservation annulée avec succès',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['error'] ?? 'Erreur lors de l\'annulation de la réservation',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.cancelBooking: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
 
   /// Marquer une réservation comme prête pour le paiement
   Future<Map<String, dynamic>> markPaymentReady(String bookingId) async {
@@ -369,6 +418,123 @@ class BookingService {
       }
     } catch (e) {
       print('Erreur BookingService.addPackagePhoto: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Confirmer le paiement (nouveau système de capture différée)
+  Future<Map<String, dynamic>> confirmPayment(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/payment/confirm'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'booking': responseData['data']['booking'] ?? responseData['booking'],
+          'message': responseData['message'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la confirmation du paiement',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.confirmPayment: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Capturer le paiement manuellement (transporteur)
+  Future<Map<String, dynamic>> capturePayment(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/payment/capture'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'booking': responseData['data']['booking'] ?? responseData['booking'],
+          'message': responseData['message'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la capture du paiement',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.capturePayment: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Obtenir le statut du paiement
+  Future<Map<String, dynamic>> getPaymentStatus(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/payment/status'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'payment_status': responseData['data']['payment_status'],
+          'booking_status': responseData['data']['booking_status'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la récupération du statut',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.getPaymentStatus: $e');
       return {
         'success': false,
         'error': 'Erreur de connexion: $e',

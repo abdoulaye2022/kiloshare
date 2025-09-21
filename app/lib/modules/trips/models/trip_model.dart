@@ -357,22 +357,40 @@ class Trip {
       // Additional data
       user: json['user'] != null ? TripUser.fromJson(json['user']) : null,
       images: json['images'] != null && json['images'] is List
-          ? List<TripImage>.from(json['images'].where((item) => item != null).map((item) {
-              // Handle both string URLs and TripImage objects
-              if (item is String) {
-                // If it's a URL string, create a TripImage object
-                return TripImage(
-                  id: '', // ID not available from string URL
-                  url: item,
-                  altText: null,
-                );
-              } else if (item is Map<String, dynamic>) {
-                // If it's an object, parse normally
-                return TripImage.fromJson(item);
-              } else {
-                throw Exception('Invalid image data type: ${item.runtimeType}');
+          ? () {
+              // Parse images and remove duplicates based on URL
+              final imageList = <TripImage>[];
+              final seenUrls = <String>{};
+
+              for (final item in json['images']) {
+                if (item == null) continue;
+
+                TripImage? image;
+                if (item is String) {
+                  // If it's a URL string, create a TripImage object
+                  if (!seenUrls.contains(item)) {
+                    image = TripImage(
+                      id: '', // ID not available from string URL
+                      url: item,
+                      altText: null,
+                    );
+                  }
+                } else if (item is Map<String, dynamic>) {
+                  // If it's an object, parse normally
+                  final parsedImage = TripImage.fromJson(item);
+                  if (!seenUrls.contains(parsedImage.url)) {
+                    image = parsedImage;
+                  }
+                }
+
+                if (image != null) {
+                  seenUrls.add(image.url);
+                  imageList.add(image);
+                }
               }
-            }))
+
+              return imageList;
+            }()
           : null,
       );
     } catch (e) {
@@ -697,13 +715,30 @@ class Trip {
   }
 
   // Images helper methods
-  TripImage? get primaryImage => images?.where((img) => img.isPrimary).firstOrNull;
-  
-  TripImage? get firstImage => images?.isNotEmpty == true ? images!.first : null;
-  
-  bool get hasImages => images?.isNotEmpty == true;
-  
-  int get imageCount => images?.length ?? 0;
+  TripImage? get primaryImage => uniqueImages?.where((img) => img.isPrimary).firstOrNull;
+
+  TripImage? get firstImage => uniqueImages?.isNotEmpty == true ? uniqueImages!.first : null;
+
+  bool get hasImages => uniqueImages?.isNotEmpty == true;
+
+  int get imageCount => uniqueImages?.length ?? 0;
+
+  /// Remove duplicate images based on URL
+  List<TripImage>? get uniqueImages {
+    if (images == null || images!.isEmpty) return images;
+
+    final uniqueList = <TripImage>[];
+    final seenUrls = <String>{};
+
+    for (final image in images!) {
+      if (!seenUrls.contains(image.url)) {
+        seenUrls.add(image.url);
+        uniqueList.add(image);
+      }
+    }
+
+    return uniqueList;
+  }
 }
 
 enum TripStatus {

@@ -69,8 +69,12 @@ class NotificationTemplate extends Model
         return $result;
     }
 
-    private function renderTemplate(string $template, array $variables): string
+    private function renderTemplate(?string $template, array $variables): string
     {
+        if ($template === null) {
+            return '';
+        }
+
         $rendered = $template;
 
         foreach ($variables as $key => $value) {

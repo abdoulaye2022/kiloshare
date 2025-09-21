@@ -10,6 +10,7 @@ use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use KiloShare\Services\CancellationService;
 use KiloShare\Services\SmartNotificationService;
+use KiloShare\Services\PaymentAuthorizationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -17,16 +18,25 @@ use Carbon\Carbon;
 class BookingController
 {
     private SmartNotificationService $notificationService;
+    private PaymentAuthorizationService $paymentAuthService;
 
     public function __construct()
     {
         $this->notificationService = new SmartNotificationService();
+        $this->paymentAuthService = new PaymentAuthorizationService();
     }
 
     public function createBookingRequest(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-        $data = json_decode($request->getBody()->getContents(), true);
+
+        // S'assurer que $data est un array
+        $body = $request->getBody()->getContents();
+        $data = [];
+        if (!empty($body)) {
+            $decoded = json_decode($body, true);
+            $data = is_array($decoded) ? $decoded : [];
+        }
 
         // Validation
         $validator = new Validator();
@@ -215,7 +225,7 @@ class BookingController
         $id = $request->getAttribute('id');
 
         try {
-            $booking = Booking::with(['trip.user', 'sender', 'receiver', 'negotiation'])
+            $booking = Booking::with(['trip.user', 'sender', 'receiver'])
                              ->find($id);
 
             if (!$booking) {
@@ -272,18 +282,6 @@ class BookingController
                             'profile_picture' => $booking->trip->user->profile_picture,
                         ],
                     ],
-                    'negotiation' => $booking->negotiation ? [
-                        'id' => $booking->negotiation->id,
-                        'status' => $booking->negotiation->status,
-                        'proposed_price' => $booking->negotiation->proposed_price,
-                        'proposed_weight' => $booking->negotiation->proposed_weight,
-                        'package_description' => $booking->negotiation->package_description,
-                        'pickup_address' => $booking->negotiation->pickup_address,
-                        'delivery_address' => $booking->negotiation->delivery_address,
-                        'counter_offer_price' => $booking->negotiation->counter_offer_price,
-                        'counter_offer_message' => $booking->negotiation->counter_offer_message,
-                        'created_at' => $booking->negotiation->created_at,
-                    ] : null,
                 ]
             ]);
 
@@ -339,16 +337,42 @@ class BookingController
 
             // Handle final price if provided (from negotiation)
             $finalPrice = isset($data['final_price']) ? (float)$data['final_price'] : null;
-            
+
+            // Accepter la réservation et passer au statut payment_authorized
             $booking->accept($finalPrice);
 
-            // Envoyer notification au sender (celui qui a fait la demande)
+            // Créer l'autorisation de paiement avec capture différée
+            $authorizationResult = $this->paymentAuthService->createPaymentAuthorization(
+                $booking->id,
+                $userStripeAccount->stripe_account_id,
+                $booking->final_price
+            );
+
+            if (!$authorizationResult['success']) {
+                // Annuler l'acceptation si l'autorisation échoue
+                $booking->update(['status' => Booking::STATUS_PENDING]);
+
+                return Response::error(
+                    'Erreur lors de la création de l\'autorisation de paiement: ' . $authorizationResult['error'],
+                    [],
+                    500
+                );
+            }
+
+            // Mettre à jour le booking avec l'ID de l'autorisation
+            $booking->update([
+                'status' => Booking::STATUS_PAYMENT_AUTHORIZED,
+                'payment_authorization_id' => $authorizationResult['authorization_id']
+            ]);
+
+            // Envoyer notification au sender avec instructions de confirmation
             $this->notificationService->send(
                 $booking->sender_id,
-                'booking_accepted',
+                'booking_accepted_payment_pending',
                 [
                     'trip_title' => $booking->trip->title ?? 'Votre voyage',
-                    'total_amount' => $booking->final_price
+                    'total_amount' => $booking->final_price,
+                    'confirmation_deadline' => '4 heures'
                 ]
             );
 
@@ -357,9 +381,10 @@ class BookingController
                     'id' => $booking->id,
                     'status' => $booking->status,
                     'final_price' => $booking->final_price,
+                    'payment_authorization_id' => $booking->payment_authorization_id,
                     'updated_at' => $booking->updated_at,
                 ]
-            ], 'Booking accepted successfully');
+            ], 'Booking accepted successfully. Payment authorization created.');
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to accept booking: ' . $e->getMessage());
@@ -370,7 +395,14 @@ class BookingController
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
-        $data = json_decode($request->getBody()->getContents(), true);
+
+        // S'assurer que $data est un array
+        $body = $request->getBody()->getContents();
+        $data = [];
+        if (!empty($body)) {
+            $decoded = json_decode($body, true);
+            $data = is_array($decoded) ? $decoded : [];
+        }
 
         // Validation des données optionnelles
         $validator = new Validator();
@@ -424,59 +456,6 @@ class BookingController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to reject booking: ' . $e->getMessage());
-        }
-    }
-
-    public function addNegotiation(ServerRequestInterface $request): ResponseInterface
-    {
-        $user = $request->getAttribute('user');
-        $id = $request->getAttribute('id');
-        $data = json_decode($request->getBody()->getContents(), true);
-
-        // Validation
-        $validator = new Validator();
-        $rules = [
-            'proposed_price' => Validator::required()->positive(),
-            'message' => Validator::optional(Validator::stringType()),
-        ];
-
-        if (!$validator->validate($data, $rules)) {
-            return Response::validationError($validator->getErrors());
-        }
-
-        try {
-            $booking = Booking::with('trip')->find($id);
-
-            if (!$booking) {
-                return Response::notFound('Booking not found');
-            }
-
-            // Seuls le client ou le propriétaire du trip peuvent négocier
-            if ($booking->user_id !== $user->id && $booking->trip->user_id !== $user->id) {
-                return Response::forbidden('Access denied');
-            }
-
-            if ($booking->status !== Booking::STATUS_PENDING) {
-                return Response::error('Cannot negotiate on this booking');
-            }
-
-            // TODO: Créer le modèle BookingNegotiation
-            /*
-            $negotiation = BookingNegotiation::create([
-                'booking_id' => $booking->id,
-                'user_id' => $user->id,
-                'proposed_price' => (float) $data['proposed_price'],
-                'message' => $data['message'] ?? '',
-                'status' => 'pending',
-            ]);
-            */
-
-            return Response::success([
-                'message' => 'Price negotiation submitted successfully'
-            ], 'Negotiation added successfully');
-
-        } catch (\Exception $e) {
-            return Response::serverError('Failed to add negotiation: ' . $e->getMessage());
         }
     }
 
@@ -592,47 +571,72 @@ class BookingController
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
-        
+
         try {
-            $booking = Booking::find($id);
+            $booking = Booking::with('trip')->find($id);
             if (!$booking) {
                 return Response::notFound('Réservation non trouvée');
             }
 
-            $cancellationService = new CancellationService();
-            $result = $cancellationService->cancelBookingBySender($booking);
-
-            // Envoyer notification au receiver (propriétaire du voyage)
-            $notificationType = ($booking->cancellation_type === 'late') ? 'booking_cancelled_late' : 'booking_cancelled_early';
-            $notificationData = [
-                'sender_name' => $user->first_name . ' ' . $user->last_name,
-            ];
-            
-            if ($booking->cancellation_type === 'late') {
-                $notificationData['amount'] = $booking->final_price * 0.5; // Compensation 50%
-            } else {
-                $notificationData['trip_title'] = $booking->trip->title ?? 'Le voyage';
+            // Vérifications simples
+            if ($booking->sender_id != $user->id) {
+                return Response::forbidden('Vous ne pouvez pas annuler cette réservation');
             }
-            
-            $this->notificationService->send(
-                $booking->receiver_id,
-                $notificationType,
-                $notificationData
-            );
+
+            if (!in_array($booking->status, [
+                Booking::STATUS_PENDING,
+                Booking::STATUS_ACCEPTED,
+                Booking::STATUS_PAYMENT_AUTHORIZED,
+                Booking::STATUS_PAYMENT_CONFIRMED
+            ])) {
+                return Response::error('Cette réservation ne peut plus être annulée');
+            }
+
+            // Si il y a une autorisation de paiement, l'annuler
+            if ($booking->payment_authorization_id) {
+                $cancelResult = $this->paymentAuthService->cancelPaymentAuthorization(
+                    $booking->payment_authorization_id,
+                    'cancelled_by_sender'
+                );
+
+                if (!$cancelResult['success']) {
+                    return Response::error(
+                        'Erreur lors de l\'annulation de l\'autorisation de paiement: ' . $cancelResult['error']
+                    );
+                }
+            }
+
+            // Annulation de la réservation
+            $booking->status = Booking::STATUS_CANCELLED;
+            $booking->save();
+
+            // Notification au transporteur
+            try {
+                $notificationData = [
+                    'sender_name' => $user->first_name . ' ' . $user->last_name,
+                    'trip_title' => $booking->trip->title ?? 'Voyage',
+                    'booking_id' => $booking->id
+                ];
+
+                $this->notificationService->send(
+                    $booking->receiver_id,
+                    'booking_cancelled',
+                    $notificationData
+                );
+            } catch (\Exception $notifException) {
+                // Continue même si la notification échoue
+            }
 
             return Response::success([
                 'booking' => [
                     'id' => $booking->id,
-                    'status' => $booking->status,
-                    'cancelled_at' => $booking->cancelled_at,
-                    'cancellation_type' => $booking->cancellation_type
+                    'status' => $booking->status
                 ],
-                'message' => $result['message'],
-                'refund_percentage' => $result['refund_percentage']
+                'message' => 'Réservation annulée avec succès'
             ]);
 
         } catch (\Exception $e) {
-            return Response::badRequest($e->getMessage());
+            return Response::error($e->getMessage());
         }
     }
 
@@ -722,6 +726,183 @@ class BookingController
 
         } catch (\Exception $e) {
             return Response::serverError('Erreur lors de la récupération de l\'historique: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Confirmer le paiement - l'expéditeur confirme qu'il accepte les conditions
+     */
+    public function confirmPayment(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::with('trip')->find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que c'est l'expéditeur
+            if ($booking->sender_id != $user->id) {
+                return Response::forbidden('Vous ne pouvez pas confirmer cette réservation');
+            }
+
+            // Vérifier le statut
+            if ($booking->status !== Booking::STATUS_PAYMENT_AUTHORIZED) {
+                return Response::error('Cette réservation n\'est pas en attente de confirmation de paiement');
+            }
+
+            if (!$booking->payment_authorization_id) {
+                return Response::error('Aucune autorisation de paiement trouvée pour cette réservation');
+            }
+
+            // Confirmer l'autorisation de paiement
+            $confirmResult = $this->paymentAuthService->confirmPaymentAuthorization(
+                $booking->payment_authorization_id
+            );
+
+            if (!$confirmResult['success']) {
+                return Response::error(
+                    'Erreur lors de la confirmation du paiement: ' . $confirmResult['error']
+                );
+            }
+
+            // Mettre à jour le statut de la réservation
+            $booking->update(['status' => Booking::STATUS_PAYMENT_CONFIRMED]);
+
+            // Envoyer notification au transporteur
+            $this->notificationService->send(
+                $booking->receiver_id,
+                'payment_confirmed',
+                [
+                    'sender_name' => $user->first_name . ' ' . $user->last_name,
+                    'trip_title' => $booking->trip->title ?? 'Votre voyage',
+                    'total_amount' => $booking->final_price
+                ]
+            );
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'updated_at' => $booking->updated_at,
+                ]
+            ], 'Paiement confirmé avec succès. Le montant sera capturé automatiquement.');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la confirmation du paiement: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Capturer le paiement manuellement (par le transporteur ou admin)
+     */
+    public function capturePayment(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::with('trip')->find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que c'est le transporteur ou un admin
+            if ($booking->receiver_id != $user->id) {
+                return Response::forbidden('Vous ne pouvez pas capturer ce paiement');
+            }
+
+            // Vérifier le statut
+            if (!in_array($booking->status, [
+                Booking::STATUS_PAYMENT_CONFIRMED,
+                Booking::STATUS_IN_TRANSIT,
+                Booking::STATUS_DELIVERED
+            ])) {
+                return Response::error('Ce paiement ne peut pas être capturé dans son état actuel');
+            }
+
+            if (!$booking->payment_authorization_id) {
+                return Response::error('Aucune autorisation de paiement trouvée pour cette réservation');
+            }
+
+            // Capturer le paiement
+            $captureResult = $this->paymentAuthService->capturePaymentAuthorization(
+                $booking->payment_authorization_id,
+                'manual'
+            );
+
+            if (!$captureResult['success']) {
+                return Response::error(
+                    'Erreur lors de la capture du paiement: ' . $captureResult['error']
+                );
+            }
+
+            // Mettre à jour le statut de la réservation
+            $booking->update(['status' => Booking::STATUS_PAID]);
+
+            // Envoyer notification à l'expéditeur
+            $this->notificationService->send(
+                $booking->sender_id,
+                'payment_captured',
+                [
+                    'trip_title' => $booking->trip->title ?? 'Votre envoi',
+                    'total_amount' => $booking->final_price
+                ]
+            );
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'updated_at' => $booking->updated_at,
+                ]
+            ], 'Paiement capturé avec succès.');
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la capture du paiement: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Obtenir le statut de l'autorisation de paiement
+     */
+    public function getPaymentStatus(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::find($id);
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que l'utilisateur a accès à cette réservation
+            if ($booking->sender_id != $user->id && $booking->receiver_id != $user->id) {
+                return Response::forbidden('Vous n\'avez pas accès à cette réservation');
+            }
+
+            if (!$booking->payment_authorization_id) {
+                return Response::success([
+                    'payment_status' => 'no_authorization',
+                    'booking_status' => $booking->status
+                ]);
+            }
+
+            // Obtenir les détails de l'autorisation
+            $authDetails = $this->paymentAuthService->getPaymentAuthorizationDetails(
+                $booking->payment_authorization_id
+            );
+
+            return Response::success([
+                'payment_status' => $authDetails['success'] ? $authDetails['authorization'] : null,
+                'booking_status' => $booking->status
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la récupération du statut: ' . $e->getMessage());
         }
     }
 }

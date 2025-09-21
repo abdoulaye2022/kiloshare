@@ -51,7 +51,7 @@ export default function ProposalsPage() {
   const [stripeAccountData, setStripeAccountData] = useState<any>(null);
   const [motivationalMessage, setMotivationalMessage] = useState('');
   
-  const { acceptBooking, acceptNegotiation, getUserBookings, loading: actionLoading } = useBooking();
+  const { acceptBooking, acceptNegotiation, cancelBooking, getUserBookings, loading: actionLoading } = useBooking();
 
   useEffect(() => {
     fetchBookings();
@@ -85,7 +85,7 @@ export default function ProposalsPage() {
 
   const handleAcceptNegotiation = async (bookingId: number, negotiationId: number) => {
     const result = await acceptNegotiation(bookingId, negotiationId);
-    
+
     if (result?.success) {
       // Vérifier si un compte Stripe a été créé
       if (result.stripe_account_created && result.stripe_account) {
@@ -93,7 +93,20 @@ export default function ProposalsPage() {
         setMotivationalMessage(result.motivational_message || '');
         setShowStripeModal(true);
       }
-      
+
+      // Recharger les propositions
+      fetchBookings();
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir annuler cette réservation?')) {
+      return;
+    }
+
+    const result = await cancelBooking(bookingId);
+
+    if (result?.success) {
       // Recharger les propositions
       fetchBookings();
     }
@@ -355,6 +368,21 @@ export default function ProposalsPage() {
                       >
                         <Check className="h-4 w-4" />
                         <span>Accepter</span>
+                        {actionLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Actions pour propositions envoyées acceptées */}
+                  {activeTab === 'sent' && booking.status === 'accepted' && (
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => handleCancelBooking(booking.id)}
+                        disabled={actionLoading}
+                        className="flex items-center space-x-2 px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                        <span>Annuler la réservation</span>
                         {actionLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
                       </button>
                     </div>
