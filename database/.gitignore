@@ -1,0 +1,18 @@
+# Base de données - Ignorer les fichiers avec données réelles
+*.sql
+!schema.sql
+!README.md
+!install.sh
+
+# Backups
+backup_*.sql
+dump_*.sql
+data_*.sql
+
+# Logs de MySQL
+*.log
+mysql.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
