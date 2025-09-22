@@ -47,6 +47,25 @@ Utilisez toujours `schema_production.sql` pour les déploiements :
 
 ## Autres Erreurs Courantes
 
+### Erreur de Syntaxe dans les Triggers
+```
+#1064 - You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version
+```
+
+**Cause :** Erreur de syntaxe dans un trigger (ex: `cancellation_count  1` au lieu de `cancellation_count + 1`)
+
+**Solutions :**
+1. **Utiliser le schéma corrigé :**
+   ```bash
+   # Le fichier schema_production.sql est déjà corrigé
+   mysql -u user -p database < schema_production.sql
+   ```
+
+2. **Exporter à nouveau :**
+   ```bash
+   ./export_production.sh  # Corrige automatiquement ces erreurs
+   ```
+
 ### Erreur de Charset
 ```
 #1273 - Unknown collation: 'utf8mb4_0900_ai_ci'
@@ -54,9 +73,11 @@ Utilisez toujours `schema_production.sql` pour les déploiements :
 
 **Solution :**
 ```sql
--- Remplacer par une collation compatible
+-- Remplacer par une collation compatible (pour MySQL < 8.0)
 utf8mb4_unicode_ci
 ```
+
+**Note :** MySQL 8.4 supporte `utf8mb4_0900_ai_ci` nativement
 
 ### Tables Already Exist
 ```
@@ -82,9 +103,25 @@ SET FOREIGN_KEY_CHECKS = 0;
 SET FOREIGN_KEY_CHECKS = 1;
 ```
 
+## 🎯 MySQL 8.4 (Production)
+
+**Excellente nouvelle !** MySQL 8.4 supporte toutes les fonctionnalités avancées :
+
+✅ **Recommandé pour MySQL 8.4 :**
+- Utilisez `schema_production.sql` (version complète)
+- Toutes les fonctionnalités sont supportées
+- Triggers, procédures, vues fonctionnent parfaitement
+- Collation `utf8mb4_0900_ai_ci` native
+
+**Import optimisé :**
+```bash
+mysql -u username -p database_name < schema_production.sql
+```
+
 ## 📋 Checklist Import Production
 
-- [ ] Utiliser `schema_production.sql`
+- [ ] Utiliser `schema_production.sql` (pour MySQL 8.x)
+- [ ] Ou `schema_minimal.sql` (si problèmes de permissions)
 - [ ] Vérifier que la base de données est vide ou faire un backup
 - [ ] Tester l'import sur un environnement de test d'abord
 - [ ] Vérifier les permissions de l'utilisateur MySQL

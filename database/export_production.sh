@@ -63,6 +63,11 @@ s/\/\*!50013[^*]*\*\///g
 s/CREATE PROCEDURE/CREATE PROCEDURE IF NOT EXISTS/g
 s/CREATE FUNCTION/CREATE FUNCTION IF NOT EXISTS/g
 
+# Corriger les erreurs de syntaxe courantes
+s/cancellation_count  1/cancellation_count + 1/g
+s/cancellation_count  -1/cancellation_count - 1/g
+s/\([a-zA-Z_][a-zA-Z0-9_]*\)  \([0-9]\)/\1 + \2/g
+
 # Nettoyer les espaces multiples
 s/[[:space:]]\+/ /g
 ' schema_production.sql
