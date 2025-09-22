@@ -4,7 +4,10 @@ Ce dossier contient le schéma de la base de données KiloShare.
 
 ## 📋 Contenu
 
-- `schema.sql` - Structure complète de la base de données (sans données)
+- `schema.sql` - Structure complète (développement local)
+- `schema_production.sql` - Version optimisée pour production/hébergement
+- `export_production.sh` - Script pour générer la version production
+- `TROUBLESHOOTING.md` - Guide de résolution des problèmes d'import
 
 ## 🗄️ Structure de la Base de Données
 
@@ -34,31 +37,30 @@ Ce dossier contient le schéma de la base de données KiloShare.
 
 ## 🚀 Installation
 
-### Créer une nouvelle base de données
+### Pour Production (Hébergement, phpMyAdmin)
 
 ```bash
-# Se connecter à MySQL
-mysql -u root -p
+# Générer le schéma production (si pas déjà fait)
+./export_production.sh
 
-# Créer la base de données
-CREATE DATABASE kiloshare CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-# Sélectionner la base
-USE kiloshare;
-
-# Importer le schéma
-SOURCE /path/to/schema.sql;
+# Importer sur votre serveur
+mysql -u username -p database_name < schema_production.sql
 ```
 
-### Ou via la ligne de commande
+### Pour Développement Local
 
 ```bash
-# Créer la base de données
-mysql -u root -p -e "CREATE DATABASE kiloshare CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+# Installation automatique
+./install.sh
 
-# Importer le schéma
+# Ou manuelle
+mysql -u root -p -e "CREATE DATABASE kiloshare CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql -u root -p kiloshare < schema.sql
 ```
+
+### ⚠️ Problèmes d'Import ?
+
+Si vous obtenez des erreurs `DEFINER` ou `Access denied`, consultez `TROUBLESHOOTING.md`
 
 ## 🔧 Configuration
 
