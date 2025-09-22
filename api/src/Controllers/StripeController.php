@@ -184,8 +184,34 @@ class StripeController
             $userStripeAccount->save();
 
             $transactionReady = $account->charges_enabled && $account->payouts_enabled;
-            $onboardingComplete = $account->details_submitted;
-            $hasRestrictions = !empty($account->requirements->currently_due) || !empty($account->requirements->past_due);
+
+            // Déterminer si l'onboarding de base est vraiment complet
+            // On considère l'onboarding complet seulement si les infos essentielles sont fournies
+            $currentlyDue = $account->requirements->currently_due ?? [];
+            $pastDue = $account->requirements->past_due ?? [];
+
+            // Vérifier si des infos bancaires essentielles sont manquantes
+            $bankingRequirements = [
+                'external_account',  // Compte bancaire
+                'business_type',     // Type d'activité
+                'tos_acceptance.date', // Acceptation des CGU
+                'tos_acceptance.ip'
+            ];
+
+            $missingBankingInfo = false;
+            foreach ($bankingRequirements as $requirement) {
+                if (in_array($requirement, $currentlyDue) || in_array($requirement, $pastDue)) {
+                    $missingBankingInfo = true;
+                    break;
+                }
+            }
+
+            // L'onboarding est complet seulement si :
+            // 1. Stripe dit que les détails sont soumis
+            // 2. ET il n'y a pas d'infos bancaires manquantes
+            $onboardingComplete = $account->details_submitted && !$missingBankingInfo;
+
+            $hasRestrictions = !empty($currentlyDue) || !empty($pastDue);
 
             // Generate new onboarding link if account has restrictions
             $onboardingUrl = null;
@@ -207,12 +233,19 @@ class StripeController
                 }
             }
 
+            // Générer un message plus précis selon l'état
             $message = 'Compte Stripe Connect prêt pour les transactions';
             if (!$transactionReady) {
-                if ($hasRestrictions) {
+                if (!$onboardingComplete) {
+                    if ($missingBankingInfo) {
+                        $message = 'Veuillez compléter vos informations bancaires et accepter les conditions';
+                    } else {
+                        $message = 'Configuration initiale en cours';
+                    }
+                } elseif ($hasRestrictions) {
                     $message = 'Vérification d\'identité requise pour finaliser votre compte';
                 } else {
-                    $message = 'Configuration Stripe Connect en cours';
+                    $message = 'Configuration Stripe Connect en cours de validation';
                 }
             }
 
@@ -225,6 +258,7 @@ class StripeController
                     'charges_enabled' => $account->charges_enabled,
                     'payouts_enabled' => $account->payouts_enabled,
                     'has_restrictions' => $hasRestrictions,
+                    'missing_banking_info' => $missingBankingInfo,
                     'requirements' => [
                         'currently_due' => $account->requirements->currently_due ?? [],
                         'eventually_due' => $account->requirements->eventually_due ?? [],

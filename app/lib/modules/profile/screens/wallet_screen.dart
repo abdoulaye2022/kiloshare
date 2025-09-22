@@ -162,11 +162,16 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
       final onboardingComplete = accountInfo['onboarding_complete'] == true;
       final account = accountInfo['account'];
       final hasRestrictions = account?['has_restrictions'] == true;
+      final missingBankingInfo = account?['missing_banking_info'] == true;
 
       if (!hasAccount) {
         statusColor = Colors.grey;
         statusIcon = Icons.account_balance_wallet;
         statusText = 'Portefeuille non configuré';
+      } else if (missingBankingInfo) {
+        statusColor = Colors.red;
+        statusIcon = Icons.account_balance;
+        statusText = 'Informations bancaires requises';
       } else if (hasRestrictions) {
         statusColor = Colors.orange;
         statusIcon = Icons.verified_user;
@@ -418,7 +423,7 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
               ),
             ),
           ),
-        ] else if (accountInfo != null && (accountInfo['onboarding_complete'] != true || accountInfo['account']?['has_restrictions'] == true)) ...[
+        ] else if (accountInfo != null && (accountInfo['account']?['missing_banking_info'] == true || accountInfo['onboarding_complete'] != true || accountInfo['account']?['has_restrictions'] == true)) ...[
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -455,9 +460,11 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.launch),
-              label: Text(_isProcessingAction ? 'Ouverture...' : 
-                accountInfo['account']?['has_restrictions'] == true ? 
-                'Compléter la vérification d\'identité' : 
+              label: Text(_isProcessingAction ? 'Ouverture...' :
+                accountInfo['account']?['missing_banking_info'] == true ?
+                'Ajouter mes informations bancaires' :
+                accountInfo['account']?['has_restrictions'] == true ?
+                'Compléter la vérification d\'identité' :
                 'Terminer la configuration'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
@@ -648,10 +655,11 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
       // Déterminer quelle étape du processus d'onboarding
       final bool hasRestrictions = _accountInfo?['account']?['has_restrictions'] == true;
       final bool onboardingComplete = _accountInfo?['onboarding_complete'] == true;
-      
+      final bool missingBankingInfo = _accountInfo?['account']?['missing_banking_info'] == true;
+
       Map<String, dynamic> result;
-      
-      if (!onboardingComplete) {
+
+      if (missingBankingInfo || !onboardingComplete) {
         // Étape 1: Configuration initiale (informations bancaires)
         result = await _stripeService.refreshAccountLink();
       } else if (hasRestrictions) {
@@ -688,7 +696,7 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
         } else {
           if (mounted) {
             String message;
-            if (!onboardingComplete) {
+            if (missingBankingInfo || !onboardingComplete) {
               message = 'Configuration bancaire Stripe ouverte dans votre navigateur';
             } else {
               message = 'Vérification d\'identité Stripe ouverte dans votre navigateur';
