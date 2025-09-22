@@ -8,18 +8,18 @@ use KiloShare\Models\Notification;
 use KiloShare\Models\UserFCMToken;
 use KiloShare\Models\UserNotificationPreference;
 use KiloShare\Services\FirebaseNotificationService;
-use KiloShare\Services\NotificationService;
+use KiloShare\Services\SmartNotificationService;
 use KiloShare\Utils\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class NotificationController
 {
-    private NotificationService $notificationService;
+    private SmartNotificationService $notificationService;
 
     public function __construct()
     {
-        $this->notificationService = new NotificationService();
+        $this->notificationService = new SmartNotificationService();
     }
 
 

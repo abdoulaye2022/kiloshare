@@ -748,6 +748,62 @@ class SmartNotificationService
     }
 
     /**
+     * Notifier qu'un paiement a été capturé automatiquement
+     */
+    public function notifyPaymentCaptured(User $user, $booking, string $message): bool
+    {
+        try {
+            return $this->send(
+                $user->id,
+                'payment_captured',
+                [
+                    'booking_id' => $booking->id,
+                    'trip_id' => $booking->trip_id,
+                    'amount' => $booking->final_price ?? $booking->proposed_price,
+                    'currency' => $booking->trip->currency ?? 'CAD',
+                    'message' => $message,
+                    'delivery_confirmed' => true,
+                ],
+                [
+                    'channels' => ['push', 'in_app', 'email'],
+                    'priority' => 'high'
+                ]
+            )['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("Erreur notification capture paiement: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Notifier qu'un transporteur a reçu le paiement
+     */
+    public function notifyPaymentReceived(User $user, $booking, string $message): bool
+    {
+        try {
+            return $this->send(
+                $user->id,
+                'payment_received',
+                [
+                    'booking_id' => $booking->id,
+                    'trip_id' => $booking->trip_id,
+                    'amount' => $booking->final_price ?? $booking->proposed_price,
+                    'currency' => $booking->trip->currency ?? 'CAD',
+                    'message' => $message,
+                    'delivery_confirmed' => true,
+                ],
+                [
+                    'channels' => ['push', 'in_app'],
+                    'priority' => 'high'
+                ]
+            )['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("Erreur notification réception paiement: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Notifier que le compte Stripe est requis
      */
     public function sendStripeAccountRequiredNotification($authorization, $user): bool

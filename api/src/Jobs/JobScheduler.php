@@ -7,7 +7,7 @@ namespace KiloShare\Jobs;
 use KiloShare\Models\ScheduledJob;
 use KiloShare\Models\PaymentAuthorization;
 use KiloShare\Services\PaymentAuthorizationService;
-use KiloShare\Services\NotificationService;
+use KiloShare\Services\SmartNotificationService;
 
 class JobScheduler
 {
@@ -15,14 +15,14 @@ class JobScheduler
     private PaymentExpiryJob $expiryJob;
     private PaymentReminderJob $reminderJob;
     private PaymentAuthorizationService $paymentService;
-    private NotificationService $notificationService;
+    private SmartNotificationService $notificationService;
 
     public function __construct(
         PaymentCaptureJob $captureJob,
         PaymentExpiryJob $expiryJob,
         PaymentReminderJob $reminderJob,
         PaymentAuthorizationService $paymentService,
-        NotificationService $notificationService
+        SmartNotificationService $notificationService
     ) {
         $this->captureJob = $captureJob;
         $this->expiryJob = $expiryJob;

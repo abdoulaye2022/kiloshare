@@ -11,6 +11,7 @@ use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use KiloShare\Services\CloudinaryService;
 use KiloShare\Services\CancellationService;
+use KiloShare\Services\SmartNotificationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -1791,7 +1792,8 @@ class TripController
             foreach ($bookedUsers as $user) {
                 if ($user && $user->id) {
                     // Envoyer notification via le service intelligent
-                    $this->notificationService->send(
+                    $notificationService = new SmartNotificationService();
+                    $notificationService->send(
                         $user->id,
                         'journey_started',
                         [

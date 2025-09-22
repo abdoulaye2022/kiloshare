@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace KiloShare\Events;
 
-use KiloShare\Services\NotificationService;
+use KiloShare\Services\SmartNotificationService;
 
 class NotificationEvents
 {
-    private NotificationService $notificationService;
+    private SmartNotificationService $notificationService;
 
     public function __construct()
     {
-        $this->notificationService = new NotificationService();
+        $this->notificationService = new SmartNotificationService();
     }
 
     public function onTripCreated(array $trip): void

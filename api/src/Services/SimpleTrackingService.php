@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KiloShare\Services;
 
 use KiloShare\Models\User;
+use KiloShare\Services\SmartNotificationService;
 use Carbon\Carbon;
 use PDO;
 
@@ -12,13 +13,13 @@ class SimpleTrackingService
 {
     private PDO $db;
     private MessagingService $messagingService;
-    private NotificationService $notificationService;
+    private SmartNotificationService $notificationService;
 
     public function __construct()
     {
         $this->db = \KiloShare\Database\Connection::getInstance();
         $this->messagingService = new MessagingService();
-        $this->notificationService = new NotificationService();
+        $this->notificationService = new SmartNotificationService();
     }
 
     /**

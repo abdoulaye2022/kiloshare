@@ -6,7 +6,7 @@ namespace KiloShare\Services;
 
 use KiloShare\Models\ConversationModel;
 use KiloShare\Models\MessageModel;
-use KiloShare\Services\NotificationService;
+use KiloShare\Services\SmartNotificationService;
 use KiloShare\Utils\Database;
 use Exception;
 use PDO;
@@ -15,14 +15,14 @@ class MessagingService
 {
     private ConversationModel $conversationModel;
     private MessageModel $messageModel;
-    private NotificationService $notificationService;
+    private SmartNotificationService $notificationService;
     private PDO $db;
 
     public function __construct()
     {
         $this->conversationModel = new ConversationModel();
         $this->messageModel = new MessageModel();
-        $this->notificationService = new NotificationService();
+        $this->notificationService = new SmartNotificationService();
         $this->db = Database::getConnection()->getPdo();
     }
 
