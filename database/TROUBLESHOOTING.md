@@ -52,7 +52,10 @@ Utilisez toujours `schema_production.sql` pour les déploiements :
 #1064 - You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version
 ```
 
-**Cause :** Erreur de syntaxe dans un trigger (ex: `cancellation_count  1` au lieu de `cancellation_count + 1`)
+**Causes courantes :**
+- `cancellation_count  1` au lieu de `cancellation_count + 1`
+- `rows_affected  ROW_COUNT()` au lieu de `rows_affected + ROW_COUNT()`
+- Opérateurs manquants dans les expressions
 
 **Solutions :**
 1. **Utiliser le schéma corrigé :**
@@ -64,6 +67,17 @@ Utilisez toujours `schema_production.sql` pour les déploiements :
 2. **Exporter à nouveau :**
    ```bash
    ./export_production.sh  # Corrige automatiquement ces erreurs
+   ```
+
+3. **Correction manuelle :**
+   ```sql
+   -- Avant (incorrect)
+   SET count = count  1;
+   SET total = total  ROW_COUNT();
+
+   -- Après (correct)
+   SET count = count + 1;
+   SET total = total + ROW_COUNT();
    ```
 
 ### Erreur de Charset
