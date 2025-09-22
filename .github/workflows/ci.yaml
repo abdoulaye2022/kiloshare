@@ -1,0 +1,45 @@
+name: Deploy API to OVH
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout le code du dépôt
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      # 2. Configurer PHP et installer les dépendances (si nécessaire dans le dossier api)
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+        if: hashFiles('./api/composer.json') != ''
+        
+      - name: Install Composer dependencies in API folder
+        run: |
+          if [ -f "./api/composer.json" ]; then
+            cd api
+            composer install --no-dev --prefer-dist --optimize-autoloader
+          fi
+          
+      # 3. Déployer via FTP sur le serveur OVH
+      - name: Deploy API to OVH via FTP
+        uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        with:
+          server: ${{ secrets.KS_FTP_SERVER }}
+          username: ${{ secrets.KS_FTP_USERNAME }}
+          password: ${{ secrets.KS_FTP_PASSWORD }}
+          local-dir: ./api/
+          server-dir: /www/api.kiloshare/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/.env

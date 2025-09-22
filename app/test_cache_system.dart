@@ -10,6 +10,7 @@ void main() {
     
     test('Cache Service - Simulation basique', () async {
       // Simuler SharedPreferences
+      // ignore: invalid_use_of_visible_for_testing_member
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       
