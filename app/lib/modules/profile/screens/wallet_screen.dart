@@ -419,6 +419,31 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
             ),
           ),
         ] else if (accountInfo != null && (accountInfo['onboarding_complete'] != true || accountInfo['account']?['has_restrictions'] == true)) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.orange.shade600),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cliquez sur le bouton ci-dessous pour ouvrir la configuration Stripe dans votre navigateur. Vous devrez compléter toutes les étapes avant de pouvoir recevoir des paiements.',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -571,18 +596,19 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Configuration Stripe ouverte dans votre navigateur'),
+              SnackBar(
+                content: const Text('Configuration Stripe ouverte dans votre navigateur. Revenez ici après avoir complété la configuration.'),
                 backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'Actualiser',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    _loadStripeAccountInfo();
+                  },
+                ),
               ),
             );
-            
-            // Attendre un peu puis recharger les infos
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                _loadStripeAccountInfo();
-              }
-            });
           }
         }
       } else {
@@ -670,17 +696,11 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
             
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(message),
+                content: Text('$message Revenez ici après avoir complété la configuration.'),
                 backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
               ),
             );
-            
-            // Attendre un peu puis recharger les infos
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                _loadStripeAccountInfo();
-              }
-            });
           }
         }
       } else {

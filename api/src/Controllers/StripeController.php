@@ -353,22 +353,6 @@ class StripeController
         }
     }
 
-    /**
-     * Créer un Payment Intent pour une réservation
-     */
-    /**
-     * DEPRECATED: Cette méthode utilise l'ancien système de paiement immédiat.
-     * Utilisez maintenant le système de capture différée via PaymentAuthorizationService.
-     * Les nouvelles réservations passent automatiquement par le nouveau système.
-     */
-    public function createPaymentIntent(ServerRequestInterface $request): ResponseInterface
-    {
-        return Response::error(
-            'Cette méthode de paiement est obsolète. Le nouveau système de capture différée est maintenant utilisé automatiquement lors de l\'acceptation des réservations.',
-            ['redirect_to' => 'booking_flow'],
-            410
-        );
-    }
 
     /**
      * Confirmer le paiement et exécuter le workflow complet post-paiement

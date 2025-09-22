@@ -16,6 +16,7 @@ use KiloShare\Services\Channels\InAppNotificationChannel;
 use Exception;
 use DateTime;
 use DateTimeZone;
+use Carbon\Carbon;
 
 /**
  * Service intelligent de notifications basé sur les préférences utilisateur
@@ -230,7 +231,7 @@ class SmartNotificationService
             'message' => $this->getNotificationMessage($type, $data),
             'data' => json_encode($data),
             'read_at' => null,
-            'created_at' => now()
+            'created_at' => Carbon::now()
         ]);
     }
 
@@ -263,7 +264,7 @@ class SmartNotificationService
                 'title' => $message['title'] ?? $message['subject'] ?? 'Notification',
                 'message' => $message['content'] ?? $message['body'] ?? $message['message'] ?? '',
                 'status' => 'pending',
-                'created_at' => now()
+                'created_at' => Carbon::now()
             ]);
 
             // Envoyer
@@ -273,7 +274,7 @@ class SmartNotificationService
             $log->update([
                 'status' => $result['success'] ? 'sent' : 'failed',
                 'error_message' => $result['error'] ?? null,
-                'sent_at' => $result['success'] ? now() : null
+                'sent_at' => $result['success'] ? Carbon::now() : null
             ]);
 
             return $result;
@@ -515,5 +516,261 @@ class SmartNotificationService
             ],
             ['priority' => 'high']
         );
+    }
+
+    /**
+     * Envoyer une notification d'autorisation de paiement
+     */
+    public function sendPaymentAuthorizationNotification($authorization, $user): bool
+    {
+        try {
+            $result = $this->send(
+                $user->id,
+                'payment_authorized',
+                [
+                    'booking_id' => $authorization->booking_id,
+                    'amount' => $authorization->getAmountInDollars(),
+                    'currency' => $authorization->currency,
+                ],
+                [
+                    'channels' => ['push', 'in_app'],
+                    'priority' => 'normal'
+                ]
+            );
+
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("Erreur notification autorisation paiement: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envoyer une notification de paiement annulé
+     */
+    public function sendPaymentCancelledNotification($authorization, ?string $reason = null): bool
+    {
+        try {
+            $senderResult = true;
+            $transporterResult = true;
+
+            // Notifier l'expéditeur
+            if ($authorization->booking && $authorization->booking->sender_id) {
+                $senderResult = $this->send(
+                    $authorization->booking->sender_id,
+                    'payment_cancelled',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                        'reason' => $reason,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app', 'email'],
+                        'priority' => 'high'
+                    ]
+                )['success'] ?? false;
+            }
+
+            // Notifier le transporteur (vérifier que les relations existent)
+            if ($authorization->booking && $authorization->booking->trip && $authorization->booking->trip->user_id) {
+                $transporterResult = $this->send(
+                    $authorization->booking->trip->user_id,
+                    'payment_cancelled_transporter',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                        'reason' => $reason,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            return $senderResult && $transporterResult;
+        } catch (\Exception $e) {
+            error_log("Erreur notification paiement annulé: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envoyer une notification de paiement confirmé
+     */
+    public function sendPaymentConfirmedNotification($authorization): bool
+    {
+        try {
+            $senderResult = true;
+            $transporterResult = true;
+
+            // Notifier l'expéditeur
+            if ($authorization->booking && $authorization->booking->sender_id) {
+                $senderResult = $this->send(
+                    $authorization->booking->sender_id,
+                    'payment_confirmed',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            // Notifier le transporteur
+            if ($authorization->booking && $authorization->booking->trip && $authorization->booking->trip->user_id) {
+                $transporterResult = $this->send(
+                    $authorization->booking->trip->user_id,
+                    'payment_confirmed_transporter',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            return $senderResult && $transporterResult;
+        } catch (\Exception $e) {
+            error_log("Erreur notification paiement confirmé: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envoyer une notification de paiement capturé
+     */
+    public function sendPaymentCapturedNotification($authorization): bool
+    {
+        try {
+            $senderResult = true;
+            $transporterResult = true;
+
+            // Notifier l'expéditeur
+            if ($authorization->booking && $authorization->booking->sender_id) {
+                $senderResult = $this->send(
+                    $authorization->booking->sender_id,
+                    'payment_captured',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            // Notifier le transporteur
+            if ($authorization->booking && $authorization->booking->trip && $authorization->booking->trip->user_id) {
+                $transporterResult = $this->send(
+                    $authorization->booking->trip->user_id,
+                    'payment_captured_transporter',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            return $senderResult && $transporterResult;
+        } catch (\Exception $e) {
+            error_log("Erreur notification paiement capturé: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envoyer une notification de paiement expiré
+     */
+    public function sendPaymentExpiredNotification($authorization): bool
+    {
+        try {
+            $senderResult = true;
+            $transporterResult = true;
+
+            // Notifier l'expéditeur
+            if ($authorization->booking && $authorization->booking->sender_id) {
+                $senderResult = $this->send(
+                    $authorization->booking->sender_id,
+                    'payment_expired',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app', 'email'],
+                        'priority' => 'high'
+                    ]
+                )['success'] ?? false;
+            }
+
+            // Notifier le transporteur
+            if ($authorization->booking && $authorization->booking->trip && $authorization->booking->trip->user_id) {
+                $transporterResult = $this->send(
+                    $authorization->booking->trip->user_id,
+                    'payment_expired_transporter',
+                    [
+                        'booking_id' => $authorization->booking_id,
+                        'amount' => $authorization->getAmountInDollars(),
+                        'currency' => $authorization->currency,
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'normal'
+                    ]
+                )['success'] ?? false;
+            }
+
+            return $senderResult && $transporterResult;
+        } catch (\Exception $e) {
+            error_log("Erreur notification paiement expiré: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Notifier que le compte Stripe est requis
+     */
+    public function sendStripeAccountRequiredNotification($authorization, $user): bool
+    {
+        try {
+            $result = $this->send(
+                $user->id,
+                'stripe_account_required',
+                [
+                    'booking_id' => $authorization->booking_id,
+                    'amount' => $authorization->getAmountInDollars(),
+                    'currency' => $authorization->currency,
+                ],
+                [
+                    'channels' => ['push', 'in_app', 'email'],
+                    'priority' => 'high'
+                ]
+            );
+
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("Erreur notification compte Stripe requis: " . $e->getMessage());
+            return false;
+        }
     }
 }

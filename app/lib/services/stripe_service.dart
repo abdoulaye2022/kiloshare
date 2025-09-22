@@ -193,56 +193,6 @@ class StripeService {
     }
   }
 
-  /// Créer un Payment Intent pour une réservation
-  Future<Map<String, dynamic>> createPaymentIntent(int bookingId) async {
-    try {
-      print('StripeService.createPaymentIntent - booking ID received: $bookingId');
-      
-      final headers = await _getAuthHeaders();
-      if (headers == null) {
-        return {
-          'success': false,
-          'error': 'Authentication required',
-        };
-      }
-
-      final body = json.encode({
-        'booking_id': bookingId,
-      });
-      
-      print('StripeService.createPaymentIntent - body to send: $body');
-
-      final response = await http.post(
-        Uri.parse('$_baseUrl/stripe/payment/create-intent'),
-        headers: headers,
-        body: body,
-      );
-
-      final responseData = json.decode(response.body);
-
-      if (response.statusCode == 200 && responseData['success'] == true) {
-        return {
-          'success': true,
-          'client_secret': responseData['data']['client_secret'],
-          'payment_intent_id': responseData['data']['payment_intent_id'],
-          'amount': responseData['data']['amount'],
-          'commission_amount': responseData['data']['commission_amount'],
-          'net_amount': responseData['data']['net_amount'],
-        };
-      } else {
-        return {
-          'success': false,
-          'error': responseData['message'] ?? 'Erreur lors de la création du Payment Intent',
-        };
-      }
-    } catch (e) {
-      print('Erreur StripeService.createPaymentIntent: $e');
-      return {
-        'success': false,
-        'error': 'Erreur de connexion lors de la création du paiement',
-      };
-    }
-  }
 
   /// Confirmer le paiement après succès Stripe
   Future<Map<String, dynamic>> confirmPayment({

@@ -5,31 +5,23 @@ declare(strict_types=1);
 namespace KiloShare\Services;
 
 use KiloShare\Models\PaymentConfiguration;
-use Illuminate\Support\Facades\Cache;
 
 class PaymentConfigurationService
 {
-    private const CACHE_PREFIX = 'payment_config_';
-    private const CACHE_TTL = 3600; // 1 heure
-
     /**
      * Récupérer une configuration
      */
     public function get(string $key, $default = null)
     {
-        $cacheKey = self::CACHE_PREFIX . $key;
+        $config = PaymentConfiguration::where('config_key', $key)
+                                     ->where('is_active', true)
+                                     ->first();
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($key, $default) {
-            $config = PaymentConfiguration::where('config_key', $key)
-                                         ->where('is_active', true)
-                                         ->first();
+        if (!$config) {
+            return $default;
+        }
 
-            if (!$config) {
-                return $default;
-            }
-
-            return $this->castValue($config->config_value, $config->value_type);
-        });
+        return $this->castValue($config->config_value, $config->value_type);
     }
 
     /**

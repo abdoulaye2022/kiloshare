@@ -256,7 +256,6 @@ class _AvatarDisplayTestPageState extends State<AvatarDisplayTestPage> {
         content: Text(message),
         backgroundColor: color,
         behavior: SnackBarBehavior.fixed,
-        margin: EdgeInsets.zero,
       ),
     );
   }

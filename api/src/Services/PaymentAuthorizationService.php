@@ -10,6 +10,8 @@ use KiloShare\Models\ScheduledJob;
 use KiloShare\Models\Booking;
 use KiloShare\Models\User;
 use KiloShare\Models\Transaction;
+use KiloShare\Models\UserStripeAccount;
+use KiloShare\Services\SmartNotificationService;
 use Stripe\StripeClient;
 use Stripe\PaymentIntent;
 use Stripe\Exception\StripeException;
@@ -18,7 +20,7 @@ use Carbon\Carbon;
 class PaymentAuthorizationService
 {
     private StripeClient $stripe;
-    private ?NotificationService $notificationService = null;
+    private ?SmartNotificationService $notificationService = null;
     private ?PaymentConfigurationService $configService = null;
 
     public function __construct()
@@ -30,10 +32,10 @@ class PaymentAuthorizationService
         // pour éviter les dépendances circulaires
     }
 
-    private function getNotificationService(): NotificationService
+    private function getNotificationService(): SmartNotificationService
     {
         if ($this->notificationService === null) {
-            $this->notificationService = new NotificationService();
+            $this->notificationService = new SmartNotificationService();
         }
         return $this->notificationService;
     }
@@ -59,53 +61,72 @@ class PaymentAuthorizationService
             $amountCents = (int) ($totalAmount * 100);
             $platformFeeCents = $this->calculatePlatformFee($amountCents);
 
-            // Récupérer le compte Stripe du transporteur
+            // Vérifier le compte Stripe du transporteur
             $stripeAccountId = $this->getTransporterStripeAccount($booking);
+            $hasStripeAccount = !empty($stripeAccountId);
 
-            // Créer le PaymentIntent avec capture manuelle
-            $paymentIntent = $this->createStripePaymentIntent(
-                $amountCents,
-                $platformFeeCents,
-                $stripeAccountId,
-                $booking,
-                $sender
-            );
+            $paymentIntentId = null;
+            $authorizationStatus = PaymentAuthorization::STATUS_PENDING;
+
+            if ($hasStripeAccount) {
+                // Créer le PaymentIntent avec capture manuelle
+                $paymentIntent = $this->createStripePaymentIntent(
+                    $amountCents,
+                    $platformFeeCents,
+                    $stripeAccountId,
+                    $booking,
+                    $sender
+                );
+                $paymentIntentId = $paymentIntent->id;
+            } else {
+                // Pas de compte Stripe - autorisation en attente de configuration
+                $authorizationStatus = PaymentAuthorization::STATUS_PENDING_STRIPE_CONFIG;
+            }
 
             // Créer l'autorisation en base
             $authorization = PaymentAuthorization::create([
                 'booking_id' => $booking->id,
-                'payment_intent_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntentId,
                 'stripe_account_id' => $stripeAccountId,
                 'amount_cents' => $amountCents,
                 'currency' => 'CAD',
                 'platform_fee_cents' => $platformFeeCents,
-                'status' => PaymentAuthorization::STATUS_PENDING,
+                'status' => $authorizationStatus,
             ]);
 
             // Créer la transaction associée
             $this->createTransaction($authorization, Transaction::TYPE_PAYMENT_AUTHORIZATION);
 
             // Mettre à jour le statut de la réservation
+            $bookingStatus = $hasStripeAccount ? Booking::STATUS_PAYMENT_AUTHORIZED : Booking::STATUS_ACCEPTED;
             $booking->update([
-                'status' => Booking::STATUS_PAYMENT_AUTHORIZED,
+                'status' => $bookingStatus,
                 'payment_authorization_id' => $authorization->id,
-                'payment_authorized_at' => now(),
+                'payment_authorized_at' => $hasStripeAccount ? Carbon::now() : null,
             ]);
 
-            // Programmer les jobs de gestion automatique
-            $this->scheduleManagementJobs($authorization);
+            // Programmer les jobs de gestion automatique seulement si le PaymentIntent existe
+            if ($hasStripeAccount) {
+                $this->scheduleManagementJobs($authorization);
+            }
 
             // Logger l'événement
             $processingTime = (int) ((microtime(true) - $startTime) * 1000);
             PaymentEventLog::logAuthorizationCreated($authorization, $sender, [
-                'payment_intent_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntentId,
                 'amount_cents' => $amountCents,
                 'platform_fee_cents' => $platformFeeCents,
                 'processing_time_ms' => $processingTime,
+                'has_stripe_account' => $hasStripeAccount,
             ]);
 
-            // Envoyer notification à l'expéditeur
-            $this->getNotificationService()->sendPaymentAuthorizationNotification($authorization, $sender);
+            // Envoyer notification appropriée
+            if ($hasStripeAccount) {
+                $this->getNotificationService()->sendPaymentAuthorizationNotification($authorization, $sender);
+            } else {
+                // Notifier que le compte Stripe doit être configuré
+                $this->getNotificationService()->sendStripeAccountRequiredNotification($authorization, $booking->trip->user);
+            }
 
             return $authorization;
 
@@ -128,7 +149,7 @@ class PaymentAuthorizationService
     }
 
     /**
-     * Confirmer une autorisation de paiement par l'expéditeur
+     * Confirmer une autorisation de paiement après confirmation client Stripe
      */
     public function confirmAuthorization(PaymentAuthorization $authorization, User $user): bool
     {
@@ -143,14 +164,11 @@ class PaymentAuthorizationService
         }
 
         try {
-            // Confirmer le PaymentIntent côté Stripe
-            $paymentIntent = $this->stripe->paymentIntents->confirm(
-                $authorization->payment_intent_id,
-                ['return_url' => $this->getReturnUrl()]
-            );
+            // Récupérer le PaymentIntent pour vérifier son statut
+            $paymentIntent = $this->stripe->paymentIntents->retrieve($authorization->payment_intent_id);
 
             if ($paymentIntent->status !== 'requires_capture') {
-                throw new \Exception('Le paiement n\'est pas dans l\'état requis pour la capture');
+                throw new \Exception('Le paiement n\'est pas dans l\'état requis pour la capture. Statut actuel: ' . $paymentIntent->status);
             }
 
             // Mettre à jour l'autorisation
@@ -159,7 +177,7 @@ class PaymentAuthorizationService
             // Mettre à jour la réservation
             $authorization->booking->update([
                 'status' => Booking::STATUS_PAYMENT_CONFIRMED,
-                'payment_confirmed_at' => now(),
+                'payment_confirmed_at' => Carbon::now(),
             ]);
 
             // Créer une transaction de confirmation
@@ -218,7 +236,7 @@ class PaymentAuthorizationService
             // Mettre à jour la réservation
             $authorization->booking->update([
                 'status' => Booking::STATUS_PAID,
-                'payment_captured_at' => now(),
+                'payment_captured_at' => Carbon::now(),
             ]);
 
             // Mettre à jour la transaction
@@ -229,7 +247,7 @@ class PaymentAuthorizationService
             if ($transaction) {
                 $transaction->update([
                     'status' => Transaction::STATUS_CAPTURED,
-                    'captured_at' => now(),
+                    'captured_at' => Carbon::now(),
                 ]);
             }
 
@@ -364,7 +382,7 @@ class PaymentAuthorizationService
             'amount' => $amountCents,
             'currency' => 'cad',
             'capture_method' => 'manual', // Capture différée
-            'confirmation_method' => 'manual',
+            'confirmation_method' => 'automatic', // Confirmation automatique côté client
             'application_fee_amount' => $applicationFeeCents,
             'transfer_data' => [
                 'destination' => $stripeAccountId,
@@ -391,14 +409,15 @@ class PaymentAuthorizationService
         return Transaction::create([
             'booking_id' => $authorization->booking_id,
             'payment_authorization_id' => $authorization->id,
-            'user_id' => $authorization->booking->sender_id,
             'type' => $type,
             'amount' => $authorization->getAmountInDollars(),
+            'commission' => $authorization->getPlatformFeeInDollars(),
+            'receiver_amount' => $authorization->getAmountInDollars() - $authorization->getPlatformFeeInDollars(),
             'currency' => $authorization->currency,
             'status' => $status,
-            'provider' => 'stripe',
-            'provider_transaction_id' => $authorization->payment_intent_id,
-            'authorized_at' => now(),
+            'payment_method' => 'stripe',
+            'stripe_payment_intent_id' => $authorization->payment_intent_id,
+            'authorized_at' => Carbon::now(),
         ]);
     }
 
@@ -464,7 +483,7 @@ class PaymentAuthorizationService
             'type' => ScheduledJob::TYPE_AUTO_CAPTURE,
             'payment_authorization_id' => $authorization->id,
             'booking_id' => $authorization->booking_id,
-            'scheduled_at' => now()->addMinutes($delayMinutes),
+            'scheduled_at' => Carbon::now()->addMinutes($delayMinutes),
             'priority' => 2, // Priorité élevée pour les retries
             'job_data' => [
                 'payment_intent_id' => $authorization->payment_intent_id,
@@ -490,16 +509,42 @@ class PaymentAuthorizationService
     /**
      * Récupérer le compte Stripe du transporteur
      */
-    private function getTransporterStripeAccount(Booking $booking): string
+    private function getTransporterStripeAccount(Booking $booking): ?string
     {
         $trip = $booking->trip;
         $transporter = $trip->user;
 
-        if (!$transporter->stripe_account_id) {
-            throw new \Exception('Le transporteur n\'a pas de compte Stripe configuré');
+        // Vérifier si l'utilisateur a un compte Stripe configuré dans la table user_stripe_accounts
+        $stripeAccount = UserStripeAccount::where('user_id', $transporter->id)->first();
+
+        if (!$stripeAccount) {
+            return null;
         }
 
-        return $transporter->stripe_account_id;
+        // Vérifier que le compte est prêt pour les transactions (charges_enabled ET payouts_enabled)
+        if (!$stripeAccount->charges_enabled || !$stripeAccount->payouts_enabled) {
+            return null;
+        }
+
+        return $stripeAccount->stripe_account_id;
+    }
+
+    /**
+     * Obtenir le client_secret d'une autorisation pour l'app mobile
+     */
+    public function getClientSecret(PaymentAuthorization $authorization): ?string
+    {
+        if (!$authorization->payment_intent_id) {
+            return null;
+        }
+
+        try {
+            $paymentIntent = $this->stripe->paymentIntents->retrieve($authorization->payment_intent_id);
+            return $paymentIntent->client_secret;
+        } catch (StripeException $e) {
+            error_log("Erreur récupération client_secret: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -515,7 +560,7 @@ class PaymentAuthorizationService
      */
     public function getAuthorizationStats(int $days = 30): array
     {
-        $startDate = now()->subDays($days);
+        $startDate = Carbon::now()->subDays($days);
 
         return [
             'total_authorizations' => PaymentAuthorization::where('created_at', '>=', $startDate)->count(),
@@ -534,7 +579,7 @@ class PaymentAuthorizationService
 
     private function getAverageConfirmationTime(int $days): ?float
     {
-        $authorizations = PaymentAuthorization::where('created_at', '>=', now()->subDays($days))
+        $authorizations = PaymentAuthorization::where('created_at', '>=', Carbon::now()->subDays($days))
                                             ->whereNotNull('confirmed_at')
                                             ->get();
 
@@ -551,7 +596,7 @@ class PaymentAuthorizationService
 
     private function getAverageCaptureTime(int $days): ?float
     {
-        $authorizations = PaymentAuthorization::where('created_at', '>=', now()->subDays($days))
+        $authorizations = PaymentAuthorization::where('created_at', '>=', Carbon::now()->subDays($days))
                                             ->whereNotNull('captured_at')
                                             ->whereNotNull('confirmed_at')
                                             ->get();

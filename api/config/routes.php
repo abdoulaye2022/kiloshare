@@ -236,6 +236,7 @@ return function (App $app) {
                 $bookingGroup->post('/{id}/no-show', [BookingController::class, 'markAsNoShow']);
 
                 // Routes pour le nouveau système de capture différée
+                $bookingGroup->get('/{id}/payment/details', [BookingController::class, 'getPaymentDetails']);
                 $bookingGroup->post('/{id}/payment/confirm', [BookingController::class, 'confirmPayment']);
                 $bookingGroup->post('/{id}/payment/capture', [BookingController::class, 'capturePayment']);
                 $bookingGroup->get('/{id}/payment/status', [BookingController::class, 'getPaymentStatus']);
@@ -346,7 +347,6 @@ return function (App $app) {
                 $stripeGroup->post('/account/refresh-onboarding', [StripeController::class, 'refreshOnboardingLink']);
                 
                 // Payment routes
-                $stripeGroup->post('/payment/create-intent', [StripeController::class, 'createPaymentIntent']);
                 $stripeGroup->post('/payment/confirm', [StripeController::class, 'confirmPayment']);
                 
                 // Verification routes

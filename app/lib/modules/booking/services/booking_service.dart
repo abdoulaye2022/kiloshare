@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../config/app_config.dart';
-import '../../auth/services/auth_service.dart';
 import '../models/booking_model.dart';
+import '../../../utils/auth_helper.dart';
 
 class BookingService {
   static final BookingService _instance = BookingService._internal();
@@ -12,18 +12,19 @@ class BookingService {
   static BookingService get instance => _instance;
 
   final String _baseUrl = AppConfig.baseUrl;
-  final AuthService _authService = AuthService.instance;
 
   Future<Map<String, String>?> _getAuthHeaders() async {
-    final token = await _authService.getValidAccessToken();
-    if (token == null) {
-      print('BookingService: No valid token found, unable to make authenticated request');
-      return null;
+    try {
+      // Utiliser l'AuthHelper pour une gestion plus robuste
+      final headers = await AuthHelper.createAuthHeaders();
+      if (headers == null) {
+        throw Exception('Authentication token is required. Please log in again.');
+      }
+      return headers;
+    } catch (e) {
+      print('BookingService: Authentication error: $e');
+      throw Exception('Authentication token is required. Please log in again.');
     }
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
   }
 
   /// Créer une demande de réservation
@@ -80,7 +81,7 @@ class BookingService {
         return {
           'success': true,
           'booking': responseData['data']?['booking'],
-          'message': responseData['message'] ?? 'Réservation créée avec succès',
+          'message': responseData['message'],
         };
       } else {
         return {
@@ -418,6 +419,47 @@ class BookingService {
       }
     } catch (e) {
       print('Erreur BookingService.addPackagePhoto: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Obtenir les détails de paiement (client_secret, etc.)
+  Future<Map<String, dynamic>> getPaymentDetails(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/payment/details'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'client_secret': responseData['data']['client_secret'],
+          'payment_intent_id': responseData['data']['payment_intent_id'],
+          'amount': responseData['data']['amount'],
+          'currency': responseData['data']['currency'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la récupération des détails de paiement',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.getPaymentDetails: $e');
       return {
         'success': false,
         'error': 'Erreur de connexion: $e',

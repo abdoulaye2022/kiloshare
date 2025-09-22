@@ -79,7 +79,6 @@ class FirebaseNotificationService {
       await initializeBasic();
     }
 
-
     try {
       // 1. Demander les permissions
       await requestPermissions();
@@ -89,6 +88,38 @@ class FirebaseNotificationService {
 
       _isFullyInitialized = true;
     } catch (e, stackTrace) {
+      debugPrint('FirebaseNotificationService: Error in initializeAfterLogin: $e');
+      // Continue sans erreur pour ne pas bloquer l'app
+    }
+  }
+
+  /// ✅ OPTIMISATION: Enregistrement rapide après connexion sans double init
+  Future<void> registerAfterLogin() async {
+    try {
+      if (!_isBasicInitialized) {
+        await initializeBasic();
+      }
+
+      // Vérifier la connexion réseau avant d'essayer d'obtenir le token
+      if (await _isNetworkAvailable()) {
+        await _handlePushNotificationsToken();
+        _isFullyInitialized = true;
+      } else {
+        debugPrint('FirebaseNotificationService: Network unavailable, skipping token registration');
+      }
+    } catch (e) {
+      debugPrint('FirebaseNotificationService: Error in registerAfterLogin: $e');
+      // Silent catch - ne pas bloquer l'authentification
+    }
+  }
+
+  /// Vérifier la disponibilité du réseau
+  Future<bool> _isNetworkAvailable() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -547,12 +578,10 @@ class FirebaseNotificationService {
 
   // ✅ MÉTHODES PUBLIQUES
 
-  /// Initialiser après connexion (à appeler dans l'AuthBloc)
-  Future<void> registerAfterLogin() async {
-    
+  /// Initialiser après connexion (à appeler dans l'AuthBloc) - VERSION LEGACY
+  Future<void> registerAfterLoginLegacy() async {
     if (!_isFullyInitialized) {
       await initializeAfterLogin();
-    } else {
     }
 
     // Forcer l'enregistrement même si déjà initialisé

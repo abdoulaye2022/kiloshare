@@ -440,10 +440,35 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
         textColor = Colors.blue.shade700;
         iconData = Icons.paid;
         break;
+      case BookingStatus.paymentAuthorized:
+        backgroundColor = Colors.blue.shade100;
+        textColor = Colors.blue.shade700;
+        iconData = Icons.credit_card;
+        break;
+      case BookingStatus.paymentConfirmed:
+        backgroundColor = Colors.indigo.shade100;
+        textColor = Colors.indigo.shade700;
+        iconData = Icons.verified;
+        break;
+      case BookingStatus.inTransit:
+        backgroundColor = Colors.teal.shade100;
+        textColor = Colors.teal.shade700;
+        iconData = Icons.local_shipping;
+        break;
+      case BookingStatus.delivered:
+        backgroundColor = Colors.lime.shade100;
+        textColor = Colors.lime.shade700;
+        iconData = Icons.inventory;
+        break;
       case BookingStatus.completed:
         backgroundColor = Colors.green.shade100;
         textColor = Colors.green.shade700;
         iconData = Icons.check_circle_outline;
+        break;
+      case BookingStatus.cancelled:
+        backgroundColor = Colors.red.shade100;
+        textColor = Colors.red.shade700;
+        iconData = Icons.cancel;
         break;
       default:
         backgroundColor = Colors.grey.shade100;
@@ -463,7 +488,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
           Icon(iconData, size: 12, color: textColor),
           const SizedBox(width: 4),
           Text(
-            status.value,
+            _getStatusDisplayText(status),
             style: TextStyle(
               color: textColor,
               fontSize: 11,
@@ -473,6 +498,33 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
         ],
       ),
     );
+  }
+
+  String _getStatusDisplayText(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return 'En attente';
+      case BookingStatus.accepted:
+        return 'Acceptée';
+      case BookingStatus.rejected:
+        return 'Rejetée';
+      case BookingStatus.paymentPending:
+        return 'Paiement requis';
+      case BookingStatus.paymentAuthorized:
+        return 'Paiement autorisé';
+      case BookingStatus.paymentConfirmed:
+        return 'Paiement confirmé';
+      case BookingStatus.paid:
+        return 'Payée';
+      case BookingStatus.inTransit:
+        return 'En transit';
+      case BookingStatus.delivered:
+        return 'Livrée';
+      case BookingStatus.completed:
+        return 'Terminée';
+      case BookingStatus.cancelled:
+        return 'Annulée';
+    }
   }
 
   void _showBookingDetails(BookingModel booking, String userRole) {

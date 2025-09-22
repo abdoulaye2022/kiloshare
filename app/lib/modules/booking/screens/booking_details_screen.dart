@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/booking_service.dart';
 import '../models/booking_model.dart';
-import '../../../services/stripe_service.dart';
 import '../../auth/services/auth_service.dart';
+import '../../../services/stripe_service.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   final String bookingId;
@@ -783,9 +783,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _initiatePayment(),
-            icon: const Icon(Icons.credit_card),
-            label: const Text('Payer maintenant'),
+            onPressed: () => _confirmPayment(),
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Confirmer le paiement'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -896,44 +896,63 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   /// Informations pour paiement confirmé (expéditeur)
   Widget _buildPaymentConfirmedInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
-      child: Column(
-        children: [
-          Row(
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Column(
             children: [
-              Icon(Icons.info, color: Colors.blue.shade600, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Paiement confirmé',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
+              Row(
+                children: [
+                  Icon(Icons.info, color: Colors.blue.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Paiement autorisé',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Les fonds sont réservés sur votre carte mais pas encore débités. Le montant sera prélevé automatiquement 72h avant le départ ou à la collecte du colis.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Votre paiement sera capturé automatiquement 72h avant le départ ou à la collecte du colis.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        // Bouton d'annulation (libération des fonds)
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _cancelBooking(),
+            icon: const Icon(Icons.cancel),
+            label: const Text('Annuler la réservation'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orange,
+              side: BorderSide(color: Colors.orange.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1025,8 +1044,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
+          Flexible(
+            flex: 2,
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1035,7 +1054,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
+            flex: 3,
             child: Text(
               value,
               style: valueStyle ?? Theme.of(context).textTheme.bodyMedium,
@@ -1124,25 +1145,108 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Future<void> _cancelBooking() async {
-    final confirmed = await showDialog<bool>(
+    // Déterminer le message selon le statut du paiement
+    String dialogContent;
+    if (_booking!.isPaymentConfirmed) {
+      // Paiement confirmé mais pas encore capturé = argent pas encore débité
+      dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
+          '💳 L\'autorisation de paiement sera annulée et les fonds réservés sur votre carte seront libérés immédiatement.\n\n'
+          '✅ Aucun montant ne sera débité de votre carte.\n\n'
+          'L\'annulation est gratuite jusqu\'à 72h avant le départ.';
+    } else if (_booking!.status == BookingStatus.paid) {
+      // Paiement capturé = argent débité, remboursement nécessaire
+      dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
+          '💰 Un remboursement sera automatiquement traité dans un délai de 3-5 jours ouvrables.\n\n'
+          'Des frais d\'annulation peuvent s\'appliquer selon les conditions.';
+    } else {
+      // Pas encore de paiement
+      dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
+          'L\'annulation est gratuite à ce stade.';
+    }
+
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Annuler la réservation'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
-          'Note: Des frais d\'annulation peuvent s\'appliquer selon les conditions.',
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Retour'),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Barre de handle
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Titre
+              Text(
+                'Annuler la réservation',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              // Contenu
+              Text(
+                dialogContent,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              // Boutons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: Colors.grey.shade400),
+                      ),
+                      child: const Text('Retour'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Confirmer l\'annulation'),
+                    ),
+                  ),
+                ],
+              ),
+              // Espace pour gérer le clavier/bottom safe area
+              SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 16),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Annuler la réservation'),
-          ),
-        ],
+        ),
       ),
     );
 
@@ -1279,104 +1383,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
-  Future<void> _initiatePayment() async {
-    _showLoader();
-
-    try {
-      if (_booking == null) {
-        _hideLoader();
-        _showErrorSnackBar('Erreur: Aucune réservation chargée');
-        return;
-      }
-
-      print('BookingDetailsScreen._initiatePayment - booking ID: ${_booking!.id}');
-      
-      if (_booking!.id <= 0) {
-        _hideLoader();
-        _showErrorSnackBar('Erreur: ID de réservation invalide (${_booking!.id})');
-        return;
-      }
-
-      // Créer le Payment Intent via Stripe
-      final stripeService = StripeService.instance;
-      final paymentResult = await stripeService.createPaymentIntent(_booking!.id);
-
-      _hideLoader();
-
-      if (paymentResult['success'] == true && mounted) {
-        // Montrer les détails du paiement et continuer avec Stripe
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => _PaymentConfirmationDialog(
-            amount: double.tryParse(paymentResult['amount'].toString()) ?? 0.0,
-            commissionAmount: double.tryParse(paymentResult['commission_amount'].toString()) ?? 0.0,
-            netAmount: double.tryParse(paymentResult['net_amount'].toString()) ?? 0.0,
-          ),
-        );
-
-        if (confirmed == true) {
-          // Initialiser et présenter la feuille de paiement Stripe
-          _showLoader();
-          
-          try {
-            final clientSecret = paymentResult['client_secret'];
-            final paymentIntentId = paymentResult['payment_intent_id'];
-            final amount = double.tryParse(paymentResult['amount'].toString()) ?? 0.0;
-            
-            // 1. Initialiser la feuille de paiement
-            final initResult = await stripeService.initializePaymentSheet(
-              clientSecret: clientSecret,
-              amount: amount,
-              currency: 'cad',
-              customerEmail: _booking?.senderEmail,
-            );
-            
-            _hideLoader();
-            
-            if (initResult['success'] == true) {
-              // 2. Présenter la feuille de paiement
-              final paymentSheetResult = await stripeService.presentPaymentSheet(
-                clientSecret: clientSecret,
-                paymentIntentId: paymentIntentId,
-              );
-              
-              if (paymentSheetResult['success'] == true) {
-                // 3. Confirmer le paiement côté serveur
-                _showLoader();
-                final confirmResult = await stripeService.confirmPayment(
-                  paymentIntentId: paymentIntentId,
-                  bookingId: _booking!.id,
-                );
-                _hideLoader();
-                
-                if (confirmResult['success'] == true) {
-                  _showSuccessSnackBar('Paiement effectué avec succès !');
-                  // Recharger les détails pour mettre à jour l'interface
-                  await _loadBookingDetails();
-                } else {
-                  _showErrorSnackBar(confirmResult['error'] ?? 'Erreur lors de la confirmation du paiement');
-                }
-              } else {
-                // L'utilisateur a annulé ou le paiement a échoué
-                _showErrorSnackBar(paymentSheetResult['error'] ?? 'Paiement annulé ou échoué');
-              }
-            } else {
-              _showErrorSnackBar(initResult['error'] ?? 'Erreur lors de l\'initialisation du paiement');
-            }
-            
-          } catch (e) {
-            _hideLoader();
-            _showErrorSnackBar('Erreur lors du paiement: $e');
-          }
-        }
-      } else {
-        _showErrorSnackBar(paymentResult['error'] ?? 'Erreur lors de l\'initialisation du paiement');
-      }
-    } catch (e) {
-      _hideLoader();
-      _showErrorSnackBar('Erreur: $e');
-    }
-  }
 
 
   Future<void> _markPaymentReady() async {
@@ -1415,23 +1421,37 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   void _showSuccessSnackBar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars() // Effacer les précédents snackbars
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
     }
   }
 
   void _showErrorSnackBar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars() // Effacer les précédents snackbars pour éviter les doublons
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
     }
   }
 
@@ -1448,46 +1468,68 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     return '${_formatDate(date)} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  /// Confirmer le paiement (nouveau système de capture différée)
+  /// Confirmer le paiement avec Stripe PaymentSheet
   Future<void> _confirmPayment() async {
     try {
-      final result = await _bookingService.confirmPayment(widget.bookingId);
+      // Étape 1: Vérifier que nous avons une réservation
+      if (_booking == null) {
+        await _loadBookingDetails();
+        if (_booking == null) {
+          _showErrorSnackBar('Impossible de charger les détails de la réservation');
+          return;
+        }
+      }
 
-      if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Paiement confirmé avec succès'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.fixed,
-              margin: EdgeInsets.zero,
-            ),
-          );
+      // Étape 2: Obtenir le client_secret via l'API (cela vérifie aussi la présence d'une autorisation)
+      final paymentDetails = await _bookingService.getPaymentDetails(widget.bookingId);
+      if (paymentDetails['success'] != true) {
+        _showErrorSnackBar(paymentDetails['error'] ?? 'Impossible d\'obtenir les détails de paiement');
+        return;
+      }
+
+      if (paymentDetails['client_secret'] == null) {
+        _showErrorSnackBar('Aucune autorisation de paiement trouvée pour cette réservation');
+        return;
+      }
+
+      // Étape 3: Initialiser et présenter Stripe PaymentSheet
+      final stripeService = StripeService.instance;
+
+      // Initialiser la feuille de paiement
+      final initResult = await stripeService.initializePaymentSheet(
+        clientSecret: paymentDetails['client_secret'],
+        amount: _booking!.finalPrice?.toDouble() ?? _booking!.proposedPrice,
+        currency: 'CAD',
+        customerEmail: null, // Pourrait être récupéré du profil utilisateur
+      );
+
+      if (initResult['success'] != true) {
+        _showErrorSnackBar(initResult['error'] ?? 'Erreur d\'initialisation du paiement');
+        return;
+      }
+
+      // Présenter la feuille de paiement
+      final paymentResult = await stripeService.presentPaymentSheet(
+        clientSecret: paymentDetails['client_secret'],
+        paymentIntentId: paymentDetails['payment_intent_id'] ?? '',
+      );
+
+      if (paymentResult['success'] == true) {
+        // Étape 4: Confirmer côté serveur que le paiement a été traité
+        final confirmResult = await _bookingService.confirmPayment(widget.bookingId);
+
+        if (confirmResult['success'] == true) {
+          _showSuccessSnackBar(confirmResult['message'] ?? 'Paiement confirmé avec succès');
           _loadBookingDetails(); // Recharger les détails
+        } else {
+          _showErrorSnackBar(confirmResult['error'] ?? 'Erreur lors de la confirmation serveur');
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Erreur lors de la confirmation'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.fixed,
-              margin: EdgeInsets.zero,
-            ),
-          );
-        }
+        // Paiement annulé ou échoué
+        _showErrorSnackBar(paymentResult['error'] ?? 'Paiement annulé');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur de connexion: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.fixed,
-            margin: EdgeInsets.zero,
-          ),
-        );
-      }
+      _showErrorSnackBar('Erreur de connexion: $e');
     }
   }
 
@@ -1524,40 +1566,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       final result = await _bookingService.capturePayment(widget.bookingId);
 
       if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Paiement capturé avec succès'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.fixed,
-              margin: EdgeInsets.zero,
-            ),
-          );
-          _loadBookingDetails(); // Recharger les détails
-        }
+        _showSuccessSnackBar(result['message'] ?? 'Paiement capturé avec succès');
+        _loadBookingDetails(); // Recharger les détails
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Erreur lors de la capture'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.fixed,
-              margin: EdgeInsets.zero,
-            ),
-          );
-        }
+        _showErrorSnackBar(result['error'] ?? 'Erreur lors de la capture');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur de connexion: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.fixed,
-            margin: EdgeInsets.zero,
-          ),
-        );
-      }
+      _showErrorSnackBar('Erreur de connexion: $e');
     }
   }
 }
@@ -1659,6 +1674,8 @@ class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
                 const SnackBar(
                   content: Text('Veuillez entrer un prix valide'),
                   backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  margin: EdgeInsets.only(bottom: 20, left: 16, right: 16),
                 ),
               );
               return;
@@ -1681,109 +1698,3 @@ class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
 }
 
 
-class _PaymentConfirmationDialog extends StatelessWidget {
-  final double amount;
-  final double commissionAmount;
-  final double netAmount;
-
-  const _PaymentConfirmationDialog({
-    required this.amount,
-    required this.commissionAmount,
-    required this.netAmount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Confirmer le paiement'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Détails du paiement :',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              _buildPaymentRow('Montant total', '${amount.toStringAsFixed(2)} CAD', isTotal: true),
-              const SizedBox(height: 8),
-              _buildPaymentRow('Commission KiloShare (15%)', '-${commissionAmount.toStringAsFixed(2)} CAD'),
-              const SizedBox(height: 8),
-              _buildPaymentRow('Montant pour le voyageur', '${netAmount.toStringAsFixed(2)} CAD'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Les fonds seront retenus en escrow jusqu\'à la livraison confirmée.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Confirmer le paiement'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPaymentRow(String label, String value, {bool isTotal = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-              fontSize: isTotal ? 16 : 14,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: isTotal ? 16 : 14,
-              color: isTotal ? Colors.blue.shade800 : null,
-            ),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
-    );
-  }
-}

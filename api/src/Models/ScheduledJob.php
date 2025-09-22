@@ -171,7 +171,7 @@ class ScheduledJob extends Model
         return $this->save();
     }
 
-    public function cancel(string $reason = null): bool
+    public function cancel(?string $reason = null): bool
     {
         if (!in_array($this->status, [self::STATUS_PENDING, self::STATUS_FAILED])) {
             return false;

@@ -15,6 +15,7 @@ class PaymentAuthorization extends Model
 
     // Statuts d'autorisation
     const STATUS_PENDING = 'pending';           // En attente de confirmation par l'expéditeur
+    const STATUS_PENDING_STRIPE_CONFIG = 'pending_stripe_config'; // En attente de configuration Stripe du transporteur
     const STATUS_CONFIRMED = 'confirmed';       // Confirmé par l'expéditeur, en attente de capture
     const STATUS_CAPTURED = 'captured';         // Montant capturé avec succès
     const STATUS_CANCELLED = 'cancelled';       // Annulé avant capture
@@ -96,19 +97,19 @@ class PaymentAuthorization extends Model
     public function scopeReadyForCapture($query)
     {
         return $query->where('status', self::STATUS_CONFIRMED)
-                    ->where('auto_capture_at', '<=', now());
+                    ->where('auto_capture_at', '<=', Carbon::now());
     }
 
     public function scopeExpired($query)
     {
         return $query->where('status', self::STATUS_PENDING)
-                    ->where('confirmation_deadline', '<', now());
+                    ->where('confirmation_deadline', '<', Carbon::now());
     }
 
     public function scopeExpiredConfirmed($query)
     {
         return $query->where('status', self::STATUS_CONFIRMED)
-                    ->where('expires_at', '<', now());
+                    ->where('expires_at', '<', Carbon::now());
     }
 
     // Méthodes de statut
@@ -187,20 +188,20 @@ class PaymentAuthorization extends Model
         }
 
         $this->status = self::STATUS_CONFIRMED;
-        $this->confirmed_at = now();
+        $this->confirmed_at = Carbon::now();
 
         // Calculer la date d'expiration pour la capture (72h avant le voyage ou 7 jours max)
         if ($this->booking && $this->booking->trip) {
             $tripDate = Carbon::parse($this->booking->trip->departure_date);
             $captureDeadline = $tripDate->copy()->subHours(72);
-            $maxCaptureTime = now()->addDays(7);
+            $maxCaptureTime = Carbon::now()->addDays(7);
 
             $this->expires_at = $captureDeadline->min($maxCaptureTime);
             $this->auto_capture_at = $captureDeadline->copy()->subHours(1); // 1h avant la deadline
         } else {
             // Valeur par défaut si pas de voyage associé
-            $this->expires_at = now()->addDays(7);
-            $this->auto_capture_at = now()->addDays(6)->addHours(23);
+            $this->expires_at = Carbon::now()->addDays(7);
+            $this->auto_capture_at = Carbon::now()->addDays(6)->addHours(23);
         }
 
         return $this->save();
@@ -213,7 +214,7 @@ class PaymentAuthorization extends Model
         }
 
         $this->status = self::STATUS_CAPTURED;
-        $this->captured_at = now();
+        $this->captured_at = Carbon::now();
         $this->capture_reason = $reason;
 
         return $this->save();
@@ -226,7 +227,7 @@ class PaymentAuthorization extends Model
         }
 
         $this->status = self::STATUS_CANCELLED;
-        $this->cancelled_at = now();
+        $this->cancelled_at = Carbon::now();
 
         return $this->save();
     }
@@ -244,7 +245,7 @@ class PaymentAuthorization extends Model
         return $this->save();
     }
 
-    public function markAsFailed(string $error = null): bool
+    public function markAsFailed(?string $error = null): bool
     {
         $this->status = self::STATUS_FAILED;
         $this->capture_attempts++;
@@ -278,7 +279,7 @@ class PaymentAuthorization extends Model
             return null;
         }
 
-        return max(0, now()->diffInMinutes($this->confirmation_deadline, false));
+        return max(0, Carbon::now()->diffInMinutes($this->confirmation_deadline, false));
     }
 
     public function getRemainingCaptureTime(): ?int
@@ -287,7 +288,7 @@ class PaymentAuthorization extends Model
             return null;
         }
 
-        return max(0, now()->diffInMinutes($this->expires_at, false));
+        return max(0, Carbon::now()->diffInMinutes($this->expires_at, false));
     }
 
     // Événement pour calculer les délais automatiquement
@@ -298,7 +299,7 @@ class PaymentAuthorization extends Model
         static::creating(function ($authorization) {
             // Définir la deadline de confirmation (4 heures par défaut)
             if (!$authorization->confirmation_deadline) {
-                $authorization->confirmation_deadline = now()->addHours(4);
+                $authorization->confirmation_deadline = Carbon::now()->addHours(4);
             }
         });
     }
