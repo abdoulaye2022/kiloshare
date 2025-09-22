@@ -83,13 +83,18 @@ for file in $FILES; do
         fi
     done
 
-    # Vérification spéciale pour les clés privées (sans utiliser grep -E avec tirets)
-    if grep -q "BEGIN PRIVATE KEY" "$file" || grep -q "BEGIN RSA PRIVATE KEY" "$file"; then
-        echo -e "${RED}🚨 CLÉ PRIVÉE DÉTECTÉE dans $file${NC}"
-        echo -e "${YELLOW}Pattern: Private Key${NC}"
-        grep -n "BEGIN.*PRIVATE KEY" "$file" | head -1
-        echo ""
-        FOUND_SECRETS=$((FOUND_SECRETS + 1))
+    # Vérification spéciale pour les clés privées (sauf fichiers .example)
+    if [[ "$file" != *".example"* ]] && [[ "$file" != *".template"* ]]; then
+        if grep -q "BEGIN PRIVATE KEY" "$file" || grep -q "BEGIN RSA PRIVATE KEY" "$file"; then
+            # Vérifier que ce n'est pas une clé factice/exemple
+            if ! grep -q "VOTRE_CLE_PRIVEE_ICI\|YOUR_PRIVATE_KEY_HERE\|EXAMPLE_PRIVATE_KEY" "$file"; then
+                echo -e "${RED}🚨 CLÉ PRIVÉE DÉTECTÉE dans $file${NC}"
+                echo -e "${YELLOW}Pattern: Private Key${NC}"
+                grep -n "BEGIN.*PRIVATE KEY" "$file" | head -1
+                echo ""
+                FOUND_SECRETS=$((FOUND_SECRETS + 1))
+            fi
+        fi
     fi
 done
 
