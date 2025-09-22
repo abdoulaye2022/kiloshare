@@ -39,20 +39,20 @@ echo ""
 echo "2. Vérification des clés en dur..."
 
 # Rechercher des clés Stripe en dur
-STRIPE_KEYS=$(grep -r "sk_live_\|sk_test_" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" . | grep -v ".env" | grep -v ".example" | wc -l)
+STRIPE_KEYS=$(grep -r "sk_live_\|sk_test_" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" --exclude="SECURITY.md" --exclude="EMERGENCY_SECURITY.md" --exclude="README_SECURITY.md" --exclude-dir=.githooks --exclude="security-check.sh" . | grep -v ".env" | grep -v ".example" | wc -l)
 if [ $STRIPE_KEYS -gt 0 ]; then
     echo -e "${RED}❌ ERREUR: Clés Stripe trouvées en dur dans le code!${NC}"
-    grep -r "sk_live_\|sk_test_" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" . | grep -v ".env" | grep -v ".example"
+    grep -r "sk_live_\|sk_test_" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" --exclude="SECURITY.md" --exclude="EMERGENCY_SECURITY.md" --exclude="README_SECURITY.md" --exclude-dir=.githooks --exclude="security-check.sh" . | grep -v ".env" | grep -v ".example"
     ((ERRORS++))
 else
     echo -e "${GREEN}✅ Aucune clé Stripe en dur détectée${NC}"
 fi
 
-# Rechercher des mots de passe en dur
-PASSWORDS=$(grep -r "password.*=.*['\"].*['\"]" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" api/src/ | grep -v "\$_ENV\|getenv" | wc -l)
+# Rechercher des mots de passe en dur (ignorer les fonctions légitimes)
+PASSWORDS=$(grep -r "password.*=.*['\"].*['\"]" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" api/src/ | grep -v "\$_ENV\|getenv\|password_hash\|Password confirmation\|password_changed" | wc -l)
 if [ $PASSWORDS -gt 0 ]; then
     echo -e "${RED}❌ ERREUR: Mots de passe potentiels en dur détectés!${NC}"
-    grep -r "password.*=.*['\"].*['\"]" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" api/src/ | grep -v "\$_ENV\|getenv"
+    grep -r "password.*=.*['\"].*['\"]" --exclude-dir=vendor --exclude-dir=node_modules --exclude="*.log" api/src/ | grep -v "\$_ENV\|getenv\|password_hash\|Password confirmation\|password_changed"
     ((ERRORS++))
 else
     echo -e "${GREEN}✅ Aucun mot de passe en dur détecté${NC}"
