@@ -1,8 +1,8 @@
-# Composer
-/api/v1/vendor/
+##################################
+# FICHIERS SENSIBLES - SÉCURITÉ #
+##################################
 
-# Local Configuration & Environment Variables
-/api/v1/.env
+# Variables d'environnement avec clés secrètes
 .env
 .env.*
 .env.local
@@ -10,92 +10,307 @@
 .env.production
 .env.staging
 .env.test
+.environment
 !.env.example
 !.env.sample
 !.env.template
 
-# Fichiers avec clés secrètes
-*secret*.md
-*key*.md
-*token*.md
-*api*.md
-*auth*.md
-STRIPE_*.md
-FIREBASE_*.md
-DATABASE_*.md
-ENV_SETUP_GUIDE.md
-ENV_SETUP_GUIDE.md.bak
-env
-env.example.bak
-*.bak
+# Fichiers de configuration avec informations sensibles
+config/settings.php
+config/database.php
+config/secrets.php
+config/production.php
+config/staging.php
+src/config/settings.php
+src/config/database.php
+api/config/settings.php
+api/config/database.php
 
-# Claude Code
-.claude_session/
-.claude_cache/
-*.claude.tmp
+# Clés et certificats
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.cer
+*.der
+*.jks
+*.keystore
+ssh_host_*
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
 
-# Backend
-backend/vendor/
-backend/.env
-backend/.env.*
-backend/.env.local
-backend/.env.development
-backend/.env.production
-backend/.env.staging
-backend/.env.test
-backend/*secret*.md
-backend/*key*.md
-
-# Web (Next.js)
-web/.env
-web/.env.*
-web/.env.local
-web/.env.development.local
-web/.env.production.local
-web/.env.test.local
-web/*secret*.md
-web/*key*.md
-web/node_modules/
-web/.next/
-web/out/
-
-# Mobile
-mobile/build/
-mobile/.dart_tool/
-mobile/.flutter-plugins*
-mobile/.env
-mobile/.env.*
-mobile/.env.local
-mobile/.env.development
-mobile/.env.production
-mobile/.env.staging
-mobile/.env.test
-mobile/*secret*.md
-mobile/*key*.md
-
-# Database
-*.sql.backup
-*.db.backup
-*.dump
-
-# Autres fichiers sensibles
-config.json
-secrets.json
-credentials.json
+# Fichiers de service et credentials
 service-account.json
 firebase-service-account.json
 google-services.json
 GoogleService-Info.plist
 firebase-config.json
-*.pem
-*.key
-*.crt
-*.p12
+credentials.json
+secrets.json
+config.json
+auth.json
+oauth.json
+client_secret*.json
+token.json
+refresh_token.json
 
-# Fichiers de configuration IDE avec secrets potentiels
+# Stripe et autres API keys
+stripe_*.txt
+stripe_*.json
+stripe_*.key
+STRIPE_*
+stripe-config.*
+paypal_*.txt
+paypal_*.json
+
+# Firebase
+firebase-adminsdk-*.json
+firebase_*.json
+firebase-service-account.json
+*firebase-service-account*.json
+!firebase-service-account.json.example
+.firebase/
+.firebaserc
+
+# AWS et Cloud
+.aws/
+aws-credentials
+aws-config
+gcloud/
+terraform.tfstate*
+terraform.tfvars*
+*.tfvars
+
+# Fichiers de sauvegarde avec données sensibles
+*.sql
+*.sql.gz
+*.sql.bz2
+*.sql.backup
+*.db.backup
+*.dump
+*.bak
+backup.*
+backup_*
+*.backup
+
+# Documentation avec informations sensibles
+*secret*.md
+*secrets*.md
+*key*.md
+*keys*.md
+*token*.md
+*tokens*.md
+*password*.md
+*passwords*.md
+*api*.md
+*auth*.md
+*credential*.md
+*credentials*.md
+STRIPE_*.md
+FIREBASE_*.md
+DATABASE_*.md
+API_KEYS*.md
+ENV_SETUP*.md
+SETUP_GUIDE*.md
+DEPLOYMENT*.md
+PRODUCTION*.md
+
+##################################
+# DÉPENDANCES ET BUILD           #
+##################################
+
+# PHP/Composer
+vendor/
+composer.phar
+composer.lock
+api/vendor/
+api/v1/vendor/
+backend/vendor/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+package-lock.json
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+app/build/
+mobile/build/
+
+##################################
+# ENVIRONNEMENTS SPÉCIFIQUES     #
+##################################
+
+# API
+api/.env*
+api/config/settings.php
+api/config/database.php
+api/logs/
+api/cache/
+api/tmp/
+api/temp/
+
+# Backend
+backend/.env*
+backend/config/settings.php
+backend/config/database.php
+backend/logs/
+backend/cache/
+
+# Frontend Web
+web/.env*
+web/.next/
+web/out/
+web/dist/
+web/build/
+
+# Mobile App
+app/.env*
+app/android/key.properties
+app/android/app/key.jks
+app/android/app/upload-keystore.jks
+app/ios/Runner/GoogleService-Info.plist
+app/ios/firebase_app_id_file.json
+
+##################################
+# LOGS ET TEMPORAIRES            #
+##################################
+
+# Logs
+logs/
+*.log
+log.*
+*.log.*
+error.log
+access.log
+debug.log
+app.log
+laravel.log
+php_error.log
+
+# Caches et temporaires
+cache/
+tmp/
+temp/
+.cache/
+.tmp/
+*.tmp
+*.temp
+storage/
+uploads/
+
+##################################
+# IDE ET OUTILS                  #
+##################################
+
+# Claude Code
+.claude_session/
+.claude_cache/
+*.claude.tmp
+CLAUDE.md
+
+# VSCode
 .vscode/settings.json
-.idea/workspace.xml
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
 
-# OS
+# IntelliJ/PHPStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+##################################
+# SYSTÈME D'EXPLOITATION        #
+##################################
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.nfs*
+
+##################################
+# DÉVELOPPEMENT ET TEST          #
+##################################
+
+# Tests
+coverage/
+.nyc_output
+.coverage
+htmlcov/
+.pytest_cache/
+.phpunit.result.cache
+
+# Docker secrets
+.docker/
+docker-compose.override.yml
+docker-compose.prod.yml
+docker-compose.staging.yml
+
+# Base de données de développement
+database.sqlite
+database.db
+*.sqlite
+*.sqlite3
+*.db
+
+##################################
+# AUTRES FICHIERS SENSIBLES     #
+##################################
+
+# Sauvegarde et export
+export.*
+dump.*
+data_export.*
+user_data.*
+*.csv.backup
+*.xlsx.backup
+
+# Scripts de déploiement
+deploy.sh
+deployment_script.*
+production_deploy.*
+staging_deploy.*
+
+# Variables d'environnement inline
+env
+env.txt
+environment
+environment.txt

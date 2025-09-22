@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Pre-commit hook pour détecter les secrets dans KiloShare
+# Pour l'activer: ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+
+# Couleurs
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+echo "🔍 Vérification des secrets avant commit..."
+
+# Patterns de secrets à détecter
+SECRET_PATTERNS=(
+    "sk_live_[a-zA-Z0-9]+"                           # Stripe Live Secret Key
+    "sk_test_[a-zA-Z0-9]+"                           # Stripe Test Secret Key
+    "pk_live_[a-zA-Z0-9]+"                           # Stripe Live Publishable Key
+    "pk_test_[a-zA-Z0-9]+"                           # Stripe Test Publishable Key
+    "whsec_[a-zA-Z0-9]+"                             # Stripe Webhook Secret
+    "password\s*=\s*['\"][^'\"]{8,}['\"]"            # Hard-coded passwords
+    "secret\s*=\s*['\"][^'\"]{8,}['\"]"              # Hard-coded secrets
+    "token\s*=\s*['\"][^'\"]{16,}['\"]"              # Hard-coded tokens
+    "api_key\s*=\s*['\"][^'\"]{16,}['\"]"            # API Keys
+    "AKIA[0-9A-Z]{16}"                               # AWS Access Key
+)
+
+# Fichiers à exclure de la vérification
+EXCLUDE_PATTERNS=(
+    "vendor/"
+    "node_modules/"
+    ".git/"
+    "*.log"
+    "*.example"
+    "*.template"
+    ".env.example"
+    "SECURITY.md"
+    "EMERGENCY_SECURITY.md"
+    "README_SECURITY.md"
+    ".githooks/"
+    "scripts/security-check.sh"
+)
+
+FOUND_SECRETS=0
+
+# Obtenir la liste des fichiers modifiés
+FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$FILES" ]; then
+    echo -e "${GREEN}✅ Aucun fichier à vérifier${NC}"
+    exit 0
+fi
+
+echo "Fichiers à vérifier: $(echo $FILES | wc -w)"
+
+for file in $FILES; do
+    # Vérifier si le fichier existe (peut être supprimé)
+    if [ ! -f "$file" ]; then
+        continue
+    fi
+
+    # Vérifier si le fichier doit être exclu
+    SKIP_FILE=false
+    for exclude in "${EXCLUDE_PATTERNS[@]}"; do
+        if [[ "$file" == *"$exclude"* ]]; then
+            SKIP_FILE=true
+            break
+        fi
+    done
+
+    if [ "$SKIP_FILE" = true ]; then
+        continue
+    fi
+
+    # Vérifier chaque pattern de secret
+    for pattern in "${SECRET_PATTERNS[@]}"; do
+        if grep -qE "$pattern" "$file"; then
+            echo -e "${RED}🚨 SECRET DÉTECTÉ dans $file${NC}"
+            echo -e "${YELLOW}Pattern: $pattern${NC}"
+            grep -nE "$pattern" "$file" | head -3
+            echo ""
+            FOUND_SECRETS=$((FOUND_SECRETS + 1))
+        fi
+    done
+
+    # Vérification spéciale pour les clés privées (sans utiliser grep -E avec tirets)
+    if grep -q "BEGIN PRIVATE KEY" "$file" || grep -q "BEGIN RSA PRIVATE KEY" "$file"; then
+        echo -e "${RED}🚨 CLÉ PRIVÉE DÉTECTÉE dans $file${NC}"
+        echo -e "${YELLOW}Pattern: Private Key${NC}"
+        grep -n "BEGIN.*PRIVATE KEY" "$file" | head -1
+        echo ""
+        FOUND_SECRETS=$((FOUND_SECRETS + 1))
+    fi
+done
+
+# Vérifications spécifiques pour les fichiers sensibles
+for file in $FILES; do
+    case "$file" in
+        *.env)
+            if [ "$file" != ".env.example" ] && [ "$file" != ".env.template" ]; then
+                echo -e "${RED}🚨 ATTENTION: Tentative de commit d'un fichier .env: $file${NC}"
+                FOUND_SECRETS=$((FOUND_SECRETS + 1))
+            fi
+            ;;
+        *service-account*.json)
+            if [[ "$file" != *".example"* ]]; then
+                echo -e "${RED}🚨 ATTENTION: Tentative de commit d'un service account: $file${NC}"
+                FOUND_SECRETS=$((FOUND_SECRETS + 1))
+            fi
+            ;;
+        *.key|*.pem|*.crt)
+            echo -e "${RED}🚨 ATTENTION: Tentative de commit d'un certificat/clé: $file${NC}"
+            FOUND_SECRETS=$((FOUND_SECRETS + 1))
+            ;;
+    esac
+done
+
+if [ $FOUND_SECRETS -gt 0 ]; then
+    echo -e "${RED}❌ COMMIT BLOQUÉ: $FOUND_SECRETS secret(s) détecté(s)${NC}"
+    echo ""
+    echo "🛠️ ACTIONS À EFFECTUER:"
+    echo "1. Supprimez les secrets du code"
+    echo "2. Utilisez des variables d'environnement"
+    echo "3. Ajoutez les fichiers sensibles au .gitignore"
+    echo "4. Si nécessaire, révoquez les clés exposées"
+    echo ""
+    echo "📚 Voir: SECURITY.md pour les bonnes pratiques"
+    echo ""
+    echo "⚠️ Pour forcer le commit (NON RECOMMANDÉ):"
+    echo "git commit --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Aucun secret détecté - Commit autorisé${NC}"
+exit 0
