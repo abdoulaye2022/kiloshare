@@ -507,42 +507,16 @@ class BookingService {
   }
 
   /// Capturer le paiement manuellement (transporteur)
+  @Deprecated('Manual payment capture has been replaced by automatic capture upon delivery code validation')
   Future<Map<String, dynamic>> capturePayment(String bookingId) async {
-    try {
-      final headers = await _getAuthHeaders();
-      if (headers == null) {
-        return {
-          'success': false,
-          'error': 'Authentification requise. Veuillez vous reconnecter.',
-        };
-      }
-
-      final response = await http.post(
-        Uri.parse('${_baseUrl}/bookings/$bookingId/payment/capture'),
-        headers: headers,
-      );
-
-      final responseData = json.decode(response.body);
-
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'booking': responseData['data']['booking'] ?? responseData['booking'],
-          'message': responseData['message'],
-        };
-      } else {
-        return {
-          'success': false,
-          'error': responseData['message'] ?? 'Erreur lors de la capture du paiement',
-        };
-      }
-    } catch (e) {
-      print('Erreur BookingService.capturePayment: $e');
-      return {
-        'success': false,
-        'error': 'Erreur de connexion: $e',
-      };
-    }
+    // DÉSACTIVÉ: La capture manuelle a été remplacée par la capture automatique
+    // lors de la validation du code secret de livraison
+    return {
+      'success': false,
+      'error': 'La capture manuelle des paiements a été désactivée.',
+      'message': 'Le paiement sera automatiquement capturé lors de la validation du code secret de livraison.',
+      'disabled_feature': true,
+    };
   }
 
   /// Obtenir le statut du paiement

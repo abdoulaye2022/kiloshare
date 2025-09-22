@@ -172,10 +172,8 @@ class BookingModel {
   bool get isPaymentConfirmed => status == BookingStatus.paymentConfirmed;
   bool get needsPaymentConfirmation => status == BookingStatus.paymentAuthorized;
   bool get canConfirmPayment => status == BookingStatus.paymentAuthorized;
-  bool get canCapturePayment =>
-      status == BookingStatus.paymentConfirmed ||
-      status == BookingStatus.inTransit ||
-      status == BookingStatus.delivered;
+  @Deprecated('Manual payment capture has been disabled. Payment is now captured automatically upon delivery code validation')
+  bool get canCapturePayment => false; // Always false - manual capture disabled
   bool get canCancelBeforePayment =>
       status == BookingStatus.pending ||
       status == BookingStatus.accepted ||

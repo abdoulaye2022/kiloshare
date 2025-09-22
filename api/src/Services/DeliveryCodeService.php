@@ -7,7 +7,10 @@ namespace KiloShare\Services;
 use KiloShare\Models\Booking;
 use KiloShare\Models\DeliveryCode;
 use KiloShare\Models\DeliveryCodeAttempt;
+use KiloShare\Models\PaymentAuthorization;
 use KiloShare\Models\User;
+use KiloShare\Services\PaymentAuthorizationService;
+use KiloShare\Services\SmartNotificationService;
 use Carbon\Carbon;
 use Exception;
 
@@ -131,18 +134,44 @@ class DeliveryCodeService
             ];
         }
 
-        // Vérifier que l'utilisateur est autorisé (destinataire ou expéditeur)
+        // SÉCURITÉ: Vérifier que l'utilisateur est autorisé (destinataire ou expéditeur)
         if ($user->id !== $booking->receiver_id && $user->id !== $booking->sender_id) {
+            // Log de tentative d'accès non autorisé
+            error_log("SECURITY: Unauthorized delivery code validation attempt by user {$user->id} for booking {$booking->id}");
             return [
                 'success' => false,
                 'error' => 'Vous n\'êtes pas autorisé à valider ce code de livraison',
             ];
         }
 
+        // SÉCURITÉ: Vérifier que la réservation est dans un état valide pour la livraison
+        $validStatuses = [Booking::STATUS_IN_TRANSIT, Booking::STATUS_PAYMENT_CONFIRMED, Booking::STATUS_PAID];
+        if (!in_array($booking->status, $validStatuses)) {
+            error_log("SECURITY: Invalid booking status {$booking->status} for delivery validation on booking {$booking->id}");
+            return [
+                'success' => false,
+                'error' => 'Cette réservation n\'est pas dans un état valide pour la validation de livraison',
+            ];
+        }
+
+        // SÉCURITÉ: Vérifier qu'il y a bien un paiement confirmé/payé
+        if (!$booking->payment_authorization_id) {
+            error_log("SECURITY: No payment authorization for booking {$booking->id} during delivery validation");
+            return [
+                'success' => false,
+                'error' => 'Aucun paiement confirmé trouvé pour cette réservation',
+            ];
+        }
+
+        // Log de tentative de validation
+        error_log("DELIVERY: Code validation attempt for booking {$booking->id} by user {$user->id} with code '{$inputCode}'");
+
         // Valider le code
         $result = $deliveryCode->validateAttempt($inputCode, $user->id, $latitude, $longitude);
 
         if ($result['success']) {
+            // Log du succès de validation
+            error_log("DELIVERY: Successful code validation for booking {$booking->id} by user {$user->id}");
             // Marquer le code comme utilisé
             $deliveryCode->markAsUsed($latitude, $longitude, $photos);
 
@@ -156,9 +185,18 @@ class DeliveryCodeService
             $this->notifyDeliveryConfirmed($booking, $deliveryCode, $user);
 
             // Déclencher la libération du paiement
-            $this->triggerPaymentRelease($booking);
-
-            $result['message'] = 'Livraison confirmée avec succès. Le paiement va être libéré.';
+            try {
+                $this->triggerPaymentRelease($booking);
+                $result['message'] = 'Livraison confirmée avec succès. Le paiement a été automatiquement transféré au transporteur.';
+                error_log("PAYMENT: Automatic payment capture completed for booking {$booking->id}");
+            } catch (Exception $e) {
+                error_log("PAYMENT_ERROR: Failed to capture payment for booking {$booking->id}: " . $e->getMessage());
+                $result['message'] = 'Livraison confirmée mais erreur lors du transfert de paiement. Un administrateur va vérifier.';
+                $result['payment_warning'] = true;
+            }
+        } else {
+            // Log de l'échec de validation
+            error_log("DELIVERY: Failed code validation for booking {$booking->id} by user {$user->id}: " . ($result['error'] ?? 'Unknown error'));
         }
 
         return $result;
@@ -327,14 +365,75 @@ class DeliveryCodeService
      */
     private function triggerPaymentRelease(Booking $booking): void
     {
-        // TODO: Intégrer avec le service de paiement Stripe
-        // pour libérer les fonds en attente
+        try {
+            // Vérifier qu'il y a bien une autorisation de paiement
+            if (!$booking->payment_authorization_id) {
+                error_log("No payment authorization found for booking {$booking->id}");
+                return;
+            }
 
-        // Pour l'instant, log de l'action
-        error_log("Payment release triggered for booking {$booking->id}");
+            // Vérifier que le paiement est dans un état capturable
+            $paymentAuth = $booking->paymentAuthorization;
+            if (!$paymentAuth || !$paymentAuth->canBeCaptured()) {
+                error_log("Payment authorization {$booking->payment_authorization_id} cannot be captured");
+                return;
+            }
 
-        // Dans une implémentation complète, ceci appellerait
-        // le service de paiement pour capturer/libérer les fonds
+            // Utiliser le service de paiement pour capturer
+            $paymentService = new PaymentAuthorizationService();
+            $success = $paymentService->capturePayment(
+                $paymentAuth,
+                PaymentAuthorization::CAPTURE_REASON_DELIVERY_CONFIRMED
+            );
+
+            if ($success) {
+                // Mettre à jour le statut de la réservation
+                $booking->update([
+                    'status' => Booking::STATUS_PAID,
+                    'payment_captured_at' => Carbon::now(),
+                ]);
+
+                // Log du succès
+                error_log("Payment successfully captured for booking {$booking->id} after delivery confirmation");
+
+                // Notifier les parties prenantes
+                $this->notifyPaymentCaptured($booking);
+            } else {
+                error_log("Failed to capture payment for booking {$booking->id}");
+                throw new Exception('Échec de la capture du paiement');
+            }
+
+        } catch (Exception $e) {
+            error_log("Error capturing payment for booking {$booking->id}: " . $e->getMessage());
+            throw new Exception('Erreur lors de la capture du paiement: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notifie les parties prenantes de la capture du paiement
+     */
+    private function notifyPaymentCaptured(Booking $booking): void
+    {
+        try {
+            $smartNotificationService = new SmartNotificationService();
+
+            // Notifier l'expéditeur que le paiement a été capturé
+            $smartNotificationService->notifyPaymentCaptured(
+                $booking->sender,
+                $booking,
+                'Le paiement a été transféré au transporteur suite à la livraison confirmée.'
+            );
+
+            // Notifier le transporteur que le paiement a été reçu
+            $smartNotificationService->notifyPaymentReceived(
+                $booking->receiver,
+                $booking,
+                'Vous avez reçu le paiement suite à la livraison confirmée.'
+            );
+
+        } catch (Exception $e) {
+            error_log("Error sending payment capture notifications for booking {$booking->id}: " . $e->getMessage());
+        }
     }
 
     /**

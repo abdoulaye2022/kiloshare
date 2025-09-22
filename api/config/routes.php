@@ -7,6 +7,8 @@ use Slim\Routing\RouteCollectorProxy;
 use KiloShare\Controllers\AuthController;
 use KiloShare\Controllers\AdminController;
 use KiloShare\Controllers\TripController;
+use KiloShare\Controllers\IntelligentCancellationController;
+use KiloShare\Controllers\CancellationAdminController;
 use KiloShare\Controllers\BookingController;
 use KiloShare\Controllers\SearchController;
 use KiloShare\Controllers\UserProfileController;
@@ -126,6 +128,20 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->get('/analytics/platform/trends', [AdminController::class, 'getPlatformTrends'])
                     ->add(new AuthMiddleware());
+
+                // Cancellation management
+                $adminGroup->get('/cancellations/dashboard', [CancellationAdminController::class, 'getCancellationDashboard'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->get('/cancellations/support-tickets', [CancellationAdminController::class, 'getAutoSupportTickets'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/cancellations/support-tickets/{id}/resolve', [CancellationAdminController::class, 'resolveSupportTicket'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/cancellations/exceptions', [CancellationAdminController::class, 'handleCancellationException'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/users/{id}/reset-reliability', [CancellationAdminController::class, 'resetUserReliability'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->get('/cancellations/detailed-report', [CancellationAdminController::class, 'getDetailedCancellationReport'])
+                    ->add(new AuthMiddleware());
                 
                 // Commission tracking
                 $adminGroup->get('/payments/commission-stats', [AdminController::class, 'getCommissionStats'])
@@ -165,6 +181,13 @@ return function (App $app) {
                 // Nouvelles routes d'annulation strictes
                 $tripGroup->get('/{id}/cancellation-check', [TripController::class, 'checkTripCancellation']);
                 $tripGroup->post('/{id}/cancel', [TripController::class, 'cancelTrip']);
+                $tripGroup->post('/{id}/duplicate', [TripController::class, 'duplicateTrip']);
+
+                // Routes d'annulation intelligente
+                $tripGroup->get('/{id}/intelligent-cancellation-check', [IntelligentCancellationController::class, 'analyzeIntelligentCancellation']);
+                $tripGroup->post('/{id}/intelligent-cancel', [IntelligentCancellationController::class, 'executeIntelligentCancellation']);
+                $tripGroup->get('/{id}/alternatives', [IntelligentCancellationController::class, 'getTripAlternatives']);
+
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->post('/{id}/cloudinary-images', [TripController::class, 'addCloudinaryImages']);
@@ -187,6 +210,16 @@ return function (App $app) {
             $v1Group->get('/user/trips', [TripController::class, 'list'])
                 ->add(new AuthMiddleware());
             $v1Group->get('/user/trips/{id}', [TripController::class, 'getUserTrip'])
+                ->add(new AuthMiddleware());
+
+            // Routes de fiabilité et annulation intelligente
+            $v1Group->get('/user/reliability-score', [IntelligentCancellationController::class, 'getUserReliabilityScore'])
+                ->add(new AuthMiddleware());
+            $v1Group->get('/user/intelligent-cancellation-history', [IntelligentCancellationController::class, 'getIntelligentCancellationHistory'])
+                ->add(new AuthMiddleware());
+
+            // Routes pour les alternatives de voyage
+            $v1Group->post('/trip-alternatives/{id}/respond', [IntelligentCancellationController::class, 'respondToAlternative'])
                 ->add(new AuthMiddleware());
 
             // Public trip images (no auth required)

@@ -578,6 +578,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
               const SnackBar(
                 content: Text('Réservation acceptée avec succès!'),
                 backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.fixed, // Collé au bottom de la page
               ),
             );
             _loadBookings(); // Recharger la liste

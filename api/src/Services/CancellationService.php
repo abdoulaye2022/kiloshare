@@ -37,8 +37,8 @@ class CancellationService
             return ['allowed' => false, 'reason' => 'Ce voyage ne peut plus être annulé'];
         }
 
-        // Vérifier s'il y a des réservations confirmées
-        $confirmedBookings = $trip->bookings()->whereIn('status', ['accepted', 'in_progress'])->count();
+        // Vérifier s'il y a des réservations confirmées (incluant les paiements)
+        $confirmedBookings = $trip->bookings()->whereIn('status', ['accepted', 'in_progress', 'paid'])->count();
         
         if ($confirmedBookings > 0) {
             // Vérifier les limites d'annulation avec réservations
@@ -138,7 +138,7 @@ class CancellationService
      */
     private function processTravelerCancellationWithBookings(Trip $trip, string $reason): void
     {
-        $confirmedBookings = $trip->bookings()->whereIn('status', ['accepted', 'in_progress'])->get();
+        $confirmedBookings = $trip->bookings()->whereIn('status', ['accepted', 'in_progress', 'paid'])->get();
         
         foreach ($confirmedBookings as $booking) {
             // Annuler la réservation

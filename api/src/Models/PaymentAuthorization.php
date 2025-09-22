@@ -26,6 +26,7 @@ class PaymentAuthorization extends Model
     const CAPTURE_REASON_MANUAL = 'manual';     // Capture manuelle
     const CAPTURE_REASON_AUTO_72H = 'auto_72h'; // Capture automatique 72h avant
     const CAPTURE_REASON_AUTO_PICKUP = 'auto_pickup'; // Capture automatique à la récupération
+    const CAPTURE_REASON_DELIVERY_CONFIRMED = 'delivery_confirmed'; // Capture automatique après confirmation de livraison
     const CAPTURE_REASON_EXPIRED = 'expired';   // Capture d'expiration
 
     protected $fillable = [

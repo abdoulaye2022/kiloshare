@@ -125,7 +125,7 @@ BEGIN
     -- Si un voyage est annulé par le voyageur avec des réservations
     IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' AND NEW.cancelled_by = 'traveler' THEN
         -- Vérifier s'il y avait des réservations confirmées
-        IF (SELECT COUNT(*) FROM bookings WHERE trip_id = NEW.id AND status IN ('accepted', 'in_progress')) > 0 THEN
+        IF (SELECT COUNT(*) FROM bookings WHERE trip_id = NEW.id AND status IN ('accepted', 'in_progress', 'paid')) > 0 THEN
             UPDATE users 
             SET 
                 cancellation_count = cancellation_count + 1,

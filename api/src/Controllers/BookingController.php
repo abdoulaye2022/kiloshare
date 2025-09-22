@@ -944,69 +944,13 @@ class BookingController
      */
     public function capturePayment(ServerRequestInterface $request): ResponseInterface
     {
-        $user = $request->getAttribute('user');
-        $id = $request->getAttribute('id');
-
-        try {
-            $booking = Booking::with('trip')->find($id);
-            if (!$booking) {
-                return Response::notFound('Réservation non trouvée');
-            }
-
-            // Vérifier que c'est le transporteur ou un admin
-            if ($booking->receiver_id != $user->id) {
-                return Response::forbidden('Vous ne pouvez pas capturer ce paiement');
-            }
-
-            // Vérifier le statut
-            if (!in_array($booking->status, [
-                Booking::STATUS_PAYMENT_CONFIRMED,
-                Booking::STATUS_IN_TRANSIT,
-                Booking::STATUS_DELIVERED
-            ])) {
-                return Response::error('Ce paiement ne peut pas être capturé dans son état actuel');
-            }
-
-            if (!$booking->payment_authorization_id) {
-                return Response::error('Aucune autorisation de paiement trouvée pour cette réservation');
-            }
-
-            // Capturer le paiement
-            $captureResult = $this->paymentAuthService->capturePaymentAuthorization(
-                $booking->payment_authorization_id,
-                'manual'
-            );
-
-            if (!$captureResult['success']) {
-                return Response::error(
-                    'Erreur lors de la capture du paiement: ' . $captureResult['error']
-                );
-            }
-
-            // Mettre à jour le statut de la réservation
-            $booking->update(['status' => Booking::STATUS_PAID]);
-
-            // Envoyer notification à l'expéditeur
-            $this->notificationService->send(
-                $booking->sender_id,
-                'payment_captured',
-                [
-                    'trip_title' => $booking->trip->title ?? 'Votre envoi',
-                    'total_amount' => $booking->final_price
-                ]
-            );
-
-            return Response::success([
-                'booking' => [
-                    'id' => $booking->id,
-                    'status' => $booking->status,
-                    'updated_at' => $booking->updated_at,
-                ]
-            ], 'Paiement capturé avec succès.');
-
-        } catch (\Exception $e) {
-            return Response::serverError('Erreur lors de la capture du paiement: ' . $e->getMessage());
-        }
+        // DÉSACTIVÉ: La capture manuelle a été remplacée par la capture automatique
+        // lors de la validation du code secret de livraison
+        return Response::error([
+            'error' => 'La capture manuelle des paiements a été désactivée.',
+            'message' => 'Le paiement sera automatiquement capturé lors de la validation du code secret de livraison.',
+            'disabled_feature' => true
+        ], 410); // HTTP 410 Gone - Feature no longer available
     }
 
     /**

@@ -773,4 +773,132 @@ class SmartNotificationService
             return false;
         }
     }
+
+    /**
+     * Notification d'annulation intelligente avec conséquences
+     */
+    public function sendTripCancelledNotification($user, $trip, $data = [])
+    {
+        $severity = $data['severity'] ?? 'medium';
+        $cancellationType = $data['cancellation_type'] ?? 'standard';
+
+        $messages = [
+            'free_cancellation' => "Votre voyage {$trip->title} a été annulé",
+            'impact_cancellation' => "Votre voyage {$trip->title} a été annulé - Des utilisateurs étaient intéressés",
+            'critical_cancellation' => "Annulation critique: Votre voyage {$trip->title} a été annulé - Remboursements en cours",
+            'booking_cancellation' => "Votre voyage {$trip->title} a été annulé - Réservations impactées"
+        ];
+
+        $message = $messages[$cancellationType] ?? "Votre voyage {$trip->title} a été annulé";
+        $channels = $severity === 'high' ? ['push', 'in_app', 'email'] : ['push', 'in_app'];
+
+        return $this->send(
+            $user->id,
+            'intelligent_trip_cancelled',
+            array_merge([
+                'trip_id' => $trip->id,
+                'trip_title' => $trip->title,
+                'cancellation_type' => $cancellationType,
+                'severity' => $severity,
+                'departure_date' => $trip->departure_date,
+                'message' => $message
+            ], $data),
+            [
+                'channels' => $channels,
+                'priority' => $severity === 'high' ? 'high' : 'normal'
+            ]
+        )['success'] ?? false;
+    }
+
+    /**
+     * Notification de suggestion d'alternative
+     */
+    public function sendAlternativeSuggestedNotification($user, $originalTrip, $suggestedTrip, $data = [])
+    {
+        return $this->send(
+            $user->id,
+            'alternative_suggested',
+            array_merge([
+                'original_trip_id' => $originalTrip->id,
+                'suggested_trip_id' => $suggestedTrip->id,
+                'suggested_trip_title' => $suggestedTrip->title,
+                'departure_date' => $suggestedTrip->departure_date,
+                'price_per_kg' => $suggestedTrip->price_per_kg,
+                'message' => "Une alternative a été trouvée pour remplacer votre voyage annulé vers {$originalTrip->arrival_city}"
+            ], $data),
+            ['channels' => ['push', 'in_app']]
+        )['success'] ?? false;
+    }
+
+    /**
+     * Notification de remboursement traité
+     */
+    public function sendRefundNotification($user, $booking, $data = [])
+    {
+        $amount = $data['amount'] ?? 0;
+        $refundType = $data['refund_type'] ?? 'standard';
+        $processingTime = $data['processing_time'] ?? '3-5 jours ouvrables';
+
+        return $this->send(
+            $user->id,
+            'refund_processed',
+            array_merge([
+                'booking_id' => $booking->id,
+                'trip_id' => $booking->trip_id,
+                'amount' => $amount,
+                'refund_type' => $refundType,
+                'processing_time' => $processingTime,
+                'message' => "Votre remboursement de {$amount}€ est en cours de traitement"
+            ], $data),
+            ['channels' => ['push', 'in_app', 'email']]
+        )['success'] ?? false;
+    }
+
+    /**
+     * Notification de pénalité appliquée
+     */
+    public function sendPenaltyNotification($user, $penaltyType, $duration, $data = [])
+    {
+        $messages = [
+            'warning' => 'Attention: Surveillez vos annulations futures',
+            'publication_restriction' => "Restriction de publication pendant {$duration} jours",
+            'account_suspension' => "Compte suspendu pendant {$duration} jours"
+        ];
+
+        $message = $messages[$penaltyType] ?? "Pénalité appliquée: {$penaltyType}";
+
+        return $this->send(
+            $user->id,
+            'penalty_applied',
+            array_merge([
+                'penalty_type' => $penaltyType,
+                'duration_days' => $duration,
+                'message' => $message
+            ], $data),
+            [
+                'channels' => ['push', 'in_app', 'email'],
+                'priority' => 'high'
+            ]
+        )['success'] ?? false;
+    }
+
+    /**
+     * Notification pour les favoris d'un voyage annulé
+     */
+    public function sendFavoritesCancellationNotification($user, $trip, $data = [])
+    {
+        return $this->send(
+            $user->id,
+            'favorite_trip_cancelled',
+            array_merge([
+                'trip_id' => $trip->id,
+                'trip_title' => $trip->title,
+                'departure_city' => $trip->departure_city,
+                'arrival_city' => $trip->arrival_city,
+                'departure_date' => $trip->departure_date,
+                'message' => "Un voyage que vous avez mis en favoris ({$trip->title}) a été annulé"
+            ], $data),
+            ['channels' => ['push', 'in_app']]
+        )['success'] ?? false;
+    }
 }

@@ -133,18 +133,30 @@ class TripError extends TripState {
 
 class DraftsLoaded extends TripState {
   final List<Trip> drafts;
-  
+
   const DraftsLoaded(this.drafts);
-  
+
+  DraftsLoaded copyWith({
+    List<Trip>? drafts,
+  }) {
+    return DraftsLoaded(drafts ?? this.drafts);
+  }
+
   @override
   List<Object?> get props => [drafts];
 }
 
 class FavoritesLoaded extends TripState {
   final List<Trip> favorites;
-  
+
   const FavoritesLoaded(this.favorites);
-  
+
+  FavoritesLoaded copyWith({
+    List<Trip>? favorites,
+  }) {
+    return FavoritesLoaded(favorites ?? this.favorites);
+  }
+
   @override
   List<Object?> get props => [favorites];
 }
@@ -179,12 +191,22 @@ class SearchResultsLoaded extends TripState {
 class PublicTripsLoaded extends TripState {
   final List<Trip> trips;
   final bool hasReachedMax;
-  
+
   const PublicTripsLoaded({
     required this.trips,
     this.hasReachedMax = false,
   });
-  
+
+  PublicTripsLoaded copyWith({
+    List<Trip>? trips,
+    bool? hasReachedMax,
+  }) {
+    return PublicTripsLoaded(
+      trips: trips ?? this.trips,
+      hasReachedMax: hasReachedMax ?? this.hasReachedMax,
+    );
+  }
+
   @override
   List<Object?> get props => [trips, hasReachedMax];
 }

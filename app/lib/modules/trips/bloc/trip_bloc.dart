@@ -122,17 +122,20 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onUpdateTrip(UpdateTrip event, Emitter<TripState> emit) async {
     try {
       final updatedTrip = await _tripService.updateTrip(event.tripId, event.updates);
-      emit(TripUpdated(updatedTrip));
-      
-      // If we're currently viewing this trip's details, update the state
-      if (state is TripDetailsLoaded) {
-        final currentState = state as TripDetailsLoaded;
-        if (currentState.trip.id == updatedTrip.id) {
-          emit(currentState.copyWith(trip: updatedTrip));
-        }
-      }
-      
-      // Refresh trips list
+
+      emit(TripActionSuccess(
+        message: 'Voyage mis à jour avec succès',
+        action: TripAction.update,
+        updatedTrip: updatedTrip,
+      ));
+
+      // Update current trip state if viewing details
+      _updateCurrentTripState(emit, updatedTrip);
+
+      // Update trips in all relevant states
+      _updateTripInStates(emit, updatedTrip);
+
+      // Refresh trips list to ensure consistency
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to update trip: ${error.toString()}', error: error));
@@ -142,13 +145,18 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onDeleteTrip(DeleteTrip event, Emitter<TripState> emit) async {
     try {
       await _tripService.deleteTrip(event.tripId);
+
       emit(const TripActionSuccess(
         message: 'Voyage supprimé avec succès',
         action: TripAction.delete,
       ));
+
+      // Remove trip from all relevant states immediately
+      _removeTripFromStates(emit, event.tripId);
+
       emit(TripDeleted(event.tripId));
-      
-      // Refresh trips list
+
+      // Refresh trips list to ensure consistency
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to delete trip: ${error.toString()}', error: error));
@@ -158,7 +166,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onDuplicateTrip(DuplicateTrip event, Emitter<TripState> emit) async {
     try {
       final newTrip = await _tripService.duplicateTrip(event.tripId);
-      
+
       // Get the original trip for context
       Trip? originalTrip;
       try {
@@ -166,17 +174,22 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       } catch (_) {
         // Original trip might not be accessible anymore
       }
-      
-      emit(const TripActionSuccess(
+
+      emit(TripActionSuccess(
         message: 'Voyage dupliqué avec succès',
         action: TripAction.duplicate,
+        updatedTrip: newTrip,
       ));
+
+      // Add new trip to relevant states immediately
+      _addTripToStates(emit, newTrip);
+
       emit(TripDuplicated(
         newTrip: newTrip,
         originalTrip: originalTrip ?? newTrip, // Fallback to new trip
       ));
-      
-      // Refresh trips list
+
+      // Refresh trips list to ensure consistency
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to duplicate trip: ${error.toString()}', error: error));
@@ -187,12 +200,12 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     try {
       final updatedTrip = await _tripService.publishTrip(event.tripId);
       emit(TripActionSuccess(
-        message: 'Trip published successfully',
+        message: 'Voyage publié avec succès',
         action: TripAction.publish,
         updatedTrip: updatedTrip,
       ));
-      
-      _updateCurrentTripState(emit, updatedTrip);
+
+      _syncTripAfterStatusChange(emit, updatedTrip);
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to publish trip: ${error.toString()}', error: error));
@@ -203,12 +216,12 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     try {
       final updatedTrip = await _tripService.pauseTrip(event.tripId, reason: event.reason);
       emit(TripActionSuccess(
-        message: 'Trip paused successfully',
+        message: 'Voyage mis en pause avec succès',
         action: TripAction.pause,
         updatedTrip: updatedTrip,
       ));
-      
-      _updateCurrentTripState(emit, updatedTrip);
+
+      _syncTripAfterStatusChange(emit, updatedTrip);
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to pause trip: ${error.toString()}', error: error));
@@ -219,12 +232,12 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     try {
       final updatedTrip = await _tripService.resumeTrip(event.tripId);
       emit(TripActionSuccess(
-        message: 'Trip resumed successfully',
+        message: 'Voyage repris avec succès',
         action: TripAction.resume,
         updatedTrip: updatedTrip,
       ));
-      
-      _updateCurrentTripState(emit, updatedTrip);
+
+      _syncTripAfterStatusChange(emit, updatedTrip);
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to resume trip: ${error.toString()}', error: error));
@@ -234,17 +247,17 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onCancelTrip(CancelTrip event, Emitter<TripState> emit) async {
     try {
       final updatedTrip = await _tripService.cancelTrip(
-        event.tripId, 
+        event.tripId,
         reason: event.reason,
         details: event.details,
       );
       emit(TripActionSuccess(
-        message: 'Trip cancelled successfully',
+        message: 'Voyage annulé avec succès',
         action: TripAction.cancel,
         updatedTrip: updatedTrip,
       ));
-      
-      _updateCurrentTripState(emit, updatedTrip);
+
+      _syncTripAfterStatusChange(emit, updatedTrip);
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to cancel trip: ${error.toString()}', error: error));
@@ -255,12 +268,12 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     try {
       final updatedTrip = await _tripService.completeTrip(event.tripId);
       emit(TripActionSuccess(
-        message: 'Trip completed successfully',
+        message: 'Voyage terminé avec succès',
         action: TripAction.complete,
         updatedTrip: updatedTrip,
       ));
-      
-      _updateCurrentTripState(emit, updatedTrip);
+
+      _syncTripAfterStatusChange(emit, updatedTrip);
       add(const RefreshTrips());
     } catch (error) {
       emit(TripError('Failed to complete trip: ${error.toString()}', error: error));
@@ -521,5 +534,140 @@ class TripBloc extends Bloc<TripEvent, TripState> {
         emit(currentState.copyWith(trip: updatedTrip));
       }
     }
+  }
+
+  /// Met à jour un voyage dans tous les états de liste pertinents
+  void _updateTripInStates(Emitter<TripState> emit, Trip updatedTrip) {
+    final currentState = state;
+
+    if (currentState is TripsLoaded) {
+      final updatedTrips = currentState.trips.map((trip) {
+        return trip.id == updatedTrip.id ? updatedTrip : trip;
+      }).toList();
+
+      emit(currentState.copyWith(trips: updatedTrips));
+    } else if (currentState is DraftsLoaded) {
+      final updatedDrafts = currentState.drafts.map((trip) {
+        return trip.id == updatedTrip.id ? updatedTrip : trip;
+      }).toList();
+
+      emit(currentState.copyWith(drafts: updatedDrafts));
+    } else if (currentState is FavoritesLoaded) {
+      final updatedFavorites = currentState.favorites.map((trip) {
+        return trip.id == updatedTrip.id ? updatedTrip : trip;
+      }).toList();
+
+      emit(currentState.copyWith(favorites: updatedFavorites));
+    } else if (currentState is PublicTripsLoaded) {
+      final updatedPublicTrips = currentState.trips.map((trip) {
+        return trip.id == updatedTrip.id ? updatedTrip : trip;
+      }).toList();
+
+      emit(currentState.copyWith(trips: updatedPublicTrips));
+    } else if (currentState is SearchResultsLoaded) {
+      final updatedResults = currentState.results.map((trip) {
+        return trip.id == updatedTrip.id ? updatedTrip : trip;
+      }).toList();
+
+      emit(currentState.copyWith(results: updatedResults));
+    }
+  }
+
+  /// Supprime un voyage de tous les états de liste pertinents
+  void _removeTripFromStates(Emitter<TripState> emit, String tripId) {
+    final currentState = state;
+
+    if (currentState is TripsLoaded) {
+      final filteredTrips = currentState.trips.where((trip) => trip.id != tripId).toList();
+      emit(currentState.copyWith(trips: filteredTrips));
+    } else if (currentState is DraftsLoaded) {
+      final filteredDrafts = currentState.drafts.where((trip) => trip.id != tripId).toList();
+      emit(currentState.copyWith(drafts: filteredDrafts));
+    } else if (currentState is FavoritesLoaded) {
+      final filteredFavorites = currentState.favorites.where((trip) => trip.id != tripId).toList();
+      emit(currentState.copyWith(favorites: filteredFavorites));
+    } else if (currentState is PublicTripsLoaded) {
+      final filteredPublicTrips = currentState.trips.where((trip) => trip.id != tripId).toList();
+      emit(currentState.copyWith(trips: filteredPublicTrips));
+    } else if (currentState is SearchResultsLoaded) {
+      final filteredResults = currentState.results.where((trip) => trip.id != tripId).toList();
+      emit(currentState.copyWith(results: filteredResults));
+    }
+
+    // Si on visualise les détails du voyage supprimé, revenir à l'état initial
+    if (currentState is TripDetailsLoaded && currentState.trip.id == tripId) {
+      emit(const TripInitial());
+    }
+  }
+
+  /// Ajoute un nouveau voyage aux états de liste pertinents
+  void _addTripToStates(Emitter<TripState> emit, Trip newTrip) {
+    final currentState = state;
+
+    // Ajouter aux brouillons si c'est un brouillon
+    if (newTrip.status == 'draft' && currentState is DraftsLoaded) {
+      final updatedDrafts = [newTrip, ...currentState.drafts];
+      emit(currentState.copyWith(drafts: updatedDrafts));
+    }
+
+    // Ajouter aux voyages utilisateur si on visualise les voyages de l'utilisateur
+    if (currentState is TripsLoaded) {
+      final updatedTrips = [newTrip, ...currentState.trips];
+      emit(currentState.copyWith(trips: updatedTrips));
+    }
+
+    // Ajouter aux voyages publics si le voyage est publié
+    if (['published', 'active'].contains(newTrip.status) && currentState is PublicTripsLoaded) {
+      final updatedPublicTrips = [newTrip, ...currentState.trips];
+      emit(currentState.copyWith(trips: updatedPublicTrips));
+    }
+  }
+
+  /// Synchronise un voyage après une action (publication, pause, reprise, etc.)
+  void _syncTripAfterStatusChange(Emitter<TripState> emit, Trip updatedTrip) {
+    // Mettre à jour l'état actuel si on visualise les détails
+    _updateCurrentTripState(emit, updatedTrip);
+
+    // Mettre à jour ou déplacer le voyage dans les bonnes listes selon son nouveau statut
+    final currentState = state;
+
+    // Si c'est devenu un brouillon, le retirer des listes publiques
+    if (updatedTrip.status == 'draft') {
+      if (currentState is PublicTripsLoaded) {
+        final filteredTrips = currentState.trips.where((trip) => trip.id != updatedTrip.id).toList();
+        emit(currentState.copyWith(trips: filteredTrips));
+      }
+      // L'ajouter aux brouillons si on visualise les brouillons
+      if (currentState is DraftsLoaded) {
+        final tripExists = currentState.drafts.any((trip) => trip.id == updatedTrip.id);
+        if (!tripExists) {
+          final updatedDrafts = [updatedTrip, ...currentState.drafts];
+          emit(currentState.copyWith(drafts: updatedDrafts));
+        } else {
+          _updateTripInStates(emit, updatedTrip);
+        }
+      }
+    }
+
+    // Si c'est devenu public, le retirer des brouillons
+    if (['published', 'active'].contains(updatedTrip.status)) {
+      if (currentState is DraftsLoaded) {
+        final filteredDrafts = currentState.drafts.where((trip) => trip.id != updatedTrip.id).toList();
+        emit(currentState.copyWith(drafts: filteredDrafts));
+      }
+      // L'ajouter aux voyages publics si on visualise les voyages publics
+      if (currentState is PublicTripsLoaded) {
+        final tripExists = currentState.trips.any((trip) => trip.id == updatedTrip.id);
+        if (!tripExists) {
+          final updatedTrips = [updatedTrip, ...currentState.trips];
+          emit(currentState.copyWith(trips: updatedTrips));
+        } else {
+          _updateTripInStates(emit, updatedTrip);
+        }
+      }
+    }
+
+    // Toujours mettre à jour dans les autres états
+    _updateTripInStates(emit, updatedTrip);
   }
 }

@@ -651,8 +651,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
     // Actions pour le transporteur selon le statut
     if (_isReceiver) {
-      if (_booking!.canCapturePayment) {
-        return _buildCapturePaymentActions();
+      if (_booking!.status == BookingStatus.paymentConfirmed) {
+        return _buildCapturePaymentActions(); // Affiche le message informatif
       }
     }
 
@@ -986,7 +986,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Vous pouvez maintenant capturer le paiement ou attendre la capture automatique.',
+                          'Le paiement sera automatiquement capturé lors de la validation du code secret de livraison.',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.green.shade700,
                           ),
@@ -1000,21 +1000,28 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
+        Container(
           width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _capturePayment(),
-            icon: const Icon(Icons.monetization_on),
-            label: const Text('Capturer le paiement'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue.shade600),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Pour recevoir le paiement, utilisez le code secret lors de la livraison du colis.',
+                  style: TextStyle(
+                    color: Colors.blue.shade800,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],
@@ -1427,11 +1434,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           SnackBar(
             content: Text(message),
             backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            behavior: SnackBarBehavior.fixed, // Collé au bottom de la page
+            duration: const Duration(seconds: 3),
           ),
         );
     }
@@ -1445,11 +1449,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           SnackBar(
             content: Text(message),
             backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            behavior: SnackBarBehavior.fixed, // Collé au bottom de la page
+            duration: const Duration(seconds: 4),
           ),
         );
     }
@@ -1533,48 +1534,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
-  /// Capturer le paiement manuellement (transporteur)
-  Future<void> _capturePayment() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Capturer le paiement'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir capturer le paiement maintenant ? '
-          'Cette action est irréversible.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Capturer'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final result = await _bookingService.capturePayment(widget.bookingId);
-
-      if (result['success'] == true) {
-        _showSuccessSnackBar(result['message'] ?? 'Paiement capturé avec succès');
-        _loadBookingDetails(); // Recharger les détails
-      } else {
-        _showErrorSnackBar(result['error'] ?? 'Erreur lors de la capture');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Erreur de connexion: $e');
-    }
-  }
 }
 
 // Dialog pour accepter une réservation

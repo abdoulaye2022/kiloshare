@@ -14,6 +14,7 @@ use KiloShare\Services\CancellationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class TripController
 {
@@ -660,7 +661,7 @@ class TripController
             ]);
 
         } catch (\Exception $e) {
-            return Response::badRequest($e->getMessage());
+            return Response::error($e->getMessage(), [], 400);
         }
     }
 
@@ -1262,6 +1263,14 @@ class TripController
                 }
             }
 
+            // Incrémenter le compteur de vues
+            try {
+                $trip->increment('view_count');
+                error_log("TripController::getPublicTripDetails - View count incremented for trip: $tripId");
+            } catch (\Exception $viewError) {
+                error_log("TripController::getPublicTripDetails - View count increment error: " . $viewError->getMessage());
+            }
+
             error_log("TripController::getPublicTripDetails - Trip found: " . $trip->title);
 
             // Préparer les images de manière sécurisée
@@ -1393,6 +1402,7 @@ class TripController
                 'special_notes' => $trip->special_notes ?? null,
                 'is_domestic' => (bool) ($trip->is_domestic ?? false),
                 'total_reward' => (float) ($trip->total_reward ?? 0),
+                'view_count' => (int) ($trip->view_count ?? 0),
                 // Structure utilisateur compatible Flutter
                 'user' => $userData,
                 // Backwards compatibility
@@ -1803,6 +1813,118 @@ class TripController
             }
         } catch (\Exception $e) {
             error_log("Error notifying booked users for trip {$trip->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Dupliquer un voyage existant
+     */
+    public function duplicateTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $tripId = (int) $request->getAttribute('id');
+
+        try {
+            // Récupérer le voyage original
+            $originalTrip = Trip::with(['images'])->where('user_id', $user->id)->find($tripId);
+
+            if (!$originalTrip) {
+                return Response::notFound('Trip not found');
+            }
+
+            // Créer un nouveau voyage avec les données de l'original
+            $newTrip = new Trip();
+            $newTrip->user_id = $user->id;
+            $newTrip->title = $originalTrip->title . ' (Copie)';
+            $newTrip->description = $originalTrip->description;
+            $newTrip->departure_city = $originalTrip->departure_city;
+            $newTrip->departure_country = $originalTrip->departure_country;
+            $newTrip->arrival_city = $originalTrip->arrival_city;
+            $newTrip->arrival_country = $originalTrip->arrival_country;
+            $newTrip->departure_date = $originalTrip->departure_date;
+            $newTrip->arrival_date = $originalTrip->arrival_date;
+            $newTrip->available_weight_kg = $originalTrip->available_weight_kg;
+            $newTrip->price_per_kg = $originalTrip->price_per_kg;
+            $newTrip->currency = $originalTrip->currency;
+            $newTrip->transport_type = $originalTrip->transport_type;
+            $newTrip->restrictions = $originalTrip->restrictions;
+            $newTrip->special_notes = $originalTrip->special_notes;
+            $newTrip->is_domestic = $originalTrip->is_domestic;
+            $newTrip->status = 'draft'; // Nouveau voyage en brouillon
+            $newTrip->uuid = Str::uuid();
+
+            $newTrip->save();
+
+            // Copier les images si elles existent
+            if ($originalTrip->images && $originalTrip->images->count() > 0) {
+                foreach ($originalTrip->images as $originalImage) {
+                    $newImage = new TripImage();
+                    $newImage->trip_id = $newTrip->id;
+                    $newImage->image_path = $originalImage->image_path ?? $originalImage->url;
+                    $newImage->url = $originalImage->url;
+                    $newImage->thumbnail = $originalImage->thumbnail;
+                    $newImage->alt_text = $originalImage->alt_text;
+                    $newImage->is_primary = $originalImage->is_primary;
+                    $newImage->order = $originalImage->order;
+                    $newImage->image_name = $originalImage->image_name ?? 'duplicated_image';
+                    $newImage->mime_type = $originalImage->mime_type ?? 'image/jpeg';
+                    $newImage->save();
+                }
+            }
+
+            // Recharger le voyage avec ses relations pour la réponse complète
+            $newTripWithRelations = Trip::with(['user', 'images'])->find($newTrip->id);
+
+            // Préparer les images de manière sécurisée
+            $imageUrls = [];
+            if ($newTripWithRelations->images) {
+                foreach ($newTripWithRelations->images as $image) {
+                    if (!empty($image->url)) {
+                        $imageUrls[] = $image->url;
+                    }
+                }
+            }
+
+            return Response::created([
+                'trip' => [
+                    'id' => $newTripWithRelations->id,
+                    'uuid' => $newTripWithRelations->uuid,
+                    'user_id' => $newTripWithRelations->user_id,
+                    'title' => $newTripWithRelations->title,
+                    'description' => $newTripWithRelations->description ?? '',
+                    'departure_city' => $newTripWithRelations->departure_city ?? '',
+                    'departure_country' => $newTripWithRelations->departure_country ?? '',
+                    'arrival_city' => $newTripWithRelations->arrival_city ?? '',
+                    'arrival_country' => $newTripWithRelations->arrival_country ?? '',
+                    'departure_date' => $newTripWithRelations->departure_date,
+                    'arrival_date' => $newTripWithRelations->arrival_date,
+                    'available_weight_kg' => (float) ($newTripWithRelations->available_weight_kg ?? 0),
+                    'price_per_kg' => (float) ($newTripWithRelations->price_per_kg ?? 0),
+                    'currency' => $newTripWithRelations->currency ?? 'EUR',
+                    'status' => $newTripWithRelations->status,
+                    'transport_type' => $newTripWithRelations->transport_type ?? 'flight',
+                    'restrictions' => $newTripWithRelations->restrictions,
+                    'special_notes' => $newTripWithRelations->special_notes ?? '',
+                    'is_domestic' => (bool) ($newTripWithRelations->is_domestic ?? false),
+                    'total_reward' => (float) ($newTripWithRelations->total_reward ?? 0),
+                    'view_count' => (int) ($newTripWithRelations->view_count ?? 0),
+                    'images' => $imageUrls,
+                    'image_urls' => $imageUrls,
+                    'user' => $newTripWithRelations->user ? [
+                        'first_name' => $newTripWithRelations->user->first_name ?? '',
+                        'last_name' => $newTripWithRelations->user->last_name ?? '',
+                        'email' => $newTripWithRelations->user->email ?? '',
+                        'profile_picture' => $newTripWithRelations->user->profile_picture ?? null,
+                        'is_verified' => (bool) ($newTripWithRelations->user->is_verified ?? false)
+                    ] : null,
+                    'created_at' => $newTripWithRelations->created_at,
+                    'updated_at' => $newTripWithRelations->updated_at
+                ]
+            ], 'Trip duplicated successfully');
+
+        } catch (\Exception $e) {
+            error_log("TripController::duplicateTrip Error: " . $e->getMessage());
+            return Response::error('Failed to duplicate trip', [], 500);
         }
     }
 }

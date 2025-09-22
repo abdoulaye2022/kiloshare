@@ -1398,9 +1398,8 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         ),
       );
       
-      if (result == true) {
-        _showMessage('Demande de réservation envoyée avec succès!', Colors.green);
-      }
+      // Note: La confirmation de succès est déjà gérée par CreateBookingScreen
+      // Pas besoin de double confirmation ici
       
     } catch (e) {
       _showMessage('Erreur lors de la création de la réservation: $e', Colors.red);
