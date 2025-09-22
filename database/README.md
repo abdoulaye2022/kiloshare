@@ -4,10 +4,19 @@ Ce dossier contient le schéma de la base de données KiloShare.
 
 ## 📋 Contenu
 
+### 📄 Fichiers de schéma
 - `schema.sql` - Structure complète (développement local)
-- `schema_production.sql` - Version optimisée pour production/hébergement
-- `export_production.sh` - Script pour générer la version production
-- `TROUBLESHOOTING.md` - Guide de résolution des problèmes d'import
+- `schema_production.sql` - Version optimisée pour production/hébergement ⭐
+- `schema_minimal.sql` - Tables seulement (hébergeurs restrictifs)
+
+### 🛠️ Scripts d'export
+- `export_production.sh` - Génère version production avec corrections auto ⭐
+- `export_minimal.sh` - Génère version minimale (tables seulement)
+- `install.sh` - Installation automatique locale
+
+### 🔍 Outils de validation
+- `validate_schema.sh` - Validation automatique des schémas ⭐
+- `TROUBLESHOOTING.md` - Guide complet de résolution d'erreurs
 
 ## 🗄️ Structure de la Base de Données
 
@@ -61,6 +70,40 @@ mysql -u root -p kiloshare < schema.sql
 ### ⚠️ Problèmes d'Import ?
 
 Si vous obtenez des erreurs `DEFINER` ou `Access denied`, consultez `TROUBLESHOOTING.md`
+
+## 🚀 Workflow Recommandé
+
+### Pour MySQL 8.4 Production (Votre cas)
+```bash
+# 1. Valider le schéma
+./validate_schema.sh schema_production.sql
+
+# 2. Importer sur votre serveur
+mysql -u username -p database_name < schema_production.sql
+```
+
+### Pour hébergeurs avec restrictions
+```bash
+# 1. Générer version minimale
+./export_minimal.sh
+
+# 2. Valider
+./validate_schema.sh schema_minimal.sql
+
+# 3. Importer
+mysql -u username -p database_name < schema_minimal.sql
+```
+
+### Après modifications locales
+```bash
+# 1. Re-générer le schéma production
+./export_production.sh
+
+# 2. Valider automatiquement
+./validate_schema.sh
+
+# 3. Déployer si valide
+```
 
 ## 🔧 Configuration
 
