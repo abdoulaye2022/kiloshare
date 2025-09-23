@@ -69,5 +69,33 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- Privacy - Photo Library Usage Description -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>KiloShare a besoin d'accéder à vos photos pour vous permettre d'ajouter des images de vos colis et de vos voyages. Cela aide les autres utilisateurs à mieux comprendre ce que vous transportez.</string>
+
+	<!-- Privacy - Camera Usage Description -->
+	<key>NSCameraUsageDescription</key>
+	<string>KiloShare utilise l'appareil photo pour prendre des photos de vos colis, de vos billets d'avion et pour la vérification d'identité lors des livraisons.</string>
+
+	<!-- Privacy - Location Always and When In Use Usage Description -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>KiloShare utilise votre localisation pour vous proposer des voyages pertinents selon votre zone géographique et pour faciliter les rencontres entre transporteurs et expéditeurs.</string>
+
+	<!-- Privacy - Location When In Use Usage Description -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>KiloShare utilise votre localisation pour vous proposer des voyages dans votre région et faciliter la coordination des livraisons avec les autres utilisateurs.</string>
+
+	<!-- Privacy - Contacts Usage Description (if needed) -->
+	<key>NSContactsUsageDescription</key>
+	<string>KiloShare peut accéder à vos contacts pour vous aider à inviter vos amis et famille à utiliser l'application.</string>
+
+	<!-- Privacy - Microphone Usage Description (if needed for video calls) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>KiloShare utilise le microphone pour les appels audio avec les autres utilisateurs lors de la coordination des livraisons.</string>
+
+	<!-- Privacy - Notifications Usage Description -->
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>KiloShare envoie des notifications pour vous informer des nouvelles demandes de transport, des mises à jour de livraison et des messages importants.</string>
 </dict>
 </plist>
