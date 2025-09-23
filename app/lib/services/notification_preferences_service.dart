@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
-import '../config/environment.dart';
 import '../modules/auth/services/auth_service.dart';
 
 class NotificationPreferencesService {

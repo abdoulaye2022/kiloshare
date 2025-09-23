@@ -1,20 +1,14 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'environment_config.dart';
 
 class AppConfig {
   static const String appName = 'KiloShare';
   static const String appVersion = '1.0.0';
-  
+
   // API Configuration
   static String get baseUrl {
-    // Utiliser uniquement la variable .env
-    String apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8080';
-    
-    // Ajouter /api/v1 si ce n'est pas déjà présent
-    if (!apiUrl.endsWith('/api/v1')) {
-      apiUrl = '$apiUrl/api/v1';
-    }
-    
-    return apiUrl;
+    // Utiliser la nouvelle configuration d'environnement
+    return EnvironmentConfig.apiUrl;
   }
   
   static const int connectionTimeout = 30000;
@@ -51,6 +45,6 @@ class AppConfig {
   static const bool enableLocationServices = true;
   
   // Environment
-  static const bool isDevelopment = true;
-  static const bool isProduction = false;
+  static bool get isDevelopment => EnvironmentConfig.isDevelopment;
+  static bool get isProduction => EnvironmentConfig.isProduction;
 }

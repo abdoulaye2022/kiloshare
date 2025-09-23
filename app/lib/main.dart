@@ -11,7 +11,7 @@ import 'firebase_options.dart';
 import 'config/app_config.dart';
 import 'config/theme.dart';
 import 'config/router.dart';
-import 'config/environment.dart';
+import 'config/environment_config.dart';
 import 'modules/auth/blocs/bloc.dart';
 import 'modules/auth/services/auth_service.dart';
 import 'modules/auth/services/phone_auth_service.dart';
@@ -29,8 +29,8 @@ void main() async {
   
   try {
     // Initialize environment configuration
-    await Environment.initialize();
-    // Environment.printConfig(); // Disabled for production
+    await EnvironmentConfig.initialize();
+    // EnvironmentConfig.printConfig(); // Disabled for production
     
     // ✅ ÉTAPE 1: Initialiser Firebase
     await Firebase.initializeApp(
@@ -44,7 +44,7 @@ void main() async {
     await FirebaseNotificationService().initializeBasic();
     
     // Initialize Stripe
-    Stripe.publishableKey = Environment.stripePublishableKey;
+    Stripe.publishableKey = EnvironmentConfig.stripePublishableKey;
     Stripe.merchantIdentifier = 'merchant.com.kiloshare.app';
     await Stripe.instance.applySettings();
     
