@@ -27,6 +27,7 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
 return function (App $app) {
+
     // Health check endpoint
     $app->get('/', function (Request $request, Response $response) {
         $response->getBody()->write(json_encode([
@@ -61,12 +62,41 @@ return function (App $app) {
         return $response->withHeader('Content-Type', 'application/json');
     });
 
+    // Route spéciale pour vardump
+    $app->get('/debug-vardump', function (Request $request, Response $response) {
+        // Cette route sera interceptée par le vardump dans index.php
+        $response->getBody()->write('This should not appear');
+        return $response;
+    });
+
+    // Debug route pour comprendre les paths
+    $app->get('/debug-path', function (Request $request, Response $response) {
+        $uri = $request->getUri();
+        $data = [
+            'success' => true,
+            'debug_info' => [
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+                'script_name' => $_SERVER['SCRIPT_NAME'] ?? 'N/A',
+                'path_info' => $_SERVER['PATH_INFO'] ?? 'N/A',
+                'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A',
+                'server_name' => $_SERVER['SERVER_NAME'] ?? 'N/A',
+                'uri_path' => $uri->getPath(),
+                'uri_query' => $uri->getQuery(),
+                'slim_base_path' => $request->getAttribute('basePath'),
+                'environment' => $_ENV['APP_ENV'] ?? 'production'
+            ]
+        ];
+
+        $response->getBody()->write(json_encode($data, JSON_PRETTY_PRINT));
+        return $response->withHeader('Content-Type', 'application/json');
+    });
+
     // API routes group
     $app->group('/api', function (RouteCollectorProxy $group) {
-        
+
         // V1 API routes
         $group->group('/v1', function (RouteCollectorProxy $v1Group) {
-            
+
             // Auth routes
             $v1Group->group('/auth', function (RouteCollectorProxy $authGroup) {
                 $authGroup->post('/register', [AuthController::class, 'register']);
@@ -77,7 +107,7 @@ return function (App $app) {
                 $authGroup->get('/verify-email', [AuthController::class, 'verifyEmail']);
                 $authGroup->post('/verify-email', [AuthController::class, 'verifyEmail']); // Support POST aussi
                 $authGroup->post('/resend-verification', [AuthController::class, 'resendEmailVerification']);
-                
+
                 // Protected auth routes
                 $authGroup->post('/logout', [AuthController::class, 'logout'])
                     ->add(new AuthMiddleware());
@@ -87,7 +117,7 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $authGroup->post('/change-password', [AuthController::class, 'changePassword'])
                     ->add(new AuthMiddleware());
-                
+
                 // Social authentication routes
                 $authGroup->post('/google', [SocialAuthController::class, 'googleAuth']);
                 $authGroup->post('/apple', [SocialAuthController::class, 'appleAuth']);
@@ -99,7 +129,7 @@ return function (App $app) {
                 $adminGroup->post('/auth/login', [AuthController::class, 'adminLogin']);
                 $adminGroup->get('/auth/me', [AuthController::class, 'me'])
                     ->add(new AuthMiddleware());
-                
+
                 // Protected admin routes
                 $adminGroup->get('/dashboard/stats', [AdminController::class, 'getDashboardStats'])
                     ->add(new AuthMiddleware());
@@ -107,7 +137,7 @@ return function (App $app) {
                 // Statistiques des codes de livraison
                 $adminGroup->get('/delivery-codes/stats', [DeliveryCodeController::class, 'getDeliveryCodeStats'])
                     ->add(new AuthMiddleware());
-                
+
                 // User management
                 $adminGroup->get('/users', [AdminController::class, 'getUsers'])
                     ->add(new AuthMiddleware());
@@ -119,7 +149,7 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->post('/users/{id}/verify', [AdminController::class, 'verifyUser'])
                     ->add(new AuthMiddleware());
-                
+
                 // Trip management
                 $adminGroup->get('/trips/pending', [AdminController::class, 'getPendingTrips'])
                     ->add(new AuthMiddleware());
@@ -129,13 +159,13 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->get('/trips', [AdminController::class, 'getAllTrips'])
                     ->add(new AuthMiddleware());
-                
+
                 // Payment management
                 $adminGroup->get('/payments/stats', [AdminController::class, 'getPaymentStats'])
                     ->add(new AuthMiddleware());
                 $adminGroup->get('/payments/transactions', [AdminController::class, 'getPaymentTransactions'])
                     ->add(new AuthMiddleware());
-                
+
                 // Stripe connected accounts management
                 $adminGroup->get('/stripe/connected-accounts', [AdminController::class, 'getConnectedAccounts'])
                     ->add(new AuthMiddleware());
@@ -143,7 +173,7 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->post('/stripe/connected-accounts/{id}/action', [AdminController::class, 'performAccountAction'])
                     ->add(new AuthMiddleware());
-                
+
                 // Analytics management
                 $adminGroup->get('/analytics/platform', [AdminController::class, 'getPlatformAnalytics'])
                     ->add(new AuthMiddleware());
@@ -165,11 +195,11 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->get('/cancellations/detailed-report', [CancellationAdminController::class, 'getDetailedCancellationReport'])
                     ->add(new AuthMiddleware());
-                
+
                 // Commission tracking
                 $adminGroup->get('/payments/commission-stats', [AdminController::class, 'getCommissionStats'])
                     ->add(new AuthMiddleware());
-                
+
                 // Transfer management
                 $adminGroup->get('/payments/pending-transfers', [AdminController::class, 'getPendingTransfers'])
                     ->add(new AuthMiddleware());
@@ -184,17 +214,17 @@ return function (App $app) {
             // Public trips (no auth required) - Routes statiques d'abord
             $v1Group->get('/trips', [TripController::class, 'getPublicTrips']);
             $v1Group->get('/trips/price-suggestion', [TripController::class, 'getPriceSuggestion']);
-            
+
             // Protected trip routes statiques (doivent venir AVANT /trips/{id})
             $v1Group->get('/trips/cancellation-history', [TripController::class, 'getCancellationHistory'])->add(new AuthMiddleware());
-            
+
             // Route dynamique publique APRÈS toutes les routes statiques
             $v1Group->get('/trips/{id}', [TripController::class, 'getPublicTripDetails']);
 
             // Autres routes protégées
             $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
                 $tripGroup->post('', [TripController::class, 'create']);
-                
+
                 // Routes dynamiques avec {id}
                 $tripGroup->put('/{id}', [TripController::class, 'update']);
                 $tripGroup->delete('/{id}', [TripController::class, 'delete']);
@@ -215,7 +245,7 @@ return function (App $app) {
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->post('/{id}/cloudinary-images', [TripController::class, 'addCloudinaryImages']);
                 $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'removeTripImage']);
-                
+
                 // === NEW STATUS TRANSITION ACTIONS ===
                 $tripGroup->get('/{id}/actions', [TripController::class, 'getAvailableActions']);
                 $tripGroup->post('/{id}/submit-for-review', [TripController::class, 'submitForReview']);
@@ -247,12 +277,12 @@ return function (App $app) {
 
             // Public trip images (no auth required)
             $v1Group->get('/trips/{id}/images', [TripController::class, 'getTripImages']);
-            
+
             // Search routes
             $v1Group->get('/search/trips', [SearchController::class, 'searchTrips']);
             $v1Group->get('/search/cities', [SearchController::class, 'getCitySuggestions']);
             $v1Group->get('/search/popular-routes', [SearchController::class, 'getPopularRoutes']);
-            
+
             // Protected search routes
             $v1Group->group('/search', function (RouteCollectorProxy $searchGroup) {
                 $searchGroup->post('/alerts', [SearchController::class, 'saveSearchAlert']);
@@ -265,10 +295,10 @@ return function (App $app) {
             $v1Group->group('/bookings', function (RouteCollectorProxy $bookingGroup) {
                 $bookingGroup->post('', [BookingController::class, 'createBookingRequest']);
                 $bookingGroup->get('', [BookingController::class, 'getUserBookings']);
-                
+
                 // Routes statiques AVANT les routes dynamiques (FastRoute requirement)
                 $bookingGroup->get('/cancellation-history', [BookingController::class, 'getCancellationHistory']);
-                
+
                 // Routes dynamiques avec {id}
                 $bookingGroup->get('/{id}', [BookingController::class, 'getBooking']);
                 $bookingGroup->post('/{id}/accept', [BookingController::class, 'acceptBooking']);
@@ -332,16 +362,16 @@ return function (App $app) {
                 $msgGroup->get('/conversations', [MessageController::class, 'getConversations']);
                 $msgGroup->get('/conversations/{conversation_id}/messages', [MessageController::class, 'getConversationMessages']);
                 $msgGroup->get('/conversations/{conversation_id}/stats', [MessageController::class, 'getConversationStats']);
-                
+
                 // Legacy booking messages support
                 $msgGroup->get('/bookings/{id}', [MessageController::class, 'getBookingMessages']);
-                
+
                 // Send messages
                 $msgGroup->post('', [MessageController::class, 'sendMessage']);
                 $msgGroup->post('/conversations/{conversation_id}/actions', [MessageController::class, 'sendQuickAction']);
                 $msgGroup->post('/conversations/{conversation_id}/location', [MessageController::class, 'shareLocation']);
                 $msgGroup->post('/conversations/{conversation_id}/photo', [MessageController::class, 'sharePhoto']);
-                
+
                 // Message management
                 $msgGroup->post('/{id}/read', [MessageController::class, 'markAsRead']);
                 $msgGroup->delete('/{id}', [MessageController::class, 'deleteMessage']);
@@ -355,20 +385,20 @@ return function (App $app) {
                 $notifGroup->post('/{id}/read', [NotificationController::class, 'markAsRead']);
                 $notifGroup->post('/read-all', [NotificationController::class, 'markAllAsRead']);
                 $notifGroup->delete('/{id}', [NotificationController::class, 'deleteNotification']);
-                
+
                 // Notification preferences
                 $notifGroup->get('/preferences', [NotificationController::class, 'getPreferences']);
                 $notifGroup->put('/preferences', [NotificationController::class, 'updatePreferences']);
-                
+
                 // Notification statistics
                 $notifGroup->get('/stats', [NotificationController::class, 'getNotificationStats']);
-                
+
                 // FCM token management
                 $notifGroup->post('/fcm/register-token', [NotificationController::class, 'registerFCMToken']);
                 $notifGroup->post('/fcm/unregister-token', [NotificationController::class, 'unregisterFCMToken']);
                 $notifGroup->post('/fcm/test', [NotificationController::class, 'sendTestNotification']);
                 $notifGroup->get('/fcm/stats', [NotificationController::class, 'getFCMStats']);
-                
+
                 // Test notification with new system
                 $notifGroup->post('/test', [NotificationController::class, 'sendTestNotification']);
             })->add(new AuthMiddleware());
@@ -401,14 +431,14 @@ return function (App $app) {
                 $stripeGroup->post('/account/create', [StripeController::class, 'createConnectedAccount']);
                 $stripeGroup->get('/account/status', [StripeController::class, 'getAccountStatus']);
                 $stripeGroup->post('/account/refresh-onboarding', [StripeController::class, 'refreshOnboardingLink']);
-                
+
                 // Payment routes
                 $stripeGroup->post('/payment/confirm', [StripeController::class, 'confirmPayment']);
-                
+
                 // Verification routes
                 $stripeGroup->post('/pickup/validate', [StripeController::class, 'validatePickupCode']);
                 $stripeGroup->post('/delivery/validate', [StripeController::class, 'validateDeliveryCode']);
-                
+
                 // Escrow routes
                 $stripeGroup->post('/escrow/{booking_id}/release', [StripeController::class, 'releaseEscrow']);
             })->add(new AuthMiddleware());
@@ -458,7 +488,7 @@ return function (App $app) {
     });
 
     // Catch-all route for undefined endpoints
-    $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', 
+    $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}',
         function (Request $request, Response $response) {
             $response->getBody()->write(json_encode([
                 'success' => false,

@@ -49,8 +49,8 @@ $app = SlimAppFactory::create($container);
 
 // Configuration du base path pour l'hébergement mutualisé
 if (($_ENV['APP_ENV'] ?? 'production') !== 'development') {
-    // Configurer le base path basé sur l'erreur qu'on voit
-    $app->setBasePath('/api.kiloshare');
+    // Configurer le base path basé sur SCRIPT_NAME du debug
+    $app->setBasePath('/api.kiloshare/public');
 }
 
 // Configuration des middlewares globaux
