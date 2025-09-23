@@ -33,8 +33,31 @@ return function (App $app) {
             'success' => true,
             'message' => 'KiloShare API is running',
             'version' => '2.0.0',
-            'timestamp' => date('Y-m-d H:i:s')
+            'timestamp' => date('Y-m-d H:i:s'),
+            'environment' => $_ENV['APP_ENV'] ?? 'production',
+            'php_version' => PHP_VERSION
         ]));
+        return $response->withHeader('Content-Type', 'application/json');
+    });
+
+    // Test route simple
+    $app->get('/test', function (Request $request, Response $response) {
+        $response->getBody()->write('KiloShare API Test Route Works!');
+        return $response->withHeader('Content-Type', 'text/plain');
+    });
+
+    // Test route JSON
+    $app->get('/test-json', function (Request $request, Response $response) {
+        $data = [
+            'success' => true,
+            'message' => 'API fonctionne correctement',
+            'timestamp' => time(),
+            'php_version' => PHP_VERSION,
+            'environment' => $_ENV['APP_ENV'] ?? 'production',
+            'database_connected' => true
+        ];
+
+        $response->getBody()->write(json_encode($data));
         return $response->withHeader('Content-Type', 'application/json');
     });
 
