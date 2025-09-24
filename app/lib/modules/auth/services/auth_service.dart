@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -163,17 +164,22 @@ class AuthService {
     }
   }
 
-  // Initialiser Firebase Notifications après connexion
+  // Initialiser Firebase Notifications après connexion (non-bloquant)
   Future<void> _initializeFirebaseNotifications() async {
-    try {
-      final firebaseService = FirebaseNotificationService();
-      // ✅ OPTIMISATION: Utiliser registerAfterLogin au lieu de initializeAfterLogin
-      // pour éviter la double initialisation
-      await firebaseService.registerAfterLogin();
-    } catch (e) {
-      // Silent catch - notification errors shouldn't block login
-      debugPrint('Firebase notification init failed: $e');
-    }
+    // Démarrer l'initialisation en arrière-plan sans attendre
+    unawaited(
+      Future(() async {
+        try {
+          final firebaseService = FirebaseNotificationService();
+          // ✅ OPTIMISATION: Utiliser registerAfterLogin au lieu de initializeAfterLogin
+          // pour éviter la double initialisation
+          await firebaseService.registerAfterLogin();
+        } catch (e) {
+          // Silent catch - notification errors shouldn't block login
+          debugPrint('Firebase notification init failed: $e');
+        }
+      })
+    );
   }
 
   Future<String?> getAccessToken() async {

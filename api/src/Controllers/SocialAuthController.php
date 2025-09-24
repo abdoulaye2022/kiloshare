@@ -124,6 +124,9 @@ class SocialAuthController
     {
         $data = json_decode($request->getBody()->getContents(), true);
 
+        // Debug: Log les données reçues
+        error_log("Apple Auth - Data received: " . json_encode($data));
+
         $validator = new Validator();
         $rules = [
             'identity_token' => Validator::required()->stringType(),
@@ -133,8 +136,11 @@ class SocialAuthController
         ];
 
         if (!$validator->validate($data, $rules)) {
+            error_log("Apple Auth - Validation errors: " . json_encode($validator->getErrors()));
             return Response::validationError($validator->getErrors());
         }
+
+        error_log("Apple Auth - Validation passed, processing...");
 
         try {
             // TODO: Vérifier le token Apple avec l'API Apple
@@ -163,8 +169,11 @@ class SocialAuthController
             } else {
                 // Nouvel utilisateur
                 if (!$email) {
+                    error_log("Apple Auth - No email provided for new user");
                     return Response::error('Email is required for new Apple Sign In users');
                 }
+
+                error_log("Apple Auth - Creating new user with email: " . $email);
 
                 $nameParts = $name ? explode(' ', trim($name), 2) : ['Apple', 'User'];
                 $firstName = $nameParts[0];
@@ -223,6 +232,8 @@ class SocialAuthController
             ], 'Apple authentication successful');
 
         } catch (\Exception $e) {
+            error_log("Apple Auth - Exception: " . $e->getMessage());
+            error_log("Apple Auth - Stack trace: " . $e->getTraceAsString());
             return Response::serverError('Apple authentication failed: ' . $e->getMessage());
         }
     }

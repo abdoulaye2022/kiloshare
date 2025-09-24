@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:dio/dio.dart';
@@ -74,9 +75,45 @@ class SimpleSocialAuthService {
       }
       
       
+      // Extraire les données du token JWT
+      String userIdentifier = appleCredential.userIdentifier ?? '';
+      String? email = appleCredential.email;
+      String? name = appleCredential.givenName != null && appleCredential.familyName != null
+          ? '${appleCredential.givenName} ${appleCredential.familyName}'
+          : appleCredential.givenName ?? appleCredential.familyName;
+
+      // Extraire les données manquantes du token JWT
+      try {
+        final parts = appleCredential.identityToken!.split('.');
+        if (parts.length == 3) {
+          final payload = parts[1];
+          final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+          final decoded = utf8.decode(base64Decode(normalizedPayload));
+          final claims = jsonDecode(decoded);
+
+          // Utiliser user_identifier du JWT si pas disponible
+          if (userIdentifier.isEmpty) {
+            userIdentifier = claims['sub'] ?? '';
+          }
+
+          // Utiliser email du JWT si pas disponible directement
+          if (email == null || email.isEmpty) {
+            email = claims['email'];
+          }
+        }
+      } catch (e) {
+        // Si extraction échoue pour userIdentifier, utiliser une valeur par défaut
+        if (userIdentifier.isEmpty) {
+          userIdentifier = 'apple_user_${DateTime.now().millisecondsSinceEpoch}';
+        }
+      }
+
       // Appeler le backend directement avec le token Apple
       return await _authenticateWithBackend({
-        'id_token': appleCredential.identityToken!,
+        'identity_token': appleCredential.identityToken!,
+        'user_identifier': userIdentifier,
+        'email': email,
+        'name': name,
       }, 'apple');
       
     } catch (e) {
@@ -92,14 +129,19 @@ class SimpleSocialAuthService {
 
   /// Appeler le backend avec les credentials
   Future<AuthResponse> _authenticateWithBackend(
-    Map<String, String> credentials,
+    Map<String, String?> credentials,
     String provider,
   ) async {
     try {
       
+      // Filtrer les valeurs nulles
+      final filteredCredentials = Map<String, dynamic>.fromEntries(
+        credentials.entries.where((entry) => entry.value != null)
+      );
+
       final response = await _dio.post(
         '/auth/$provider',
-        data: credentials,
+        data: filteredCredentials,
       );
       
       
@@ -126,6 +168,7 @@ class SimpleSocialAuthService {
     try {
       await _googleSignIn.signOut();
     } catch (e) {
+      // Ignore sign out errors
     }
   }
 }
