@@ -17,8 +17,11 @@ interface User {
   role: string;
   last_login_at?: string;
   created_at: string;
-  stripe_account_id?: string;
+  stripe_account_id?: string | null;
   stripe_onboarding_complete?: boolean;
+  stripe_account_status?: string | null;
+  stripe_charges_enabled?: boolean;
+  stripe_payouts_enabled?: boolean;
   total_trips?: number;
   total_bookings?: number;
   trust_score?: number;
@@ -39,14 +42,27 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await adminAuth.apiRequest(`/api/v1/admin/users?status=${filter}&limit=50`);
-      
+      const token = await adminAuth.getValidAccessToken();
+
+      if (!token) {
+        console.error('No valid token for fetching users');
+        return;
+      }
+
+      const response = await fetch(`/api/v1/admin/users?status=${filter}&limit=50`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         console.log('Users API response:', data);
         setUsers(data.data?.users || []);
       } else {
-        console.error('Failed to fetch users');
+        console.error('Failed to fetch users', response.status);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -57,38 +73,71 @@ export default function UserManagement() {
 
   const handleUserAction = async (userId: number, action: 'block' | 'unblock' | 'verify') => {
     try {
-      const response = await adminAuth.apiRequest(`/api/v1/admin/users/${userId}/${action}`, {
-        method: 'POST',
+      let endpoint = '';
+      let method = 'POST';
+      let body: any = {};
+
+      switch (action) {
+        case 'block':
+          endpoint = `/api/v1/admin/users/${userId}/block`;
+          body = { reason: 'Bloqué par l\'administrateur' };
+          break;
+        case 'unblock':
+          endpoint = `/api/v1/admin/users/${userId}/unblock`;
+          break;
+        case 'verify':
+          endpoint = `/api/v1/admin/users/${userId}/verify`;
+          break;
+        default:
+          console.error('Action not supported:', action);
+          return;
+      }
+
+      const response = await adminAuth.apiRequest(endpoint, {
+        method,
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
       });
 
       if (response.ok) {
+        const result = await response.json();
+        console.log(`User ${action} successful:`, result);
+
+        // Show success message
+        alert(`Utilisateur ${action === 'block' ? 'bloqué' : action === 'unblock' ? 'débloqué' : 'vérifié'} avec succès`);
+
         fetchUsers(); // Refresh the list
         if (selectedUser && selectedUser.id === userId) {
-          setSelectedUser(null);
-          setShowUserDetails(false);
+          // Update selected user data
+          const updatedUser = { ...selectedUser, status: action === 'block' ? 'blocked' : action === 'unblock' ? 'active' : selectedUser.status };
+          setSelectedUser(updatedUser);
         }
+      } else {
+        const errorData = await response.json();
+        console.error(`${action} action failed:`, errorData);
+        alert(`Erreur lors de l'action: ${errorData.message || 'Une erreur inconnue s\'est produite'}`);
       }
     } catch (error) {
       console.error(`Error ${action}ing user:`, error);
+      alert(`Erreur de connexion lors de l'action sur l'utilisateur`);
     }
   };
 
   const getUserStatusBadge = (status: string) => {
     const badgeClasses = {
-      active: 'bg-green-100 text-green-800',
-      blocked: 'bg-red-100 text-red-800', 
-      pending: 'bg-yellow-100 text-yellow-800'
+      active: 'badge bg-success',
+      blocked: 'badge bg-danger',
+      pending: 'badge bg-warning text-dark'
     };
-    
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClasses[status as keyof typeof badgeClasses]}`}>
+      <span className={badgeClasses[status as keyof typeof badgeClasses] || 'badge bg-secondary'}>
         {status}
       </span>
     );
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
@@ -96,13 +145,10 @@ export default function UserManagement() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="space-y-3">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
+      <div className="container-fluid p-4">
+        <div className="d-flex justify-content-center align-items-center" style={{minHeight: '400px'}}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Chargement...</span>
           </div>
         </div>
       </div>
@@ -110,268 +156,364 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Gestion des utilisateurs</h2>
-        
-        {/* Filters and Search */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
-            >
-              <option value="all">Tous les utilisateurs</option>
-              <option value="active">Actifs</option>
-              <option value="blocked">Bloqués</option>
-              <option value="pending">En attente</option>
-            </select>
-          </div>
-          
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Rechercher un utilisateur..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
+    <div className="container-fluid p-4">
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2 className="h3 mb-0 fw-bold">Gestion des utilisateurs</h2>
+              <p className="text-muted mb-0">Gérez tous les utilisateurs de la plateforme</p>
             </div>
           </div>
-        </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-gray-900">{users.length}</div>
-            <div className="text-sm text-gray-600">Total utilisateurs</div>
+          {/* Filters and Search */}
+          <div className="card mb-4">
+            <div className="card-body">
+              <div className="row g-3 align-items-center">
+                <div className="col-md-3">
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    className="form-select"
+                  >
+                    <option value="all">Tous les utilisateurs</option>
+                    <option value="active">Actifs</option>
+                    <option value="blocked">Bloqués</option>
+                    <option value="pending">En attente</option>
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="input-group">
+                    <span className="input-group-text">
+                      <i className="bi bi-search"></i>
+                    </span>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Rechercher un utilisateur..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="text-muted small">
+                    <strong>{filteredUsers.length}</strong> utilisateur{filteredUsers.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-green-600">{users.filter(u => u.status === 'active').length}</div>
-            <div className="text-sm text-gray-600">Actifs</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-red-600">{users.filter(u => u.status === 'blocked').length}</div>
-            <div className="text-sm text-gray-600">Bloqués</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-blue-600">{users.filter(u => u.stripe_account_id).length}</div>
-            <div className="text-sm text-gray-600">Comptes Stripe</div>
+
+          {/* Stats */}
+          <div className="row g-3 mb-4">
+            <div className="col-md-3">
+              <div className="card bg-primary text-white h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 className="card-subtitle mb-2 text-white-50">Total utilisateurs</h6>
+                      <h3 className="card-title mb-0">{users.length}</h3>
+                    </div>
+                    <i className="bi bi-people fs-1 opacity-50"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card bg-success text-white h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 className="card-subtitle mb-2 text-white-50">Actifs</h6>
+                      <h3 className="card-title mb-0">{users.filter(u => u.status === 'active').length}</h3>
+                    </div>
+                    <i className="bi bi-check-circle fs-1 opacity-50"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card bg-danger text-white h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 className="card-subtitle mb-2 text-white-50">Bloqués</h6>
+                      <h3 className="card-title mb-0">{users.filter(u => u.status === 'blocked').length}</h3>
+                    </div>
+                    <i className="bi bi-x-circle fs-1 opacity-50"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card bg-info text-white h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 className="card-subtitle mb-2 text-white-50">Comptes Stripe</h6>
+                      <h3 className="card-title mb-0">{users.filter(u => u.stripe_account_id).length}</h3>
+                    </div>
+                    <i className="bi bi-credit-card fs-1 opacity-50"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Users List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Utilisateur
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Vérifications
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Activité
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                          <span className="text-white font-medium text-sm">
-                            {user.first_name?.[0]}{user.last_name?.[0]}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.first_name} {user.last_name}
-                        </div>
-                        <div className="text-sm text-gray-600">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getUserStatusBadge(user.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {user.email_verified_at ? (
-                        <span className="inline-flex items-center text-green-600">
-                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Email
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Email</span>
-                      )}
-                      {user.phone_verified_at ? (
-                        <span className="inline-flex items-center text-green-600">
-                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Téléphone
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Téléphone</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>
-                      {user.total_trips || 0} voyages
-                    </div>
-                    <div className="text-xs">
-                      Dernière connexion: {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowUserDetails(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Voir
-                      </button>
-                      {user.status === 'active' ? (
-                        <button
-                          onClick={() => handleUserAction(user.id, 'block')}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Bloquer
-                        </button>
-                      ) : user.status === 'blocked' ? (
-                        <button
-                          onClick={() => handleUserAction(user.id, 'unblock')}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          Débloquer
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="row">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-header">
+              <h5 className="card-title mb-0">
+                <i className="bi bi-people me-2"></i>
+                Liste des utilisateurs
+              </h5>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Utilisateur</th>
+                      <th>Statut</th>
+                      <th>Vérifications</th>
+                      <th>Activité</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="d-flex align-items-center">
+                            <div className="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
+                                 style={{ width: '40px', height: '40px', fontSize: '14px' }}>
+                              {user.first_name?.[0]}{user.last_name?.[0]}
+                            </div>
+                            <div>
+                              <div className="fw-medium">{user.first_name} {user.last_name}</div>
+                              <div className="text-muted small">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {getUserStatusBadge(user.status)}
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            {user.email_verified_at ? (
+                              <span className="text-success small">
+                                <i className="bi bi-check-circle-fill me-1"></i>
+                                Email
+                              </span>
+                            ) : (
+                              <span className="text-muted small">Email</span>
+                            )}
+                            {user.phone_verified_at ? (
+                              <span className="text-success small">
+                                <i className="bi bi-check-circle-fill me-1"></i>
+                                Téléphone
+                              </span>
+                            ) : (
+                              <span className="text-muted small">Téléphone</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            <span className="fw-medium">{user.total_trips || 0}</span> voyage{(user.total_trips || 0) !== 1 ? 's' : ''}
+                          </div>
+                          <div className="text-muted small">
+                            Dernière connexion: {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowUserDetails(true);
+                              }}
+                              className="btn btn-outline-primary"
+                              title="Voir les détails"
+                            >
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            {!user.email_verified_at && (
+                              <button
+                                onClick={() => handleUserAction(user.id, 'verify')}
+                                className="btn btn-outline-warning"
+                                title="Vérifier l'utilisateur"
+                              >
+                                <i className="bi bi-patch-check"></i>
+                              </button>
+                            )}
+                            {user.status === 'active' ? (
+                              <button
+                                onClick={() => handleUserAction(user.id, 'block')}
+                                className="btn btn-outline-danger"
+                                title="Bloquer l'utilisateur"
+                              >
+                                <i className="bi bi-x-circle"></i>
+                              </button>
+                            ) : user.status === 'blocked' ? (
+                              <button
+                                onClick={() => handleUserAction(user.id, 'unblock')}
+                                className="btn btn-outline-success"
+                                title="Débloquer l'utilisateur"
+                              >
+                                <i className="bi bi-check-circle"></i>
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* User Details Modal */}
       {showUserDetails && selectedUser && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900">
-                        Détails utilisateur
-                      </h3>
-                      <button
-                        onClick={() => setShowUserDetails(false)}
-                        className="text-gray-400 hover:text-gray-600"
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-person-fill me-2"></i>
+                  Détails utilisateur
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowUserDetails(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Nom complet</label>
+                    <p className="mb-0">{selectedUser.first_name} {selectedUser.last_name}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Email</label>
+                    <p className="mb-0">{selectedUser.email}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Téléphone</label>
+                    <p className="mb-0">{selectedUser.phone || 'Non renseigné'}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Statut</label>
+                    <div>{getUserStatusBadge(selectedUser.status)}</div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Compte Stripe</label>
+                    <p className="mb-0">
+                      {selectedUser.stripe_account_id ? (
+                        <div>
+                          <div className="mb-1">
+                            {selectedUser.stripe_account_status === 'active' && (
+                              <span className="badge bg-success">
+                                <i className="bi bi-check-circle-fill me-1"></i>
+                                Actif
+                              </span>
+                            )}
+                            {selectedUser.stripe_account_status === 'pending' && (
+                              <span className="badge bg-warning">
+                                <i className="bi bi-clock-fill me-1"></i>
+                                En attente
+                              </span>
+                            )}
+                            {selectedUser.stripe_account_status === 'restricted' && (
+                              <span className="badge bg-danger">
+                                <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                Restreint
+                              </span>
+                            )}
+                          </div>
+                          <small className="text-muted d-block">
+                            ID: {selectedUser.stripe_account_id}
+                          </small>
+                          <small className="text-muted d-block">
+                            Paiements: {selectedUser.stripe_charges_enabled ? 'Activés' : 'Désactivés'} |
+                            Virements: {selectedUser.stripe_payouts_enabled ? 'Activés' : 'Désactivés'}
+                          </small>
+                        </div>
+                      ) : (
+                        <span className="text-muted">
+                          <i className="bi bi-x-circle me-1"></i>
+                          Non configuré
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Score de confiance</label>
+                    <div className="progress" style={{height: '20px'}}>
+                      <div
+                        className="progress-bar bg-primary"
+                        style={{width: `${selectedUser.trust_score || 0}%`}}
                       >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Nom complet</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedUser.first_name} {selectedUser.last_name}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Email</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedUser.email}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Téléphone</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedUser.phone || 'Non renseigné'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Statut</label>
-                        <div className="mt-1">{getUserStatusBadge(selectedUser.status)}</div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Compte Stripe</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedUser.stripe_account_id ? (
-                            <span className="text-green-600">Configuré</span>
-                          ) : (
-                            <span className="text-gray-500">Non configuré</span>
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Score de confiance</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedUser.trust_score || 0}/100</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Date d'inscription</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {new Date(selectedUser.created_at).toLocaleDateString('fr-FR')}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Dernière connexion</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedUser.last_login_at ? new Date(selectedUser.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
-                        </p>
+                        {selectedUser.trust_score || 0}/100
                       </div>
                     </div>
                   </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Date d'inscription</label>
+                    <p className="mb-0">
+                      {new Date(selectedUser.created_at).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Dernière connexion</label>
+                    <p className="mb-0">
+                      {selectedUser.last_login_at ? new Date(selectedUser.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <div className="flex space-x-3">
+              <div className="modal-footer">
+                <div className="d-flex gap-2">
+                  {!selectedUser.email_verified_at && (
+                    <button
+                      onClick={() => handleUserAction(selectedUser.id, 'verify')}
+                      className="btn btn-warning"
+                    >
+                      <i className="bi bi-patch-check me-1"></i>
+                      Vérifier l'utilisateur
+                    </button>
+                  )}
                   {selectedUser.status === 'active' ? (
                     <button
                       onClick={() => handleUserAction(selectedUser.id, 'block')}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      className="btn btn-danger"
                     >
+                      <i className="bi bi-x-circle me-1"></i>
                       Bloquer l'utilisateur
                     </button>
                   ) : selectedUser.status === 'blocked' ? (
                     <button
                       onClick={() => handleUserAction(selectedUser.id, 'unblock')}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      className="btn btn-success"
                     >
+                      <i className="bi bi-check-circle me-1"></i>
                       Débloquer l'utilisateur
                     </button>
                   ) : null}
                   <button
                     onClick={() => setShowUserDetails(false)}
-                    className="bg-white hover:bg-gray-50 text-gray-900 px-4 py-2 rounded-md text-sm font-medium border border-gray-300"
+                    className="btn btn-secondary"
                   >
                     Fermer
                   </button>

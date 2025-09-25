@@ -32,7 +32,7 @@ interface Transaction {
 }
 
 interface TransactionManagementProps {
-  adminInfo: any;
+  adminInfo?: any;
 }
 
 export default function TransactionManagement({ adminInfo }: TransactionManagementProps) {
@@ -43,17 +43,10 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   const [stats, setStats] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
-  const [commissionStats, setCommissionStats] = useState<any>(null);
-  const [platformAnalytics, setPlatformAnalytics] = useState<any>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTransactions();
     fetchStats();
-    fetchCommissionStats();
-    fetchPlatformAnalytics();
-    fetchPendingTransfers();
   }, [filter, typeFilter]);
 
   const fetchTransactions = async () => {
@@ -62,11 +55,10 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
       const response = await adminAuth.apiRequest(
         `/api/v1/admin/payments/transactions?status=${filter}&type=${typeFilter}&limit=50`
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('Transactions API response:', data);
-        // Handle nested data structure: data.data.transactions
         const transactions = data.data?.transactions || data.transactions || [];
         setTransactions(transactions);
       } else {
@@ -82,91 +74,15 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   const fetchStats = async () => {
     try {
       const response = await adminAuth.apiRequest('/api/v1/admin/payments/stats');
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('Stats API response:', data);
-        // Handle nested data structure
         const stats = data.data?.stats || data.stats;
         setStats(stats);
       }
     } catch (error) {
       console.error('Error fetching transaction stats:', error);
-    }
-  };
-
-  const fetchCommissionStats = async () => {
-    try {
-      const response = await adminAuth.apiRequest('/api/v1/admin/payments/commission-stats');
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCommissionStats(data.data?.stats);
-      }
-    } catch (error) {
-      console.error('Error fetching commission stats:', error);
-    }
-  };
-
-  const fetchPlatformAnalytics = async () => {
-    try {
-      const response = await adminAuth.apiRequest('/api/v1/admin/analytics/platform');
-      
-      if (response.ok) {
-        const data = await response.json();
-        setPlatformAnalytics(data.data?.analytics);
-      }
-    } catch (error) {
-      console.error('Error fetching platform analytics:', error);
-    }
-  };
-
-  const fetchPendingTransfers = async () => {
-    try {
-      const response = await adminAuth.apiRequest('/api/v1/admin/payments/pending-transfers');
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Pending transfers API response:', data);
-        setPendingTransfers(data.data?.transfers || data.transfers || []);
-      }
-    } catch (error) {
-      console.error('Error fetching pending transfers:', error);
-    }
-  };
-
-  const handleTransferPayment = async (transferId: string, action: 'approve' | 'reject' | 'force') => {
-    try {
-      const response = await adminAuth.apiRequest(`/api/v1/admin/payments/transfers/${transferId}/${action}`, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          reason: action === 'approve' ? 'Admin approved transfer' : 
-                 action === 'force' ? 'Admin forced transfer (24h passed)' : 'Admin rejected transfer'
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`Transfer ${action} successful:`, result);
-        
-        // Show success message
-        if (action === 'approve') {
-          alert(`Transfert approuvé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
-        } else if (action === 'force') {
-          alert(`Transfert forcé avec succès ! Montant transféré: ${result.data?.amount_transferred?.toFixed(2)} CAD`);
-        } else {
-          alert('Transfert rejeté avec succès');
-        }
-        
-        fetchPendingTransfers();
-        fetchStats();
-      } else {
-        const errorData = await response.json();
-        console.error('Transfer action failed:', errorData);
-        alert(`Erreur lors du transfert: ${errorData.message || 'Une erreur inconnue s\'est produite'}`);
-      }
-    } catch (error) {
-      console.error(`Error ${action}ing transfer:`, error);
     }
   };
 
@@ -193,53 +109,30 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
 
   const getStatusBadge = (status: string) => {
     const badgeClasses = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      cancelled: 'bg-gray-100 text-gray-800'
+      pending: 'badge bg-warning text-dark',
+      completed: 'badge bg-success',
+      failed: 'badge bg-danger',
+      cancelled: 'badge bg-secondary'
     };
-    
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClasses[status as keyof typeof badgeClasses]}`}>
+      <span className={badgeClasses[status as keyof typeof badgeClasses] || 'badge bg-secondary'}>
         {status}
       </span>
     );
   };
 
   const getTypeIcon = (type: string) => {
-    const iconClass = "w-4 h-4";
-    switch (type) {
-      case 'payment': 
-        return (
-          <svg className={`${iconClass} text-green-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
-        );
-      case 'refund':
-        return (
-          <svg className={`${iconClass} text-red-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3" />
-          </svg>
-        );
-      case 'commission':
-        return (
-          <svg className={`${iconClass} text-blue-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-          </svg>
-        );
-      case 'payout':
-        return (
-          <svg className={`${iconClass} text-purple-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className={`${iconClass} text-gray-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-          </svg>
-        );
-    }
+    const icons = {
+      payment: 'bi-credit-card text-success',
+      refund: 'bi-arrow-counterclockwise text-danger',
+      commission: 'bi-percent text-primary',
+      payout: 'bi-arrow-up-right text-info'
+    };
+
+    return (
+      <i className={`bi ${icons[type as keyof typeof icons] || 'bi-currency-dollar text-muted'}`}></i>
+    );
   };
 
   const formatCurrency = (amount: number, currency: string = 'CAD') => {
@@ -251,18 +144,10 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
+      <div className="container-fluid p-4">
+        <div className="d-flex justify-content-center align-items-center" style={{minHeight: '400px'}}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Chargement...</span>
           </div>
         </div>
       </div>
@@ -270,496 +155,305 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
   }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Gestion des transactions</h2>
-        
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.total_revenue || 0)}</div>
-              <div className="text-sm text-gray-600">Revenus totaux</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-blue-600">{formatCurrency(stats.total_commission || 0)}</div>
-              <div className="text-sm text-gray-600">Commissions</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending_count || 0}</div>
-              <div className="text-sm text-gray-600">En attente</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="text-2xl font-bold text-red-600">{stats.failed_count || 0}</div>
-              <div className="text-sm text-gray-600">Échouées</div>
+    <div className="container-fluid p-4">
+      {/* Header */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2 className="h3 mb-0 fw-bold">Gestion des transactions</h2>
+              <p className="text-muted mb-0">Gérez tous les paiements de la plateforme</p>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Commission & Analytics Section */}
-        {(commissionStats || platformAnalytics) && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Analytics de la plateforme</h3>
-              <button
-                onClick={() => setShowAnalytics(!showAnalytics)}
-                className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-              >
-                {showAnalytics ? 'Masquer' : 'Afficher'} les détails
-              </button>
-            </div>
-
-            {/* Commission Stats */}
-            {commissionStats && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(commissionStats.total_commission || 0)}
+      {/* Stats */}
+      {stats && (
+        <div className="row g-3 mb-4">
+          <div className="col-lg-3 col-md-6">
+            <div className="card bg-success text-white h-100">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 className="card-subtitle mb-2 text-white-50">Revenus totaux</h6>
+                    <h4 className="card-title mb-0">{formatCurrency(stats.total_revenue || 0)}</h4>
                   </div>
-                  <div className="text-sm text-blue-700">Commission totale collectée</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {commissionStats.commission_rate || '0'}%
-                  </div>
-                  <div className="text-sm text-purple-700">Taux de commission moyen</div>
-                </div>
-                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                  <div className="text-2xl font-bold text-indigo-600">
-                    {formatCurrency(commissionStats.monthly_commission || 0)}
-                  </div>
-                  <div className="text-sm text-indigo-700">Commission ce mois</div>
-                </div>
-                <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
-                  <div className="text-2xl font-bold text-teal-600">
-                    {commissionStats.commission_transactions || '0'}
-                  </div>
-                  <div className="text-sm text-teal-700">Transactions avec commission</div>
+                  <i className="bi bi-cash-stack fs-1 opacity-50"></i>
                 </div>
               </div>
-            )}
-
-            {/* Expanded Analytics */}
-            {showAnalytics && platformAnalytics && (
-              <div className="bg-white p-6 rounded-lg border">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Volume Analytics */}
+            </div>
+          </div>
+          <div className="col-lg-3 col-md-6">
+            <div className="card bg-primary text-white h-100">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <h4 className="text-md font-medium text-gray-900 mb-3">Volume des transactions</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Transactions aujourd'hui</span>
-                        <span className="text-sm font-medium">{platformAnalytics.daily_transactions || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Transactions ce mois</span>
-                        <span className="text-sm font-medium">{platformAnalytics.monthly_transactions || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Volume total traité</span>
-                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.total_volume || 0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Valeur moyenne/transaction</span>
-                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.avg_transaction_value || 0)}</span>
-                      </div>
-                    </div>
+                    <h6 className="card-subtitle mb-2 text-white-50">Commissions</h6>
+                    <h4 className="card-title mb-0">{formatCurrency(stats.total_commission || 0)}</h4>
                   </div>
-
-                  {/* User Analytics */}
+                  <i className="bi bi-percent fs-1 opacity-50"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-3 col-md-6">
+            <div className="card bg-warning text-dark h-100">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <h4 className="text-md font-medium text-gray-900 mb-3">Utilisateurs actifs</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Utilisateurs actifs</span>
-                        <span className="text-sm font-medium">{platformAnalytics.active_users || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Nouveaux utilisateurs</span>
-                        <span className="text-sm font-medium">{platformAnalytics.new_users || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Comptes connectés</span>
-                        <span className="text-sm font-medium">{platformAnalytics.connected_accounts || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Taux de conversion</span>
-                        <span className="text-sm font-medium">{platformAnalytics.conversion_rate?.toFixed(1) || '0.0'}%</span>
-                      </div>
-                    </div>
+                    <h6 className="card-subtitle mb-2 opacity-75">En attente</h6>
+                    <h4 className="card-title mb-0">{stats.pending_count || 0}</h4>
                   </div>
-
-                  {/* Performance Analytics */}
+                  <i className="bi bi-clock fs-1 opacity-50"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-3 col-md-6">
+            <div className="card bg-danger text-white h-100">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <h4 className="text-md font-medium text-gray-900 mb-3">Performance</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Taux de succès</span>
-                        <span className="text-sm font-medium text-green-600">{platformAnalytics.success_rate?.toFixed(1) || '0.0'}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Taux d'échec</span>
-                        <span className="text-sm font-medium text-red-600">{platformAnalytics.failure_rate?.toFixed(1) || '0.0'}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Remboursements</span>
-                        <span className="text-sm font-medium">{platformAnalytics.refunds_count || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Frais Stripe totaux</span>
-                        <span className="text-sm font-medium">{formatCurrency(platformAnalytics.stripe_fees || 0)}</span>
-                      </div>
-                    </div>
+                    <h6 className="card-subtitle mb-2 text-white-50">Échouées</h6>
+                    <h4 className="card-title mb-0">{stats.failed_count || 0}</h4>
                   </div>
+                  <i className="bi bi-x-circle fs-1 opacity-50"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-body">
+              <div className="row g-3 align-items-center">
+                <div className="col-md-4">
+                  <label className="form-label fw-medium">Statut:</label>
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    className="form-select"
+                  >
+                    <option value="all">Tous les statuts</option>
+                    <option value="pending">En attente</option>
+                    <option value="completed">Complétées</option>
+                    <option value="failed">Échouées</option>
+                  </select>
                 </div>
 
-                {/* Charts placeholder */}
-                <div className="mt-6 pt-6 border-t">
-                  <h4 className="text-md font-medium text-gray-900 mb-3">Tendances (7 derniers jours)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm font-medium text-gray-700 mb-2">Volume quotidien</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(platformAnalytics.daily_trend?.volume || 0)}
-                      </div>
-                      <div className={`text-sm ${platformAnalytics.daily_trend?.volume_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {platformAnalytics.daily_trend?.volume_change >= 0 ? '+' : ''}
-                        {platformAnalytics.daily_trend?.volume_change?.toFixed(1) || '0.0'}% par rapport à hier
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm font-medium text-gray-700 mb-2">Transactions quotidiennes</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {platformAnalytics.daily_trend?.transactions || '0'}
-                      </div>
-                      <div className={`text-sm ${platformAnalytics.daily_trend?.transactions_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {platformAnalytics.daily_trend?.transactions_change >= 0 ? '+' : ''}
-                        {platformAnalytics.daily_trend?.transactions_change?.toFixed(1) || '0.0'}% par rapport à hier
-                      </div>
-                    </div>
+                <div className="col-md-4">
+                  <label className="form-label fw-medium">Type:</label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as any)}
+                    className="form-select"
+                  >
+                    <option value="all">Tous les types</option>
+                    <option value="payment">Paiements</option>
+                    <option value="refund">Remboursements</option>
+                    <option value="commission">Commissions</option>
+                    <option value="payout">Virements</option>
+                  </select>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="text-center">
+                    <div className="h4 mb-0 text-primary">{transactions.length}</div>
+                    <small className="text-muted">transaction{transactions.length !== 1 ? 's' : ''}</small>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-        
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="pending">En attente</option>
-              <option value="completed">Complétées</option>
-              <option value="failed">Échouées</option>
-            </select>
-            
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
-            >
-              <option value="all">Tous les types</option>
-              <option value="payment">Paiements</option>
-              <option value="refund">Remboursements</option>
-              <option value="commission">Commissions</option>
-              <option value="payout">Virements</option>
-            </select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Transactions List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Transaction
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Utilisateur
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Montant
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {transactions.map((transaction) => (
-                <tr key={transaction.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getTypeIcon(transaction.type)}
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {transaction.stripe_transaction_id}
-                        </div>
-                        <div className="text-sm text-gray-500 capitalize">
-                          {transaction.type}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {transaction.user?.first_name} {transaction.user?.last_name}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {transaction.user?.email}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(transaction.amount, transaction.currency)}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Net: {formatCurrency(transaction.net_amount, transaction.currency)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(transaction.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(transaction.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedTransaction(transaction);
-                          setShowTransactionDetails(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Détails
-                      </button>
-                      {transaction.type === 'payment' && transaction.status === 'completed' && (
-                        <button
-                          onClick={() => handleRefund(transaction.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Rembourser
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Transfer Management Section */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Gestion des transferts de paiement</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Transferts en attente vers les comptes Stripe des transporteurs
-          </p>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Voyage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Transporteur</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Montant</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {pendingTransfers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                    Aucun transfert en attente
-                  </td>
-                </tr>
-              ) : (
-                pendingTransfers.map((transfer) => {
-                  const canForceTransfer = transfer.hours_since_delivery >= 24;
-                  
-                  return (
-                    <tr key={transfer.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {transfer.trip?.departure_city} → {transfer.trip?.arrival_city}
-                        </div>
-                        <div className="text-sm text-gray-600">#{transfer.trip?.id}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {transfer.transporter?.first_name} {transfer.transporter?.last_name}
-                        </div>
-                        <div className="text-sm text-gray-600">{transfer.transporter?.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(transfer.amount, transfer.currency)}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Commission: {formatCurrency(transfer.commission, transfer.currency)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          transfer.status === 'ready' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {transfer.status === 'ready' ? 'Prêt' : 'En attente'}
-                        </span>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {canForceTransfer ? 'Peut transférer' : `${Math.max(0, 24 - transfer.hours_since_delivery)}h restantes`}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleTransferPayment(transfer.id, 'approve')}
-                            className="text-green-600 hover:text-green-900 px-3 py-1 border border-green-600 rounded-md hover:bg-green-50"
-                          >
-                            Approuver
-                          </button>
-                          {canForceTransfer && (
-                            <button
-                              onClick={() => handleTransferPayment(transfer.id, 'force')}
-                              className="text-blue-600 hover:text-blue-900 px-3 py-1 border border-blue-600 rounded-md hover:bg-blue-50 font-medium"
-                            >
-                              Transférer (24h)
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleTransferPayment(transfer.id, 'reject')}
-                            className="text-red-600 hover:text-red-900 px-3 py-1 border border-red-600 rounded-md hover:bg-red-50"
-                          >
-                            Rejeter
-                          </button>
-                        </div>
-                      </td>
+      <div className="row">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-header">
+              <h5 className="card-title mb-0">
+                <i className="bi bi-credit-card me-2"></i>
+                Liste des transactions
+              </h5>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Transaction</th>
+                      <th>Utilisateur</th>
+                      <th>Montant</th>
+                      <th>Statut</th>
+                      <th>Date</th>
+                      <th>Actions</th>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  </thead>
+                  <tbody>
+                    {transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td>
+                          <div className="d-flex align-items-center">
+                            {getTypeIcon(transaction.type)}
+                            <div className="ms-3">
+                              <div className="fw-medium">{transaction.stripe_transaction_id}</div>
+                              <div className="text-muted small text-capitalize">{transaction.type}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            <div className="fw-medium">
+                              {transaction.user?.first_name} {transaction.user?.last_name}
+                            </div>
+                            <div className="text-muted small">{transaction.user?.email}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="fw-medium">
+                            {formatCurrency(transaction.amount, transaction.currency)}
+                          </div>
+                          <div className="text-muted small">
+                            Net: {formatCurrency(transaction.net_amount, transaction.currency)}
+                          </div>
+                        </td>
+                        <td>
+                          {getStatusBadge(transaction.status)}
+                        </td>
+                        <td className="text-muted small">
+                          {new Date(transaction.created_at).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td>
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              onClick={() => {
+                                setSelectedTransaction(transaction);
+                                setShowTransactionDetails(true);
+                              }}
+                              className="btn btn-outline-primary"
+                              title="Voir les détails"
+                            >
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            {transaction.type === 'payment' && transaction.status === 'completed' && (
+                              <button
+                                onClick={() => handleRefund(transaction.id)}
+                                className="btn btn-outline-danger"
+                                title="Rembourser"
+                              >
+                                <i className="bi bi-arrow-counterclockwise"></i>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Transaction Details Modal */}
       {showTransactionDetails && selectedTransaction && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900">
-                        Détails de la transaction
-                      </h3>
-                      <button
-                        onClick={() => setShowTransactionDetails(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-credit-card me-2"></i>
+                  Détails de la transaction
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowTransactionDetails(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">ID Transaction</label>
+                    <p className="mb-0 font-monospace small">{selectedTransaction.id}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Stripe ID</label>
+                    <p className="mb-0 font-monospace small">{selectedTransaction.stripe_transaction_id}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Type</label>
+                    <div className="d-flex align-items-center">
+                      {getTypeIcon(selectedTransaction.type)}
+                      <span className="ms-2 text-capitalize">{selectedTransaction.type}</span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">ID Transaction</label>
-                        <p className="mt-1 text-sm text-gray-900 font-mono">{selectedTransaction.id}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Stripe ID</label>
-                        <p className="mt-1 text-sm text-gray-900 font-mono">{selectedTransaction.stripe_transaction_id}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Type</label>
-                        <div className="mt-1 flex items-center">
-                          {getTypeIcon(selectedTransaction.type)}
-                          <span className="ml-2 text-sm text-gray-900 capitalize">{selectedTransaction.type}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Statut</label>
-                        <div className="mt-1">{getStatusBadge(selectedTransaction.status)}</div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Montant</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Montant net</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {formatCurrency(selectedTransaction.net_amount, selectedTransaction.currency)}
-                        </p>
-                      </div>
-                      {selectedTransaction.stripe_fee && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Frais Stripe</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            {formatCurrency(selectedTransaction.stripe_fee || 0, selectedTransaction.currency)}
-                          </p>
-                        </div>
-                      )}
-                      {selectedTransaction.failure_reason && (
-                        <div className="col-span-2">
-                          <label className="text-sm font-medium text-gray-700">Raison de l'échec</label>
-                          <p className="mt-1 text-sm text-red-600">{selectedTransaction.failure_reason}</p>
-                        </div>
-                      )}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Date de création</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {new Date(selectedTransaction.created_at).toLocaleString('fr-FR')}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Dernière mise à jour</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {new Date(selectedTransaction.updated_at).toLocaleString('fr-FR')}
-                        </p>
-                      </div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Statut</label>
+                    <div>{getStatusBadge(selectedTransaction.status)}</div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Montant</label>
+                    <p className="mb-0 fw-medium">
+                      {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}
+                    </p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Montant net</label>
+                    <p className="mb-0 fw-medium">
+                      {formatCurrency(selectedTransaction.net_amount, selectedTransaction.currency)}
+                    </p>
+                  </div>
+                  {selectedTransaction.stripe_fee && (
+                    <div className="col-md-6">
+                      <label className="form-label fw-medium">Frais Stripe</label>
+                      <p className="mb-0">
+                        {formatCurrency(selectedTransaction.stripe_fee || 0, selectedTransaction.currency)}
+                      </p>
                     </div>
+                  )}
+                  {selectedTransaction.failure_reason && (
+                    <div className="col-12">
+                      <label className="form-label fw-medium">Raison de l'échec</label>
+                      <div className="alert alert-danger">{selectedTransaction.failure_reason}</div>
+                    </div>
+                  )}
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Date de création</label>
+                    <p className="mb-0">
+                      {new Date(selectedTransaction.created_at).toLocaleString('fr-FR')}
+                    </p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Dernière mise à jour</label>
+                    <p className="mb-0">
+                      {new Date(selectedTransaction.updated_at).toLocaleString('fr-FR')}
+                    </p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <div className="flex space-x-3">
+              <div className="modal-footer">
+                <div className="d-flex gap-2">
                   {selectedTransaction.type === 'payment' && selectedTransaction.status === 'completed' && (
                     <button
                       onClick={() => handleRefund(selectedTransaction.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                      className="btn btn-danger"
                     >
+                      <i className="bi bi-arrow-counterclockwise me-1"></i>
                       Rembourser
                     </button>
                   )}
                   <button
                     onClick={() => setShowTransactionDetails(false)}
-                    className="bg-white hover:bg-gray-50 text-gray-900 px-4 py-2 rounded-md text-sm font-medium border border-gray-300"
+                    className="btn btn-secondary"
                   >
                     Fermer
                   </button>

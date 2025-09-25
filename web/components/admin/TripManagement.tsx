@@ -3,6 +3,24 @@
 import { useState, useEffect } from 'react';
 import adminAuth from '../../lib/admin-auth';
 
+interface TripImage {
+  id: number;
+  trip_id: number;
+  image_url: string;
+  image_path?: string;
+  is_primary?: boolean;
+  caption?: string;
+}
+
+interface TripImageData {
+  id: number;
+  trip_id: number;
+  image_url?: string;
+  file_path?: string;
+  is_primary?: boolean;
+  description?: string;
+}
+
 interface Trip {
   id: number;
   uuid: string;
@@ -37,6 +55,8 @@ interface Trip {
   };
   trips_count?: number;
   bookings_count?: number;
+  images?: TripImage[];
+  trip_images?: TripImageData[];
 }
 
 export default function TripManagement() {
@@ -54,12 +74,24 @@ export default function TripManagement() {
   const fetchTrips = async () => {
     try {
       setLoading(true);
-      const endpoint = filter === 'pending_review' 
-        ? `/api/v1/admin/trips/pending`
-        : `/api/v1/admin/trips?status=${filter}&limit=50`;
-      
-      const response = await adminAuth.apiRequest(endpoint);
-      
+      const endpoint = filter === 'pending_review'
+        ? `/api/admin/trips/pending?include=images`
+        : `/api/v1/admin/trips?status=${filter}&limit=50&include=images`;
+
+      const token = await adminAuth.getValidAccessToken();
+      if (!token) {
+        setError('Token d\'authentification manquant');
+        return;
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         console.log('Trips API response:', data);
@@ -112,17 +144,17 @@ export default function TripManagement() {
 
   const getTripStatusBadge = (status: string) => {
     const badgeClasses = {
-      draft: 'bg-gray-100 text-gray-800',
-      pending_review: 'bg-yellow-100 text-yellow-800',
-      published: 'bg-green-100 text-green-800',
-      active: 'bg-blue-100 text-blue-800',
-      rejected: 'bg-red-100 text-red-800',
-      paused: 'bg-orange-100 text-orange-800',
-      completed: 'bg-purple-100 text-purple-800',
-      cancelled: 'bg-gray-100 text-gray-800',
-      expired: 'bg-red-100 text-red-800'
+      draft: 'badge bg-secondary',
+      pending_review: 'badge bg-warning text-dark',
+      published: 'badge bg-success',
+      active: 'badge bg-info',
+      rejected: 'badge bg-danger',
+      paused: 'badge bg-warning text-dark',
+      completed: 'badge bg-primary',
+      cancelled: 'badge bg-secondary',
+      expired: 'badge bg-danger'
     };
-    
+
     const statusLabels = {
       draft: 'Brouillon',
       pending_review: 'En attente',
@@ -134,9 +166,9 @@ export default function TripManagement() {
       cancelled: 'Annulé',
       expired: 'Expiré'
     };
-    
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClasses[status as keyof typeof badgeClasses] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={badgeClasses[status as keyof typeof badgeClasses] || 'badge bg-secondary'}>
         {statusLabels[status as keyof typeof statusLabels] || status}
       </span>
     );
@@ -170,8 +202,28 @@ export default function TripManagement() {
     });
   };
 
+  // Fonction pour normaliser les images selon les différents formats API
+  const getNormalizedImages = (trip: Trip): TripImage[] => {
+    if (trip.images && trip.images.length > 0) {
+      return trip.images;
+    }
+
+    if (trip.trip_images && trip.trip_images.length > 0) {
+      return trip.trip_images.map(img => ({
+        id: img.id,
+        trip_id: img.trip_id,
+        image_url: img.image_url || img.file_path || '',
+        image_path: img.file_path,
+        is_primary: img.is_primary,
+        caption: img.description
+      }));
+    }
+
+    return [];
+  };
+
   const filteredTrips = trips.filter(trip => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       trip.departure_city.toLowerCase().includes(searchTerm.toLowerCase()) ||
       trip.arrival_city.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${trip.user.first_name} ${trip.user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -181,17 +233,10 @@ export default function TripManagement() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-          <div className="flex space-x-4 mb-6">
-            <div className="h-10 bg-gray-200 rounded w-32"></div>
-            <div className="h-10 bg-gray-200 rounded w-64"></div>
-          </div>
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
-            ))}
+      <div className="container-fluid p-4">
+        <div className="d-flex justify-content-center align-items-center" style={{minHeight: '400px'}}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Chargement...</span>
           </div>
         </div>
       </div>
@@ -199,333 +244,420 @@ export default function TripManagement() {
   }
 
   return (
-    <div className="p-8 bg-gray-100 min-h-screen">
+    <div className="container-fluid p-4">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Gestion des voyages
-        </h1>
-        <p className="text-gray-700">
-          Gérez tous les voyages de la plateforme
-        </p>
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2 className="h3 mb-0 fw-bold">Gestion des voyages</h2>
+              <p className="text-muted mb-0">Gérez tous les voyages de la plateforme</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0 md:space-x-4">
-          {/* Status Filter */}
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">Statut:</label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-900"
-            >
-              <option value="all">Tous</option>
-              <option value="pending_review">En attente de révision</option>
-              <option value="published">Publiés</option>
-              <option value="active">Actifs</option>
-              <option value="draft">Brouillons</option>
-              <option value="paused">En pause</option>
-              <option value="completed">Terminés</option>
-              <option value="cancelled">Annulés</option>
-              <option value="rejected">Rejetés</option>
-              <option value="expired">Expirés</option>
-            </select>
-          </div>
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-body">
+              <div className="row g-3 align-items-center">
+                <div className="col-md-3">
+                  <label className="form-label fw-medium">Statut:</label>
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    className="form-select"
+                  >
+                    <option value="all">Tous</option>
+                    <option value="pending_review">En attente de révision</option>
+                    <option value="published">Publiés</option>
+                    <option value="active">Actifs</option>
+                    <option value="draft">Brouillons</option>
+                    <option value="paused">En pause</option>
+                    <option value="completed">Terminés</option>
+                    <option value="cancelled">Annulés</option>
+                    <option value="rejected">Rejetés</option>
+                    <option value="expired">Expirés</option>
+                  </select>
+                </div>
 
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <input
-              type="text"
-              placeholder="Rechercher par ville, utilisateur, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-medium">Rechercher:</label>
+                  <div className="input-group">
+                    <span className="input-group-text">
+                      <i className="bi bi-search"></i>
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Rechercher par ville, utilisateur, email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+                </div>
 
-          {/* Stats */}
-          <div className="text-sm text-gray-700 font-medium">
-            {filteredTrips.length} voyage{filteredTrips.length !== 1 ? 's' : ''}
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <div className="h4 mb-0 text-primary">{filteredTrips.length}</div>
+                    <small className="text-muted">voyage{filteredTrips.length !== 1 ? 's' : ''}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Trips List */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {filteredTrips.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="text-gray-400 text-6xl mb-4">✈️</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun voyage trouvé</h3>
-            <p className="text-gray-700">
-              {searchTerm ? 'Essayez de modifier vos critères de recherche' : 'Aucun voyage ne correspond aux filtres sélectionnés'}
-            </p>
+      <div className="row">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-header">
+              <h5 className="card-title mb-0">
+                <i className="bi bi-airplane me-2"></i>
+                Liste des voyages
+              </h5>
+            </div>
+            <div className="card-body p-0">
+              {filteredTrips.length === 0 ? (
+                <div className="text-center py-5">
+                  <div className="text-muted mb-3" style={{fontSize: '3rem'}}>✈️</div>
+                  <h5 className="text-muted">Aucun voyage trouvé</h5>
+                  <p className="text-muted">
+                    {searchTerm ? 'Essayez de modifier vos critères de recherche' : 'Aucun voyage ne correspond aux filtres sélectionnés'}
+                  </p>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Voyage</th>
+                        <th>Route</th>
+                        <th>Prix</th>
+                        <th>Statut</th>
+                        <th>Utilisateur</th>
+                        <th>Date création</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTrips.map((trip) => (
+                        <tr key={trip.id}>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <div className="me-3" style={{fontSize: '1.5rem'}}>
+                                {getTransportIcon(trip.transport_type)}
+                              </div>
+                              <div className="flex-grow-1">
+                                <div className="d-flex align-items-center">
+                                  <div className="fw-medium me-2">
+                                    {trip.title || `${trip.departure_city} → ${trip.arrival_city}`}
+                                  </div>
+                                  {(() => {
+                                    const images = getNormalizedImages(trip);
+                                    return images.length > 0 && (
+                                      <span className="badge bg-info text-dark" title={`${images.length} image${images.length > 1 ? 's' : ''}`}>
+                                        <i className="bi bi-images me-1"></i>
+                                        {images.length}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                <div className="text-muted small">
+                                  Départ: {formatDate(trip.departure_date)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div>
+                              <div className="fw-medium">
+                                {trip.departure_city}, {trip.departure_country}
+                              </div>
+                              <div className="text-muted">
+                                <i className="bi bi-arrow-down me-1"></i>
+                                {trip.arrival_city}, {trip.arrival_country}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="fw-medium">
+                              {formatCurrency(trip.price_per_kg, trip.currency)}/kg
+                            </div>
+                            {trip.available_weight_kg && (
+                              <div className="text-muted small">
+                                {trip.available_weight_kg} kg disponible
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {getTripStatusBadge(trip.status)}
+                          </td>
+                          <td>
+                            <div>
+                              <div className="fw-medium">
+                                {trip.user.first_name} {trip.user.last_name}
+                              </div>
+                              <div className="text-muted small">
+                                {trip.user.email}
+                              </div>
+                              {trip.user.total_trips && (
+                                <div className="text-primary small">
+                                  {trip.user.total_trips} voyage{trip.user.total_trips !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="text-muted small">
+                            {formatDate(trip.created_at)}
+                          </td>
+                          <td>
+                            <div className="btn-group btn-group-sm">
+                              <button
+                                onClick={() => {
+                                  setSelectedTrip(trip);
+                                  setShowTripDetails(true);
+                                }}
+                                className="btn btn-outline-primary"
+                                title="Voir les détails"
+                              >
+                                <i className="bi bi-eye"></i>
+                              </button>
+
+                              {trip.status === 'pending_review' && (
+                                <>
+                                  <button
+                                    onClick={() => handleTripAction(trip.id, 'approve')}
+                                    className="btn btn-outline-success"
+                                    title="Approuver"
+                                  >
+                                    <i className="bi bi-check-circle"></i>
+                                  </button>
+                                  <button
+                                    onClick={() => handleTripAction(trip.id, 'reject')}
+                                    className="btn btn-outline-danger"
+                                    title="Rejeter"
+                                  >
+                                    <i className="bi bi-x-circle"></i>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Voyage
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Route
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Prix
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Utilisateur
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Date création
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTrips.map((trip) => (
-                  <tr key={trip.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3">
-                          {getTransportIcon(trip.transport_type)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {trip.title || `${trip.departure_city} → ${trip.arrival_city}`}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Départ: {formatDate(trip.departure_date)}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        <div className="font-medium">
-                          {trip.departure_city}, {trip.departure_country}
-                        </div>
-                        <div className="text-gray-500">
-                          ↓ {trip.arrival_city}, {trip.arrival_country}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatCurrency(trip.price_per_kg, trip.currency)}/kg
-                      </div>
-                      {trip.available_weight_kg && (
-                        <div className="text-xs text-gray-500">
-                          {trip.available_weight_kg} kg disponible
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {getTripStatusBadge(trip.status)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        <div className="font-medium">
-                          {trip.user.first_name} {trip.user.last_name}
-                        </div>
-                        <div className="text-gray-500">
-                          {trip.user.email}
-                        </div>
-                        {trip.user.total_trips && (
-                          <div className="text-xs text-blue-600">
-                            {trip.user.total_trips} voyage{trip.user.total_trips !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {formatDate(trip.created_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedTrip(trip);
-                            setShowTripDetails(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                        >
-                          Voir
-                        </button>
-                        
-                        {trip.status === 'pending_review' && (
-                          <>
-                            <button
-                              onClick={() => handleTripAction(trip.id, 'approve')}
-                              className="text-green-600 hover:text-green-900 text-sm font-medium"
-                            >
-                              Approuver
-                            </button>
-                            <button
-                              onClick={() => handleTripAction(trip.id, 'reject')}
-                              className="text-red-600 hover:text-red-900 text-sm font-medium"
-                            >
-                              Rejeter
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Trip Details Modal */}
       {showTripDetails && selectedTrip && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-lg bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Détails du voyage
-              </h3>
-              <button
-                onClick={() => setShowTripDetails(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Route
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {getTransportIcon(selectedTrip.transport_type)} {selectedTrip.departure_city}, {selectedTrip.departure_country} → {selectedTrip.arrival_city}, {selectedTrip.arrival_country}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Statut
-                  </label>
-                  {getTripStatusBadge(selectedTrip.status)}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Prix par kg
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {formatCurrency(selectedTrip.price_per_kg, selectedTrip.currency)}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Poids disponible
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {selectedTrip.available_weight_kg || 'Non spécifié'} kg
-                  </p>
-                </div>
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-xl modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="bi bi-airplane me-2"></i>
+                  Détails du voyage
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowTripDetails(false)}
+                ></button>
               </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Date de départ
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {formatDate(selectedTrip.departure_date)}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Date de création
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {formatDate(selectedTrip.created_at)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Description */}
-              {selectedTrip.description && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">
-                    Description
-                  </label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                    {selectedTrip.description}
-                  </p>
-                </div>
-              )}
-
-              {/* User Info */}
-              <div className="border-t pt-4">
-                <h4 className="text-md font-medium text-gray-900 mb-2">
-                  Informations utilisateur
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">
-                      Nom complet
-                    </label>
-                    <p className="text-sm text-gray-900">
-                      {selectedTrip.user.first_name} {selectedTrip.user.last_name}
+              <div className="modal-body">
+                {/* Basic Info */}
+                <div className="row g-3 mb-4">
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Route</label>
+                    <p className="mb-0">
+                      {getTransportIcon(selectedTrip.transport_type)} {selectedTrip.departure_city}, {selectedTrip.departure_country} → {selectedTrip.arrival_city}, {selectedTrip.arrival_country}
                     </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">
-                      Email
-                    </label>
-                    <p className="text-sm text-gray-900">
-                      {selectedTrip.user.email}
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Statut</label>
+                    <div>{getTripStatusBadge(selectedTrip.status)}</div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Prix par kg</label>
+                    <p className="mb-0">
+                      {formatCurrency(selectedTrip.price_per_kg, selectedTrip.currency)}
                     </p>
                   </div>
-                  {selectedTrip.user.total_trips && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-1">
-                        Voyages publiés
-                      </label>
-                      <p className="text-sm text-gray-900">
-                        {selectedTrip.user.total_trips}
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Poids disponible</label>
+                    <p className="mb-0">
+                      {selectedTrip.available_weight_kg || 'Non spécifié'} kg
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="row g-3 mb-4">
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Date de départ</label>
+                    <p className="mb-0">
+                      {formatDate(selectedTrip.departure_date)}
+                    </p>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Date de création</label>
+                    <p className="mb-0">
+                      {formatDate(selectedTrip.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedTrip.description && (
+                  <div className="mb-4">
+                    <label className="form-label fw-medium">Description</label>
+                    <div className="card">
+                      <div className="card-body">
+                        {selectedTrip.description}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
+                {/* Images */}
+                {(() => {
+                  const images = getNormalizedImages(selectedTrip);
+                  if (images.length > 0) {
+                    return (
+                      <div className="mb-4">
+                        <label className="form-label fw-medium">
+                          <i className="bi bi-images me-2"></i>
+                          Images du voyage ({images.length})
+                        </label>
+                        <div className="row g-3">
+                          {images.map((image, index) => (
+                          <div key={image.id} className="col-md-4 col-sm-6">
+                            <div className="card">
+                              <div className="position-relative">
+                                <img
+                                  src={image.image_url}
+                                  alt={image.caption || `Image ${index + 1} du voyage`}
+                                  className="card-img-top"
+                                  style={{
+                                    height: '200px',
+                                    objectFit: 'cover',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => window.open(image.image_url, '_blank')}
+                                />
+                                {image.is_primary && (
+                                  <span className="position-absolute top-0 start-0 badge bg-primary m-2">
+                                    <i className="bi bi-star-fill me-1"></i>
+                                    Principale
+                                  </span>
+                                )}
+                                <div className="position-absolute top-0 end-0 m-2">
+                                  <button
+                                    className="btn btn-sm btn-light opacity-75"
+                                    onClick={() => window.open(image.image_url, '_blank')}
+                                    title="Voir en grand"
+                                  >
+                                    <i className="bi bi-zoom-in"></i>
+                                  </button>
+                                </div>
+                              </div>
+                              {image.caption && (
+                                <div className="card-body p-2">
+                                  <small className="text-muted">{image.caption}</small>
+                                </div>
+                              )}
+                            </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="mb-4">
+                        <label className="form-label fw-medium">
+                          <i className="bi bi-images me-2"></i>
+                          Images du voyage
+                        </label>
+                        <div className="alert alert-info">
+                          <i className="bi bi-info-circle me-2"></i>
+                          Aucune image trouvée pour ce voyage.
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
+
+                {/* User Info */}
+                <div className="border-top pt-4">
+                  <h6 className="fw-bold mb-3">
+                    <i className="bi bi-person-fill me-2"></i>
+                    Informations utilisateur
+                  </h6>
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label fw-medium">Nom complet</label>
+                      <p className="mb-0">
+                        {selectedTrip.user.first_name} {selectedTrip.user.last_name}
                       </p>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              {selectedTrip.status === 'pending_review' && (
-                <div className="border-t pt-4">
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => handleTripAction(selectedTrip.id, 'approve')}
-                      className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                    >
-                      Approuver le voyage
-                    </button>
-                    <button
-                      onClick={() => handleTripAction(selectedTrip.id, 'reject')}
-                      className="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-                    >
-                      Rejeter le voyage
-                    </button>
+                    <div className="col-md-6">
+                      <label className="form-label fw-medium">Email</label>
+                      <p className="mb-0">
+                        {selectedTrip.user.email}
+                      </p>
+                    </div>
+                    {selectedTrip.user.total_trips && (
+                      <div className="col-md-6">
+                        <label className="form-label fw-medium">Voyages publiés</label>
+                        <p className="mb-0">
+                          {selectedTrip.user.total_trips}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
+              <div className="modal-footer">
+                <div className="d-flex gap-2">
+                  {selectedTrip.status === 'pending_review' && (
+                    <>
+                      <button
+                        onClick={() => handleTripAction(selectedTrip.id, 'approve')}
+                        className="btn btn-success"
+                      >
+                        <i className="bi bi-check-circle me-1"></i>
+                        Approuver le voyage
+                      </button>
+                      <button
+                        onClick={() => handleTripAction(selectedTrip.id, 'reject')}
+                        className="btn btn-danger"
+                      >
+                        <i className="bi bi-x-circle me-1"></i>
+                        Rejeter le voyage
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowTripDetails(false)}
+                    className="btn btn-secondary"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

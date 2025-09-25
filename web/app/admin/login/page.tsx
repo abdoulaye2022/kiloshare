@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Mail, Lock, Eye, EyeOff, Loader } from 'lucide-react';
 import { useAdminAuthStore } from '../../../stores/adminAuthStore';
 import { useClientOnly } from '../../../hooks/useClientOnly';
 import { AUTH_ENDPOINTS, getDefaultHeaders } from '../../../lib/api-config';
@@ -84,96 +83,114 @@ export default function AdminLogin() {
 
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center items-center space-x-3 mb-4">
-            <Shield className="h-12 w-12 text-blue-600" />
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">KiloShare</h1>
-              <p className="text-sm text-blue-600 font-medium">Administration</p>
+    <div className="min-vh-100 bg-light d-flex align-items-center justify-content-center">
+      <div className="container">
+        <div className="row justify-content-center">
+          <div className="col-md-6 col-lg-4">
+            {/* Header */}
+            <div className="text-center mb-4">
+              <div className="d-flex justify-content-center align-items-center mb-3">
+                <i className="bi bi-shield-check fs-1 text-primary me-2"></i>
+                <div>
+                  <h1 className="h2 fw-bold text-dark mb-0">KiloShare</h1>
+                  <p className="text-primary small fw-medium mb-0">Administration</p>
+                </div>
+              </div>
+              <h2 className="h4 fw-bold text-secondary">Connexion Admin</h2>
+              <p className="text-muted">Connectez-vous à votre espace d'administration</p>
+            </div>
+
+            {/* Login Form */}
+            <div className="card shadow">
+              <div className="card-body p-4">
+                <form onSubmit={handleSubmit}>
+                  {/* Email Field */}
+                  <div className="mb-3">
+                    <label htmlFor="email" className="form-label fw-medium">
+                      Email
+                    </label>
+                    <div className="input-group">
+                      <span className="input-group-text">
+                        <i className="bi bi-envelope text-muted"></i>
+                      </span>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        className="form-control"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="admin@kiloshare.com"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password Field */}
+                  <div className="mb-3">
+                    <label htmlFor="password" className="form-label fw-medium">
+                      Mot de passe
+                    </label>
+                    <div className="input-group">
+                      <span className="input-group-text">
+                        <i className="bi bi-lock text-muted"></i>
+                      </span>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        id="password"
+                        name="password"
+                        className="form-control"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Error Message */}
+                  {error && (
+                    <div className="alert alert-danger" role="alert">
+                      <i className="bi bi-exclamation-triangle me-2"></i>
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <div className="d-grid">
+                    <button
+                      type="submit"
+                      disabled={localLoading}
+                      className="btn btn-primary btn-lg"
+                    >
+                      {localLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Connexion...
+                        </>
+                      ) : (
+                        'Se connecter'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center mt-4">
+              <p className="text-muted small">
+                © 2024 KiloShare. Tous droits réservés.
+              </p>
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-700">Connexion Admin</h2>
-          <p className="text-gray-500 mt-2">Connectez-vous à votre espace d'administration</p>
-        </div>
-
-        {/* Login Form */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white text-gray-900 placeholder-gray-500"
-                  placeholder="admin@kiloshare.com"
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Mot de passe
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white text-gray-900 placeholder-gray-500"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={localLoading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
-            >
-              {localLoading && <Loader className="h-4 w-4 animate-spin" />}
-              <span>{localLoading ? 'Connexion...' : 'Se connecter'}</span>
-            </button>
-          </form>
-        </div>
-
-
-        {/* Footer */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-gray-500">
-            © 2024 KiloShare. Tous droits réservés.
-          </p>
         </div>
       </div>
     </div>

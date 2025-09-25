@@ -11,29 +11,37 @@ interface DashboardStats {
   verified_users: number;
   new_registrations_today: number;
   new_registrations_this_week: number;
-  
+
+  // Comptes Stripe
+  total_stripe_accounts: number;
+  active_stripe_accounts: number;
+  pending_stripe_accounts: number;
+  restricted_stripe_accounts: number;
+  stripe_onboarding_rate: string | number;
+
   // Voyages
   total_trips: number;
   published_trips: number;
   pending_trips_count: number;
+  completed_trips: number;
   published_trips_today: number;
   published_trips_this_week: number;
-  
+
   // Réservations
   total_bookings: number;
   active_bookings: number;
   bookings_today: number;
   bookings_this_week: number;
-  
+
   // Financier
   revenue_today: number;
   revenue_this_week: number;
   revenue_this_month: number;
   commissions_collected: number;
   transactions_pending: number;
-  
+
   // Indicateurs
-  trip_completion_rate: number;
+  trip_completion_rate: number | string;
   dispute_rate: number;
   suspected_fraud_count: number;
   urgent_disputes_count: number;
@@ -53,7 +61,7 @@ export default function Dashboard() {
   const [charts, setCharts] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { isAuthenticated } = useAdminAuthStore();
 
   useEffect(() => {
@@ -67,8 +75,21 @@ export default function Dashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await adminAuth.apiRequest('/api/v1/admin/dashboard/stats');
-      
+      const token = await adminAuth.getValidAccessToken();
+
+      if (!token) {
+        console.error('No valid token for fetching dashboard stats');
+        return;
+      }
+
+      const response = await fetch('/api/v1/admin/dashboard/stats', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         console.log('Dashboard stats:', data);
@@ -98,27 +119,27 @@ export default function Dashboard() {
     return new Intl.NumberFormat('fr-FR').format(num || 0);
   };
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    change, 
-    icon, 
-    color = 'blue',
+  const StatCard = ({
+    title,
+    value,
+    change,
+    icon,
+    color = 'primary',
     format = 'number'
   }: {
     title: string;
     value: number | string;
     change?: { value: number; label: string };
     icon: string;
-    color?: 'blue' | 'green' | 'orange' | 'red' | 'purple';
+    color?: 'primary' | 'success' | 'warning' | 'danger' | 'info';
     format?: 'number' | 'currency' | 'percentage';
   }) => {
     const colorClasses = {
-      blue: 'bg-blue-50 text-blue-700 border-blue-200',
-      green: 'bg-green-50 text-green-700 border-green-200',
-      orange: 'bg-orange-50 text-orange-700 border-orange-200',
-      red: 'bg-red-50 text-red-700 border-red-200',
-      purple: 'bg-purple-50 text-purple-700 border-purple-200',
+      primary: 'bg-primary text-white',
+      success: 'bg-success text-white',
+      warning: 'bg-warning text-dark',
+      danger: 'bg-danger text-white',
+      info: 'bg-info text-white',
     };
 
     const formatValue = (val: number | string) => {
@@ -134,31 +155,33 @@ export default function Dashboard() {
     };
 
     return (
-      <div className={`p-6 rounded-lg border-2 ${colorClasses[color]}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium opacity-70">{title}</p>
-            <p className="text-2xl font-bold mt-2">
-              {formatValue(value)}
-            </p>
-            {change && (
-              <p className="text-sm mt-2 opacity-60">
-                {change.value > 0 ? '+' : ''}{change.value} {change.label}
-              </p>
-            )}
-          </div>
-          <div className="text-3xl opacity-30">
-            {icon}
+      <div className={`card h-100 ${colorClasses[color]}`}>
+        <div className="card-body">
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 className="card-subtitle mb-2" style={{opacity: 0.7}}>{title}</h6>
+              <h3 className="card-title mb-0">
+                {formatValue(value)}
+              </h3>
+              {change && (
+                <small className="mt-2 d-block" style={{opacity: 0.8}}>
+                  {change.value > 0 ? '+' : ''}{change.value} {change.label}
+                </small>
+              )}
+            </div>
+            <div className="fs-1" style={{opacity: 0.3}}>
+              {icon}
+            </div>
           </div>
         </div>
       </div>
     );
   };
 
-  const SimpleChart = ({ 
-    data, 
-    title, 
-    color = '#3B82F6',
+  const SimpleChart = ({
+    data,
+    title,
+    color = '#0d6efd',
     dataKey = 'count'
   }: {
     data: Array<{date: string, count?: number, amount?: number}>;
@@ -167,44 +190,47 @@ export default function Dashboard() {
     dataKey?: 'count' | 'amount';
   }) => {
     if (!data || data.length === 0) return null;
-    
+
     const maxValue = Math.max(...data.map(d => d[dataKey] || 0));
     const lastWeekData = data.slice(-7);
 
     return (
-      <div className="p-6 bg-white rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="flex items-end space-x-2 h-32">
-          {lastWeekData.map((item, index) => {
-            const height = maxValue > 0 ? (item[dataKey] || 0) / maxValue * 100 : 0;
-            return (
-              <div key={index} className="flex flex-col items-center flex-1">
-                <div className="w-full flex items-end justify-center">
-                  <div
-                    className="w-8 rounded-t"
-                    style={{
-                      height: `${Math.max(height, 2)}%`,
-                      backgroundColor: color,
-                      minHeight: '4px'
-                    }}
-                    title={`${item.date}: ${item[dataKey] || 0}`}
-                  />
+      <div className="card">
+        <div className="card-body">
+          <h5 className="card-title">{title}</h5>
+          <div className="d-flex align-items-end gap-1" style={{height: '128px'}}>
+            {lastWeekData.map((item, index) => {
+              const height = maxValue > 0 ? (item[dataKey] || 0) / maxValue * 100 : 0;
+              return (
+                <div key={index} className="d-flex flex-column align-items-center flex-grow-1">
+                  <div className="w-100 d-flex align-items-end justify-content-center">
+                    <div
+                      className="rounded-top"
+                      style={{
+                        width: '32px',
+                        height: `${Math.max(height, 2)}%`,
+                        backgroundColor: color,
+                        minHeight: '4px'
+                      }}
+                      title={`${item.date}: ${item[dataKey] || 0}`}
+                    />
+                  </div>
+                  <small className="text-muted mt-2 text-center">
+                    {new Date(item.date).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short'
+                    })}
+                  </small>
                 </div>
-                <div className="text-xs text-gray-500 mt-2 text-center">
-                  {new Date(item.date).toLocaleDateString('fr-FR', { 
-                    day: 'numeric',
-                    month: 'short'
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
-          <span>7 derniers jours</span>
-          <span className="font-medium">
-            Max: {dataKey === 'amount' ? formatCurrency(maxValue) : formatNumber(maxValue)}
-          </span>
+              );
+            })}
+          </div>
+          <div className="d-flex justify-content-between align-items-center mt-3 small text-muted">
+            <span>7 derniers jours</span>
+            <span className="fw-medium">
+              Max: {dataKey === 'amount' ? formatCurrency(maxValue) : formatNumber(maxValue)}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -212,18 +238,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-8"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-64 bg-gray-200 rounded-lg"></div>
-            ))}
+      <div className="container-fluid p-4">
+        <div className="d-flex justify-content-center align-items-center" style={{minHeight: '400px'}}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Chargement...</span>
           </div>
         </div>
       </div>
@@ -232,14 +250,14 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="p-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <div className="text-red-400 text-4xl mb-4">⚠️</div>
-          <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur</h3>
-          <p className="text-red-600">{error}</p>
+      <div className="container-fluid p-4">
+        <div className="alert alert-danger text-center">
+          <div className="mb-3" style={{fontSize: '3rem'}}>⚠️</div>
+          <h4 className="alert-heading">Erreur</h4>
+          <p>{error}</p>
           <button
             onClick={fetchDashboardStats}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            className="btn btn-danger"
           >
             Réessayer
           </button>
@@ -251,152 +269,182 @@ export default function Dashboard() {
   if (!stats) return null;
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="container-fluid p-4">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Tableau de bord
-        </h1>
-        <p className="text-gray-600">
-          Vue d'ensemble de la plateforme KiloShare
-        </p>
+      <div className="row mb-4">
+        <div className="col-12">
+          <h1 className="h2 fw-bold mb-2">
+            Tableau de bord
+          </h1>
+          <p className="text-muted">
+            Vue d'ensemble de la plateforme KiloShare
+          </p>
+        </div>
       </div>
 
       {/* KPIs Principaux */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Utilisateurs totaux"
-          value={stats.total_users}
-          change={{ value: stats.new_registrations_this_week, label: 'cette semaine' }}
-          icon="👥"
-          color="blue"
-        />
-        
-        <StatCard
-          title="Voyages publiés"
-          value={stats.published_trips}
-          change={{ value: stats.published_trips_this_week, label: 'cette semaine' }}
-          icon="✈️"
-          color="green"
-        />
-        
-        <StatCard
-          title="Réservations actives"
-          value={stats.active_bookings}
-          change={{ value: stats.bookings_this_week, label: 'cette semaine' }}
-          icon="📦"
-          color="orange"
-        />
-        
-        <StatCard
-          title="Revenus ce mois"
-          value={stats.revenue_this_month}
-          change={{ value: stats.revenue_this_week, label: 'cette semaine' }}
-          icon="💰"
-          color="purple"
-          format="currency"
-        />
+      <div className="row g-4 mb-4">
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Utilisateurs totaux"
+            value={stats.total_users}
+            change={{ value: stats.new_registrations_this_week, label: 'cette semaine' }}
+            icon="👥"
+            color="primary"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Voyages publiés"
+            value={stats.published_trips}
+            change={{ value: stats.published_trips_this_week, label: 'cette semaine' }}
+            icon="✈️"
+            color="success"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Réservations actives"
+            value={stats.active_bookings}
+            change={{ value: stats.bookings_this_week, label: 'cette semaine' }}
+            icon="📦"
+            color="warning"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Revenus ce mois"
+            value={stats.revenue_this_month}
+            change={{ value: stats.revenue_this_week, label: 'cette semaine' }}
+            icon="💰"
+            color="info"
+            format="currency"
+          />
+        </div>
       </div>
 
       {/* Indicateurs secondaires */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Utilisateurs vérifiés"
-          value={stats.verified_users}
-          icon="✅"
-          color="green"
-        />
-        
-        <StatCard
-          title="Voyages en attente"
-          value={stats.pending_trips_count}
-          icon="⏳"
-          color="orange"
-        />
-        
-        <StatCard
-          title="Taux de finalisation"
-          value={stats.trip_completion_rate}
-          icon="🎯"
-          color="blue"
-          format="percentage"
-        />
-        
-        <StatCard
-          title="Commissions collectées"
-          value={stats.commissions_collected}
-          icon="🏦"
-          color="purple"
-          format="currency"
-        />
+      <div className="row g-4 mb-4">
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Utilisateurs vérifiés"
+            value={stats.verified_users}
+            icon="✅"
+            color="success"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Voyages en attente"
+            value={stats.pending_trips_count}
+            icon="⏳"
+            color="warning"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Taux de finalisation"
+            value={stats.trip_completion_rate}
+            icon="🎯"
+            color="primary"
+            format="percentage"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Commissions collectées"
+            value={stats.commissions_collected}
+            icon="🏦"
+            color="info"
+            format="currency"
+          />
+        </div>
       </div>
 
       {/* Alertes */}
       {(stats.suspected_fraud_count > 0 || stats.urgent_disputes_count > 0 || stats.reported_trips_count > 0 || stats.failed_payments_count > 0) && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
-          <h2 className="text-lg font-semibold text-red-800 mb-4 flex items-center">
-            <span className="text-2xl mr-2">🚨</span>
-            Alertes importantes
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.suspected_fraud_count > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-700">{stats.suspected_fraud_count}</div>
-                <div className="text-sm text-red-600">Fraudes suspectées</div>
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="alert alert-danger">
+              <h4 className="alert-heading d-flex align-items-center">
+                <span className="me-2 fs-3">🚨</span>
+                Alertes importantes
+              </h4>
+              <div className="row g-4 mt-2">
+                {stats.suspected_fraud_count > 0 && (
+                  <div className="col-lg-3 col-md-6 text-center">
+                    <div className="h3 fw-bold text-danger">{stats.suspected_fraud_count}</div>
+                    <div className="small">Fraudes suspectées</div>
+                  </div>
+                )}
+                {stats.urgent_disputes_count > 0 && (
+                  <div className="col-lg-3 col-md-6 text-center">
+                    <div className="h3 fw-bold text-danger">{stats.urgent_disputes_count}</div>
+                    <div className="small">Litiges urgents</div>
+                  </div>
+                )}
+                {stats.reported_trips_count > 0 && (
+                  <div className="col-lg-3 col-md-6 text-center">
+                    <div className="h3 fw-bold text-danger">{stats.reported_trips_count}</div>
+                    <div className="small">Voyages signalés</div>
+                  </div>
+                )}
+                {stats.failed_payments_count > 0 && (
+                  <div className="col-lg-3 col-md-6 text-center">
+                    <div className="h3 fw-bold text-danger">{stats.failed_payments_count}</div>
+                    <div className="small">Paiements échoués</div>
+                  </div>
+                )}
               </div>
-            )}
-            {stats.urgent_disputes_count > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-700">{stats.urgent_disputes_count}</div>
-                <div className="text-sm text-red-600">Litiges urgents</div>
-              </div>
-            )}
-            {stats.reported_trips_count > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-700">{stats.reported_trips_count}</div>
-                <div className="text-sm text-red-600">Voyages signalés</div>
-              </div>
-            )}
-            {stats.failed_payments_count > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-700">{stats.failed_payments_count}</div>
-                <div className="text-sm text-red-600">Paiements échoués</div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Graphiques */}
       {charts && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SimpleChart
-            data={charts.user_growth}
-            title="Croissance des utilisateurs"
-            color="#3B82F6"
-            dataKey="count"
-          />
-          
-          <SimpleChart
-            data={charts.trip_growth}
-            title="Voyages publiés"
-            color="#10B981"
-            dataKey="count"
-          />
-          
-          <SimpleChart
-            data={charts.booking_growth}
-            title="Nouvelles réservations"
-            color="#F59E0B"
-            dataKey="count"
-          />
-          
-          <SimpleChart
-            data={charts.revenue_growth}
-            title="Revenus quotidiens"
-            color="#8B5CF6"
-            dataKey="amount"
-          />
+        <div className="row g-4">
+          <div className="col-lg-6">
+            <SimpleChart
+              data={charts.user_growth}
+              title="Croissance des utilisateurs"
+              color="#0d6efd"
+              dataKey="count"
+            />
+          </div>
+
+          <div className="col-lg-6">
+            <SimpleChart
+              data={charts.trip_growth}
+              title="Voyages publiés"
+              color="#198754"
+              dataKey="count"
+            />
+          </div>
+
+          <div className="col-lg-6">
+            <SimpleChart
+              data={charts.booking_growth}
+              title="Nouvelles réservations"
+              color="#ffc107"
+              dataKey="count"
+            />
+          </div>
+
+          <div className="col-lg-6">
+            <SimpleChart
+              data={charts.revenue_growth}
+              title="Revenus quotidiens"
+              color="#0dcaf0"
+              dataKey="amount"
+            />
+          </div>
         </div>
       )}
     </div>

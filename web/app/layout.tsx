@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import Navigation from "../components/Navigation";
 import MobileBottomNav from "../components/MobileBottomNav";
 import AdminStoreInitializer from "../components/admin/AdminStoreInitializer";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap-icons/font/bootstrap-icons.css";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });

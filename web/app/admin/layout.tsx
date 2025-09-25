@@ -2,9 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import AdminHeader from '../../components/admin/AdminHeader';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminAuthDebug from '../../components/admin/AdminAuthDebug';
 import { useAdminAuthStore } from '../../stores/adminAuthStore';
 import { useClientOnly } from '../../hooks/useClientOnly';
 
@@ -64,19 +61,16 @@ export default function AdminLayout({
 
   // Si on est sur la page de login, afficher seulement le contenu
   if (pathname === '/admin/login') {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        {children}
-        <AdminAuthDebug />
-      </div>
-    );
+    return <div>{children}</div>;
   }
 
   // Écran de chargement
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+      <div className="min-vh-100 bg-light d-flex align-items-center justify-content-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Chargement...</span>
+        </div>
       </div>
     );
   }
@@ -86,39 +80,115 @@ export default function AdminLayout({
     return null;
   }
 
+  const menuItems = [
+    { href: '/admin/dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+    { href: '/admin/users', icon: 'bi-people', label: 'Utilisateurs' },
+    { href: '/admin/trips', icon: 'bi-airplane', label: 'Voyages' },
+    { href: '/admin/transactions', icon: 'bi-credit-card', label: 'Transactions' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header Admin */}
-      <AdminHeader 
-        user={user} 
-        onLogout={handleLogout}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-      />
-
-      <div className="flex">
-        {/* Sidebar */}
-        <AdminSidebar 
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-
-        {/* Main Content */}
-        <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'} pt-16`}>
-          <div className="p-6">
-            {children}
+    <div className="d-flex vh-100">
+      {/* Sidebar */}
+      <nav className="bg-dark text-white" style={{ width: '250px' }}>
+        {/* Brand */}
+        <div className="p-3 border-bottom border-secondary">
+          <div className="d-flex justify-content-center">
+            <img
+              src="/dashboard_logo.png"
+              alt="KiloShare Logo"
+              style={{ width: '100%', height: '60px', objectFit: 'contain' }}
+            />
           </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="p-3">
+          <ul className="nav flex-column">
+            {menuItems.map((item) => (
+              <li key={item.href} className="nav-item mb-1">
+                <a
+                  href={item.href}
+                  className={`nav-link text-white rounded px-3 py-2 d-flex align-items-center ${
+                    pathname === item.href ? 'bg-primary' : ''
+                  }`}
+                  style={{ transition: 'all 0.2s' }}
+                >
+                  <i className={`bi ${item.icon} me-2`}></i>
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="mt-auto p-3 border-top border-secondary">
+          {/* Profile, Settings, Logout buttons */}
+          <div className="d-grid gap-2">
+            <a
+              href="/admin/profile"
+              className={`btn ${pathname === '/admin/profile' ? 'btn-primary' : 'btn-outline-light'} d-flex align-items-center justify-content-center`}
+            >
+              <i className="bi bi-person-circle me-2"></i>
+              Mon Profil
+            </a>
+
+            <a
+              href="/admin/settings"
+              className={`btn ${pathname === '/admin/settings' ? 'btn-primary' : 'btn-outline-light'} d-flex align-items-center justify-content-center`}
+            >
+              <i className="bi bi-gear me-2"></i>
+              Configuration
+            </a>
+
+            <button
+              onClick={handleLogout}
+              className="btn btn-outline-danger d-flex align-items-center justify-content-center"
+            >
+              <i className="bi bi-box-arrow-right me-2"></i>
+              Déconnexion
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main content */}
+      <div className="flex-grow-1 overflow-auto">
+        {/* Top navbar */}
+        <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+          <div className="container-fluid">
+            <div className="d-flex align-items-center">
+              <button
+                className="btn btn-link d-md-none p-0 me-3"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+              >
+                <i className="bi bi-list fs-4 text-muted"></i>
+              </button>
+              <span className="text-muted text-capitalize">
+                {pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard'}
+              </span>
+            </div>
+            <div className="d-flex align-items-center">
+              {/* User info removed */}
+            </div>
+          </div>
+        </nav>
+
+        {/* Page content */}
+        <main>
+          {children}
         </main>
       </div>
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+        <div
+          className="position-fixed w-100 h-100 bg-dark bg-opacity-50 d-md-none"
+          style={{ top: 0, left: 0, zIndex: 1050 }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
-      <AdminAuthDebug />
     </div>
   );
 }
