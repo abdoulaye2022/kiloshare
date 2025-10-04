@@ -38,9 +38,9 @@ class EnvironmentConfig {
   static String get apiUrl {
     switch (_currentEnvironment) {
       case Environment.production:
-        return dotenv.env['API_URL_PROD'] ?? 'https://m2atodev.com/api.kiloshare/public';
+        return dotenv.env['API_URL_PROD'] ?? dotenv.env['API_URL'] ?? 'https://m2atodev.com/api.kiloshare/public';
       case Environment.development:
-        return dotenv.env['API_URL_DEV'] ?? 'http://127.0.0.1:8080/api/v1';
+        return dotenv.env['API_URL_DEV'] ?? dotenv.env['API_URL'] ?? 'http://127.0.0.1:8080/api/v1';
     }
   }
 
@@ -48,9 +48,9 @@ class EnvironmentConfig {
   static String get webUrl {
     switch (_currentEnvironment) {
       case Environment.production:
-        return dotenv.env['WEB_URL_PROD'] ?? 'https://kiloshare.com';
+        return dotenv.env['WEB_URL_PROD'] ?? dotenv.env['WEB_URL'] ?? 'https://kiloshare.com';
       case Environment.development:
-        return dotenv.env['WEB_URL_DEV'] ?? 'http://localhost:3000';
+        return dotenv.env['WEB_URL_DEV'] ?? dotenv.env['WEB_URL'] ?? 'http://localhost:3000';
     }
   }
 

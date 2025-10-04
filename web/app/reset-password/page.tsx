@@ -2,16 +2,8 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Lock,
-  ArrowRight,
-  RefreshCw,
-  Luggage,
-  Download
-} from 'lucide-react';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 interface ResetResult {
   success: boolean;
@@ -26,24 +18,24 @@ function ResetPasswordContent() {
   const [isResetting, setIsResetting] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   const token = searchParams.get('token');
-  
+
   useEffect(() => {
     if (!token) {
       setStatus('missing-token');
       return;
     }
-    
+
     // Simulate token validation
     setTimeout(() => {
       setStatus('form');
     }, 1000);
   }, [token]);
-  
+
   const resetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       setResult({
         success: false,
@@ -53,7 +45,7 @@ function ResetPasswordContent() {
       setStatus('error');
       return;
     }
-    
+
     if (password.length < 6) {
       setResult({
         success: false,
@@ -63,10 +55,10 @@ function ResetPasswordContent() {
       setStatus('error');
       return;
     }
-    
+
     try {
       setIsResetting(true);
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -77,10 +69,10 @@ function ResetPasswordContent() {
           password: password
         })
       });
-      
+
       const data: ResetResult = await response.json();
       setResult(data);
-      
+
       if (data.success) {
         setStatus('success');
       } else {
@@ -98,17 +90,17 @@ function ResetPasswordContent() {
       setIsResetting(false);
     }
   };
-  
+
   const openMobileApp = () => {
     // Try to open the mobile app with a deep link
     const appScheme = 'kiloshare://login';
-    
+
     // Create a hidden iframe to try the app scheme
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = appScheme;
     document.body.appendChild(iframe);
-    
+
     // Fallback: show instructions after 2 seconds
     setTimeout(() => {
       alert('Si l\'app ne s\'ouvre pas automatiquement, lancez KiloShare manuellement et connectez-vous avec votre nouveau mot de passe.');
@@ -121,72 +113,76 @@ function ResetPasswordContent() {
       case 'loading':
         return (
           <div className="text-center">
-            <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <div className="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <div className="spinner-border text-primary" role="status" style={{ width: '40px', height: '40px' }}>
+                <span className="visually-hidden">Chargement...</span>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Validation du lien...
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted">
               Nous vérifions votre lien de réinitialisation, veuillez patienter.
             </p>
           </div>
         );
-        
+
       case 'form':
         return (
           <div className="text-center">
-            <div className="bg-green-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Lock className="h-10 w-10 text-green-600" />
+            <div className="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-lock-fill text-success" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Nouveau mot de passe
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-4">
               Choisissez un nouveau mot de passe sécurisé pour votre compte.
             </p>
-            
-            <form onSubmit={resetPassword} className="space-y-4">
-              <div className="text-left">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+
+            <form onSubmit={resetPassword} className="text-start">
+              <div className="mb-3">
+                <label htmlFor="password" className="form-label">
                   Nouveau mot de passe
                 </label>
                 <input
                   type="password"
                   id="password"
+                  className="form-control form-control-lg"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
                   placeholder="Au moins 6 caractères"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 />
               </div>
-              
-              <div className="text-left">
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+
+              <div className="mb-4">
+                <label htmlFor="confirmPassword" className="form-label">
                   Confirmer le mot de passe
                 </label>
                 <input
                   type="password"
                   id="confirmPassword"
+                  className="form-control form-control-lg"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   placeholder="Répéter le mot de passe"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 />
               </div>
-              
+
               <button
                 type="submit"
                 disabled={isResetting}
-                className="hero-gradient text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2 w-full"
+                className="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center gap-2"
               >
                 {isResetting ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <div className="spinner-border spinner-border-sm" role="status">
+                    <span className="visually-hidden">Chargement...</span>
+                  </div>
                 ) : (
-                  <Lock className="h-5 w-5" />
+                  <i className="bi bi-lock"></i>
                 )}
                 <span>
                   {isResetting ? 'Réinitialisation en cours...' : 'Réinitialiser le mot de passe'}
@@ -195,68 +191,64 @@ function ResetPasswordContent() {
             </form>
           </div>
         );
-        
+
       case 'success':
         return (
           <div className="text-center">
-            <div className="bg-green-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Mot de passe réinitialisé !
             </h2>
-            <p className="text-gray-600 mb-6">
-              Félicitations ! Votre mot de passe a été mis à jour avec succès. 
+            <p className="text-muted mb-4">
+              Félicitations ! Votre mot de passe a été mis à jour avec succès.
               Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.
             </p>
-            
-            {/* Call to actions */}
-            <div className="space-y-4">
-              <button 
+
+            <div className="d-flex flex-column gap-3 align-items-center">
+              <button
                 onClick={openMobileApp}
-                className="hero-gradient text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-2 w-full sm:w-auto mx-auto"
+                className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
               >
-                <Download className="h-5 w-5" />
+                <i className="bi bi-download"></i>
                 <span>Ouvrir l'application mobile</span>
               </button>
-              
-              <div className="text-sm text-gray-500">
-                ou
-              </div>
-              
-              <a 
+
+              <div className="text-muted small">ou</div>
+
+              <a
                 href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
+                className="text-decoration-none text-primary d-inline-flex align-items-center gap-2"
               >
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
         );
-        
+
       case 'error':
         return (
           <div className="text-center">
-            <div className="bg-red-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <XCircle className="h-10 w-10 text-red-600" />
+            <div className="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-x-circle-fill text-danger" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Erreur de réinitialisation
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-4">
               {result?.message || 'Une erreur est survenue lors de la réinitialisation de votre mot de passe.'}
             </p>
-            
-            <div className="space-y-4">
-              {result?.error_code === 'INVALID_TOKEN' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-yellow-800">
-                    Le lien de réinitialisation a peut-être expiré ou été déjà utilisé.
-                  </p>
-                </div>
-              )}
-              
+
+            {result?.error_code === 'INVALID_TOKEN' && (
+              <div className="alert alert-warning mb-4" role="alert">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                Le lien de réinitialisation a peut-être expiré ou été déjà utilisé.
+              </div>
+            )}
+
+            <div className="d-flex flex-column gap-3 align-items-center">
               <button
                 onClick={() => {
                   setStatus('form');
@@ -264,78 +256,76 @@ function ResetPasswordContent() {
                   setPassword('');
                   setConfirmPassword('');
                 }}
-                className="bg-primary text-white px-6 py-3 rounded-full font-semibold hover:bg-secondary transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto mx-auto"
+                className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
               >
-                <RefreshCw className="h-5 w-5" />
+                <i className="bi bi-arrow-clockwise"></i>
                 <span>Réessayer</span>
               </button>
-              
-              <div className="text-sm text-gray-500">
-                ou
-              </div>
-              
-              <a 
+
+              <div className="text-muted small">ou</div>
+
+              <a
                 href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
+                className="text-decoration-none text-primary d-inline-flex align-items-center gap-2"
               >
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
         );
-        
+
       case 'missing-token':
         return (
           <div className="text-center">
-            <div className="bg-yellow-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <XCircle className="h-10 w-10 text-yellow-600" />
+            <div className="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-x-circle-fill text-warning" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Lien de réinitialisation manquant
             </h2>
-            <p className="text-gray-600 mb-6">
-              Il semble que le lien de réinitialisation soit incomplet. 
+            <p className="text-muted mb-4">
+              Il semble que le lien de réinitialisation soit incomplet.
               Veuillez utiliser le lien complet reçu dans votre email.
             </p>
-            
-            <div className="space-y-4">
-              <a 
+
+            <div className="d-flex flex-column gap-3 align-items-center">
+              <a
                 href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
+                className="text-decoration-none text-primary d-inline-flex align-items-center gap-2"
               >
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
         );
-        
+
       default:
         return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+    <div className="min-vh-100 d-flex align-items-center justify-content-center p-4 bg-white">
+      <div className="bg-white rounded-4 shadow-lg p-5 w-100" style={{ maxWidth: '500px' }}>
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Luggage className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
+        <div className="text-center mb-5">
+          <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <i className="bi bi-luggage text-primary" style={{ fontSize: '32px' }}></i>
+            <h1 className="h3 fw-bold mb-0 text-primary">KiloShare</h1>
           </div>
-          <h2 className="text-lg text-gray-600">Réinitialisation du mot de passe</h2>
+          <h2 className="h5 text-muted">Réinitialisation du mot de passe</h2>
         </div>
-        
+
         {/* Content */}
         {renderContent()}
-        
+
         {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            Besoin d'aide ? {' '}
-            <a href="mailto:support@kiloshare.com" className="text-primary hover:underline">
+        <div className="mt-5 pt-4 border-top">
+          <p className="text-center text-muted small mb-0">
+            Besoin d'aide ?{' '}
+            <a href="mailto:support@kiloshare.com" className="text-primary text-decoration-none">
               Contactez notre support
             </a>
           </p>
@@ -348,24 +338,26 @@ function ResetPasswordContent() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Luggage className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
+      <div className="min-vh-100 d-flex align-items-center justify-content-center p-4 bg-white">
+        <div className="bg-white rounded-4 shadow-lg p-5 w-100" style={{ maxWidth: '500px' }}>
+          <div className="text-center mb-5">
+            <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+              <i className="bi bi-luggage text-primary" style={{ fontSize: '32px' }}></i>
+              <h1 className="h3 fw-bold mb-0 text-primary">KiloShare</h1>
             </div>
-            <h2 className="text-lg text-gray-600">Réinitialisation du mot de passe</h2>
+            <h2 className="h5 text-muted">Réinitialisation du mot de passe</h2>
           </div>
 
           <div className="text-center">
-            <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <div className="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <div className="spinner-border text-primary" role="status" style={{ width: '40px', height: '40px' }}>
+                <span className="visually-hidden">Chargement...</span>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Validation du lien...
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted">
               Nous vérifions votre lien de réinitialisation, veuillez patienter.
             </p>
           </div>

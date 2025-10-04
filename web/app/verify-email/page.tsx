@@ -2,16 +2,8 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Mail,
-  ArrowRight,
-  RefreshCw,
-  Luggage,
-  Download
-} from 'lucide-react';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 interface VerificationResult {
   success: boolean;
@@ -87,13 +79,15 @@ function VerifyEmailContent() {
       case 'loading':
         return (
           <div className="text-center">
-            <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <div className="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <div className="spinner-border text-primary" role="status" style={{ width: '40px', height: '40px' }}>
+                <span className="visually-hidden">Chargement...</span>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Vérification en cours...
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted">
               Nous vérifions votre adresse email, veuillez patienter.
             </p>
           </div>
@@ -102,34 +96,28 @@ function VerifyEmailContent() {
       case 'success':
         return (
           <div className="text-center">
-            <div className="bg-green-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Email vérifié avec succès !
             </h2>
-            <p className="text-gray-600 mb-6">
-              Félicitations ! Votre adresse email a été vérifiée. 
+            <p className="text-muted mb-4">
+              Félicitations ! Votre adresse email a été vérifiée.
               Vous pouvez maintenant utiliser toutes les fonctionnalités de KiloShare.
             </p>
-            
-            {/* Call to actions */}
-            <div className="space-y-4">
-              <button className="hero-gradient text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-2 w-full sm:w-auto mx-auto">
-                <Download className="h-5 w-5" />
+
+            <div className="d-flex flex-column gap-3 align-items-center">
+              <button className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2">
+                <i className="bi bi-download"></i>
                 <span>Ouvrir l'application mobile</span>
               </button>
-              
-              <div className="text-sm text-gray-500">
-                ou
-              </div>
-              
-              <a 
-                href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
-              >
+
+              <div className="text-muted small">ou</div>
+
+              <a href="/" className="text-decoration-none text-primary d-inline-flex align-items-center gap-2">
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
@@ -138,50 +126,46 @@ function VerifyEmailContent() {
       case 'error':
         return (
           <div className="text-center">
-            <div className="bg-red-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <XCircle className="h-10 w-10 text-red-600" />
+            <div className="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-x-circle-fill text-danger" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Erreur de vérification
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-4">
               {result?.message || 'Une erreur est survenue lors de la vérification de votre email.'}
             </p>
-            
-            <div className="space-y-4">
-              {result?.error_code === 'EMAIL_VERIFICATION_FAILED' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-yellow-800">
-                    Le lien de vérification a peut-être expiré ou été déjà utilisé.
-                  </p>
-                </div>
-              )}
-              
+
+            {result?.error_code === 'EMAIL_VERIFICATION_FAILED' && (
+              <div className="alert alert-warning mb-4" role="alert">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                Le lien de vérification a peut-être expiré ou été déjà utilisé.
+              </div>
+            )}
+
+            <div className="d-flex flex-column gap-3 align-items-center">
               <button
                 onClick={resendVerification}
                 disabled={isResending}
-                className="bg-primary text-white px-6 py-3 rounded-full font-semibold hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 w-full sm:w-auto mx-auto"
+                className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
               >
                 {isResending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <div className="spinner-border spinner-border-sm" role="status">
+                    <span className="visually-hidden">Chargement...</span>
+                  </div>
                 ) : (
-                  <RefreshCw className="h-5 w-5" />
+                  <i className="bi bi-arrow-clockwise"></i>
                 )}
                 <span>
                   {isResending ? 'Envoi en cours...' : 'Renvoyer le lien de vérification'}
                 </span>
               </button>
-              
-              <div className="text-sm text-gray-500">
-                ou
-              </div>
-              
-              <a 
-                href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
-              >
+
+              <div className="text-muted small">ou</div>
+
+              <a href="/" className="text-decoration-none text-primary d-inline-flex align-items-center gap-2">
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
@@ -190,43 +174,40 @@ function VerifyEmailContent() {
       case 'missing-token':
         return (
           <div className="text-center">
-            <div className="bg-yellow-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Mail className="h-10 w-10 text-yellow-600" />
+            <div className="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <i className="bi bi-envelope-fill text-warning" style={{ fontSize: '40px' }}></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Lien de vérification manquant
             </h2>
-            <p className="text-gray-600 mb-6">
-              Il semble que le lien de vérification soit incomplet. 
+            <p className="text-muted mb-4">
+              Il semble que le lien de vérification soit incomplet.
               Veuillez utiliser le lien complet reçu dans votre email.
             </p>
-            
-            <div className="space-y-4">
+
+            <div className="d-flex flex-column gap-3 align-items-center">
               <button
                 onClick={resendVerification}
                 disabled={isResending}
-                className="bg-primary text-white px-6 py-3 rounded-full font-semibold hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 w-full sm:w-auto mx-auto"
+                className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
               >
                 {isResending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <div className="spinner-border spinner-border-sm" role="status">
+                    <span className="visually-hidden">Chargement...</span>
+                  </div>
                 ) : (
-                  <Mail className="h-5 w-5" />
+                  <i className="bi bi-envelope"></i>
                 )}
                 <span>
                   {isResending ? 'Envoi en cours...' : 'Recevoir un nouveau lien'}
                 </span>
               </button>
-              
-              <div className="text-sm text-gray-500">
-                ou
-              </div>
-              
-              <a 
-                href="/"
-                className="inline-flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
-              >
+
+              <div className="text-muted small">ou</div>
+
+              <a href="/" className="text-decoration-none text-primary d-inline-flex align-items-center gap-2">
                 <span>Retour à l'accueil</span>
-                <ArrowRight className="h-4 w-4" />
+                <i className="bi bi-arrow-right"></i>
               </a>
             </div>
           </div>
@@ -238,25 +219,25 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+    <div className="min-vh-100 d-flex align-items-center justify-content-center p-4 bg-white">
+      <div className="bg-white rounded-4 shadow-lg p-5 w-100" style={{ maxWidth: '500px' }}>
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Luggage className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
+        <div className="text-center mb-5">
+          <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <i className="bi bi-luggage text-primary" style={{ fontSize: '32px' }}></i>
+            <h1 className="h3 fw-bold mb-0 text-primary">KiloShare</h1>
           </div>
-          <h2 className="text-lg text-gray-600">Vérification d'email</h2>
+          <h2 className="h5 text-muted">Vérification d'email</h2>
         </div>
-        
+
         {/* Content */}
         {renderContent()}
-        
+
         {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            Besoin d'aide ? {' '}
-            <a href="mailto:support@kiloshare.com" className="text-primary hover:underline">
+        <div className="mt-5 pt-4 border-top">
+          <p className="text-center text-muted small mb-0">
+            Besoin d'aide ?{' '}
+            <a href="mailto:support@kiloshare.com" className="text-primary text-decoration-none">
               Contactez notre support
             </a>
           </p>
@@ -269,24 +250,26 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Luggage className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
+      <div className="min-vh-100 d-flex align-items-center justify-content-center p-4 bg-white">
+        <div className="bg-white rounded-4 shadow-lg p-5 w-100" style={{ maxWidth: '500px' }}>
+          <div className="text-center mb-5">
+            <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+              <i className="bi bi-luggage text-primary" style={{ fontSize: '32px' }}></i>
+              <h1 className="h3 fw-bold mb-0 text-primary">KiloShare</h1>
             </div>
-            <h2 className="text-lg text-gray-600">Vérification d'email</h2>
+            <h2 className="h5 text-muted">Vérification d'email</h2>
           </div>
 
           <div className="text-center">
-            <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <div className="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '80px', height: '80px' }}>
+              <div className="spinner-border text-primary" role="status" style={{ width: '40px', height: '40px' }}>
+                <span className="visually-hidden">Chargement...</span>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="h3 fw-bold text-dark mb-3">
               Vérification en cours...
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted">
               Nous vérifions votre adresse email, veuillez patienter.
             </p>
           </div>

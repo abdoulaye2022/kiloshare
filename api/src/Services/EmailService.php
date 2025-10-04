@@ -169,4 +169,116 @@ KiloShare Team
 © " . date('Y') . " KiloShare. Tous droits réservés.
         ";
     }
+
+    /**
+     * Envoyer un email de notification générique
+     */
+    public function sendNotificationEmail(string $toEmail, string $userName, string $subject, string $message, ?string $actionUrl = null, ?string $actionText = null): bool
+    {
+        try {
+            // En dev, rediriger vers l'email de développement
+            $recipientEmail = $this->isDev && !empty($this->devEmail) ? $this->devEmail : $toEmail;
+
+            // Suppress deprecation warnings for Brevo models
+            $oldErrorReporting = error_reporting(E_ALL & ~E_DEPRECATED);
+
+            $sendSmtpEmail = new SendSmtpEmail([
+                'sender' => new SendSmtpEmailSender([
+                    'name' => $this->fromName,
+                    'email' => $this->fromEmail
+                ]),
+                'to' => [
+                    new SendSmtpEmailTo([
+                        'email' => $recipientEmail,
+                        'name' => $userName
+                    ])
+                ],
+                'subject' => $subject,
+                'htmlContent' => $this->getNotificationTemplate($userName, $subject, $message, $actionUrl, $actionText, $toEmail),
+                'textContent' => $this->getNotificationTextTemplate($userName, $message, $actionUrl)
+            ]);
+
+            $result = $this->emailApi->sendTransacEmail($sendSmtpEmail);
+
+            error_reporting($oldErrorReporting);
+
+            error_log("Notification email sent successfully to {$recipientEmail} (original: {$toEmail}) - Message ID: " . $result->getMessageId());
+
+            return true;
+        } catch (\Exception $e) {
+            error_log("Failed to send notification email to {$toEmail}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Template HTML pour l'email de notification
+     */
+    private function getNotificationTemplate(string $userName, string $subject, string $message, ?string $actionUrl, ?string $actionText, string $originalEmail): string
+    {
+        $devNote = $this->isDev ? "<p style='color: #ff6b6b; font-size: 12px; margin-top: 20px;'><strong>Note dev:</strong> Cet email était destiné à {$originalEmail}</p>" : '';
+
+        $actionButton = '';
+        if ($actionUrl && $actionText) {
+            $actionButton = "
+                <a href='{$actionUrl}'
+                   style='display: inline-block; background-color: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 20px 0;'>
+                    {$actionText}
+                </a>";
+        }
+
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <title>{$subject}</title>
+        </head>
+        <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
+            <div style='background-color: #f8f9fa; padding: 30px; border-radius: 10px;'>
+                <h1 style='color: #2563eb; margin-bottom: 30px; text-align: center;'>🚀 KiloShare</h1>
+
+                <p style='font-size: 16px; margin-bottom: 20px;'>Bonjour <strong>{$userName}</strong>,</p>
+
+                <div style='background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #2563eb; margin-bottom: 20px;'>
+                    <p style='color: #333; line-height: 1.6; margin: 0;'>" . nl2br(htmlspecialchars($message)) . "</p>
+                </div>
+
+                {$actionButton}
+
+                <hr style='margin: 30px 0; border: none; border-top: 1px solid #ddd;'>
+
+                <p style='font-size: 12px; color: #888; text-align: center;'>
+                    Cet email a été envoyé par KiloShare<br>
+                    © " . date('Y') . " KiloShare. Tous droits réservés.
+                </p>
+
+                {$devNote}
+            </div>
+        </body>
+        </html>";
+    }
+
+    /**
+     * Template texte pour l'email de notification
+     */
+    private function getNotificationTextTemplate(string $userName, string $message, ?string $actionUrl): string
+    {
+        $actionText = '';
+        if ($actionUrl) {
+            $actionText = "\n\nPour plus de détails, visitez : {$actionUrl}";
+        }
+
+        return "
+KiloShare Notification
+
+Bonjour {$userName},
+
+{$message}{$actionText}
+
+---
+KiloShare Team
+© " . date('Y') . " KiloShare. Tous droits réservés.
+        ";
+    }
 }

@@ -306,7 +306,7 @@ class PaymentReminderJob
      */
     private function generateConfirmationUrl(PaymentAuthorization $authorization): string
     {
-        $baseUrl = config('app.frontend_url', 'https://kiloshare.com');
+        $baseUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:3000';
         return "{$baseUrl}/booking/{$authorization->booking_id}/confirm-payment";
     }
 
