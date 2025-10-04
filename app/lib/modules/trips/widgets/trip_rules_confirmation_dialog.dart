@@ -200,7 +200,7 @@ class _TripRulesConfirmationDialogState extends State<TripRulesConfirmationDialo
                         foregroundColor: Colors.white,
                       ),
                       child: const Text(
-                        'Publier l\'annonce',
+                        'Publier',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

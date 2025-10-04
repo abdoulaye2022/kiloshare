@@ -613,11 +613,15 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _submitForReview(),
-                    icon: const Icon(Icons.send),
-                    label: const Text('Soumettre'),
+                    icon: const Icon(Icons.send, size: 18),
+                    label: const Text(
+                      'Publier',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
                   ),
                 ),

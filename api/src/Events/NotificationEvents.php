@@ -158,20 +158,21 @@ class NotificationEvents
         );
     }
 
-    public function onPriceNegotiation(array $negotiation): void
-    {
-        $this->notificationService->send(
-            $negotiation['recipient_id'],
-            'price_negotiation',
-            [
-                'negotiation_id' => $negotiation['id'],
-                'sender_name' => $negotiation['sender_name'],
-                'proposed_price' => $negotiation['proposed_price'],
-                'booking_id' => $negotiation['booking_id']
-            ],
-            ['scope' => 'negotiation', 'scope_id' => $negotiation['id']]
-        );
-    }
+    // DEPRECATED: Negotiation system removed
+    // public function onPriceNegotiation(array $negotiation): void
+    // {
+    //     $this->notificationService->send(
+    //         $negotiation['recipient_id'],
+    //         'price_negotiation',
+    //         [
+    //             'negotiation_id' => $negotiation['id'],
+    //             'sender_name' => $negotiation['sender_name'],
+    //             'proposed_price' => $negotiation['proposed_price'],
+    //             'booking_id' => $negotiation['booking_id']
+    //         ],
+    //         ['scope' => 'negotiation', 'scope_id' => $negotiation['id']]
+    //     );
+    // }
 
     public function onDocumentRequired(array $booking): void
     {

@@ -7,6 +7,7 @@ interface TripImage {
   id: number;
   trip_id: number;
   image_url: string;
+  url?: string;
   image_path?: string;
   is_primary?: boolean;
   caption?: string;
@@ -16,6 +17,7 @@ interface TripImageData {
   id: number;
   trip_id: number;
   image_url?: string;
+  url?: string;
   file_path?: string;
   is_primary?: boolean;
   description?: string;
@@ -67,14 +69,27 @@ export default function TripManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [showTripDetails, setShowTripDetails] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error' | 'info' | 'warning', message: string } | null>(null);
 
   useEffect(() => {
     fetchTrips();
   }, [filter]);
 
+  // Auto-dismiss alert after 5 seconds for success messages
+  useEffect(() => {
+    if (alertMessage && alertMessage.type === 'success') {
+      const timer = setTimeout(() => {
+        setAlertMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [alertMessage]);
+
   const fetchTrips = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       const endpoint = filter === 'pending_review'
         ? `/api/admin/trips/pending?include=images`
         : `/api/v1/admin/trips?status=${filter}&limit=50&include=images`;
@@ -82,6 +97,7 @@ export default function TripManagement() {
       const token = await adminAuth.getValidAccessToken();
       if (!token) {
         setError('Token d\'authentification manquant');
+        setLoading(false);
         return;
       }
 
@@ -96,11 +112,25 @@ export default function TripManagement() {
       if (response.ok) {
         const data = await response.json();
         setTrips(data.data?.trips || data.trips || []);
+        setError(null);
       } else {
-        console.error('Failed to fetch trips');
+        // Essayer de parser le JSON, sinon utiliser le texte brut
+        let errorMessage = 'Erreur lors de la récupération des voyages';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          // Si ce n'est pas du JSON, lire le texte
+          const errorText = await response.text();
+          console.error('Non-JSON error response:', errorText);
+          errorMessage = `Erreur ${response.status}: ${errorText.substring(0, 100)}`;
+        }
+        setError(errorMessage);
+        console.error('Failed to fetch trips:', response.status);
       }
     } catch (error) {
       console.error('Error fetching trips:', error);
+      setError(`Erreur de connexion au serveur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setLoading(false);
     }
@@ -113,11 +143,11 @@ export default function TripManagement() {
 
       switch (action) {
         case 'approve':
-          endpoint = '/api/v1/admin/trips/approve';
+          endpoint = '/api/admin/trips/approve';
           break;
         case 'reject':
           const reason = prompt('Raison du rejet (optionnel):');
-          endpoint = '/api/v1/admin/trips/reject';
+          endpoint = '/api/admin/trips/reject';
           body.reason = reason;
           break;
         default:
@@ -125,10 +155,26 @@ export default function TripManagement() {
           return;
       }
 
-      const response = await adminAuth.apiRequest(endpoint, {
+      // Appeler la route Next.js proxy (pas directement le backend)
+      const token = await adminAuth.getValidAccessToken();
+      if (!token) {
+        setAlertMessage({ type: 'error', message: 'Session expirée. Veuillez vous reconnecter.' });
+        return;
+      }
+
+      console.log('🔍 TripManagement - Calling endpoint:', endpoint);
+      console.log('🔍 TripManagement - With body:', body);
+
+      const response = await fetch(endpoint, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
+
+      console.log('🔍 TripManagement - Response status:', response.status);
 
       if (response.ok) {
         fetchTrips();
@@ -136,9 +182,29 @@ export default function TripManagement() {
           setSelectedTrip(null);
           setShowTripDetails(false);
         }
+        setAlertMessage({
+          type: 'success',
+          message: action === 'approve' ? 'Annonce approuvée avec succès!' : 'Action effectuée avec succès!'
+        });
+      } else {
+        // Essayer de parser le JSON, sinon utiliser le texte brut
+        let errorMessage = 'Une erreur est survenue';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('Non-JSON error response:', errorText);
+          errorMessage = `Erreur ${response.status}`;
+        }
+        setAlertMessage({ type: 'error', message: errorMessage });
       }
     } catch (error) {
       console.error(`Error ${action}ing trip:`, error);
+      setAlertMessage({
+        type: 'error',
+        message: `Erreur lors de l'action: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+      });
     }
   };
 
@@ -205,14 +271,21 @@ export default function TripManagement() {
   // Fonction pour normaliser les images selon les différents formats API
   const getNormalizedImages = (trip: Trip): TripImage[] => {
     if (trip.images && trip.images.length > 0) {
-      return trip.images;
+      return trip.images.map(img => ({
+        id: img.id,
+        trip_id: img.trip_id,
+        image_url: img.image_url || (img as any).url || img.image_path || '',
+        image_path: img.image_path,
+        is_primary: img.is_primary,
+        caption: img.caption
+      }));
     }
 
     if (trip.trip_images && trip.trip_images.length > 0) {
       return trip.trip_images.map(img => ({
         id: img.id,
         trip_id: img.trip_id,
-        image_url: img.image_url || img.file_path || '',
+        image_url: img.image_url || (img as any).url || img.file_path || '',
         image_path: img.file_path,
         is_primary: img.is_primary,
         caption: img.description
@@ -256,6 +329,47 @@ export default function TripManagement() {
           </div>
         </div>
       </div>
+
+      {/* Alert Messages */}
+      {alertMessage && (
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className={`alert alert-${alertMessage.type === 'error' ? 'danger' : alertMessage.type} alert-dismissible fade show`} role="alert">
+              <i className={`bi ${
+                alertMessage.type === 'success' ? 'bi-check-circle-fill' :
+                alertMessage.type === 'error' ? 'bi-exclamation-triangle-fill' :
+                alertMessage.type === 'warning' ? 'bi-exclamation-circle-fill' :
+                'bi-info-circle-fill'
+              } me-2`}></i>
+              {alertMessage.message}
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setAlertMessage(null)}
+                aria-label="Close"
+              ></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Alert */}
+      {error && (
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="alert alert-danger alert-dismissible fade show" role="alert">
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              {error}
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setError(null)}
+                aria-label="Close"
+              ></button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="row mb-4">

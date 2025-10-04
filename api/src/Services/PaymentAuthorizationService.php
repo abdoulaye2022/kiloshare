@@ -57,7 +57,7 @@ class PaymentAuthorizationService
 
         try {
             // Calculer les montants
-            $totalAmount = $booking->final_price ?? $booking->proposed_price;
+            $totalAmount = $booking->total_price;
             $amountCents = (int) ($totalAmount * 100);
             $platformFeeCents = $this->calculatePlatformFee($amountCents);
 

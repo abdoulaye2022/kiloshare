@@ -227,11 +227,11 @@ class BookingService {
   }
 
   /// Accepter une réservation (par le propriétaire du voyage)
-  Future<Map<String, dynamic>> acceptBooking(String bookingId, {double? finalPrice}) async {
+  Future<Map<String, dynamic>> acceptBooking(String bookingId, {double? totalPrice}) async {
     try {
       final headers = await _getAuthHeaders();
       final body = json.encode({
-        if (finalPrice != null) 'final_price': finalPrice,
+        if (totalPrice != null) 'total_price': totalPrice,
       });
 
 

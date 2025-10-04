@@ -80,7 +80,7 @@ class BookingController
                 'trip_id' => $trip->id,
                 'status' => Booking::STATUS_PENDING,
                 'weight_kg' => (float) $data['weight'],
-                'proposed_price' => $totalPrice,
+                'total_price' => $totalPrice,
                 'package_description' => $data['package_description'],
                 'pickup_address' => $data['pickup_address'] ?? '',
                 'delivery_address' => $data['delivery_address'] ?? '',
@@ -112,7 +112,7 @@ class BookingController
                     'trip_title' => $trip->title ?? 'Votre voyage',
                     'package_description' => $data['package_description'],
                     'weight_kg' => $data['weight'],
-                    'proposed_price' => $booking->proposed_price,
+                    'total_price' => $booking->total_price,
                     'booking_id' => $booking->id
                 ]
             );
@@ -123,7 +123,7 @@ class BookingController
                     'uuid' => $booking->uuid,
                     'status' => $booking->status,
                     'weight_kg' => $booking->weight_kg,
-                    'proposed_price' => $booking->proposed_price,
+                    'total_price' => $booking->total_price,
                     'created_at' => $booking->created_at,
                 ]
             ], 'Demande de réservation créée avec succès');
@@ -188,8 +188,8 @@ class BookingController
                         'receiver_id' => $booking->receiver_id,
                         'status' => $booking->status,
                         'weight_kg' => $booking->weight_kg,
-                        'proposed_price' => $booking->proposed_price,
-                        'final_price' => $booking->final_price,
+                        'total_price' => $booking->total_price,
+                        'total_price' => $booking->total_price,
                         'package_description' => $booking->package_description,
                         'pickup_address' => $booking->pickup_address,
                         'delivery_address' => $booking->delivery_address,
@@ -261,8 +261,8 @@ class BookingController
                     'receiver_id' => $booking->receiver_id,
                     'status' => $booking->status,
                     'weight_kg' => $booking->weight_kg,
-                    'proposed_price' => $booking->proposed_price,
-                    'final_price' => $booking->final_price,
+                    'total_price' => $booking->total_price,
+                    'total_price' => $booking->total_price,
                     'package_description' => $booking->package_description,
                     'pickup_address' => $booking->pickup_address,
                     'delivery_address' => $booking->delivery_address,
@@ -351,11 +351,8 @@ class BookingController
                 );
             }
 
-            // Handle final price if provided (from negotiation)
-            $finalPrice = isset($data['final_price']) ? (float)$data['final_price'] : null;
-
             // Accepter la réservation et passer au statut payment_authorized
-            $booking->accept($finalPrice);
+            $booking->accept();
 
             // Créer l'autorisation de paiement avec capture différée
             try {
@@ -385,7 +382,7 @@ class BookingController
                 'booking_accepted_payment_pending',
                 [
                     'trip_title' => $booking->trip->title ?? 'Votre voyage',
-                    'total_amount' => $booking->final_price,
+                    'total_amount' => $booking->total_price,
                     'confirmation_deadline' => '4 heures'
                 ]
             );
@@ -403,13 +400,13 @@ class BookingController
                 'booking' => [
                     'id' => $booking->id,
                     'status' => $booking->status,
-                    'final_price' => $booking->final_price,
+                    'total_price' => $booking->total_price,
                     'payment_authorization_id' => $booking->payment_authorization_id,
                     'updated_at' => $booking->updated_at,
                 ],
                 'payment' => [
                     'client_secret' => $clientSecret,
-                    'amount' => $booking->final_price,
+                    'amount' => $booking->total_price,
                     'currency' => 'CAD',
                     'requires_payment_method' => !empty($clientSecret),
                 ]
@@ -770,7 +767,7 @@ class BookingController
                     'cancelled_at' => $booking->cancelled_at,
                     'cancellation_type' => $booking->cancellation_type,
                     'cancellation_reason' => $booking->cancellation_reason,
-                    'final_price' => $booking->final_price,
+                    'total_price' => $booking->total_price,
                     'refund_processed' => true // À implémenter selon le système de paiement
                 ];
             });
@@ -922,7 +919,7 @@ class BookingController
                 [
                     'sender_name' => $user->first_name . ' ' . $user->last_name,
                     'trip_title' => $booking->trip->title ?? 'Votre voyage',
-                    'total_amount' => $booking->final_price
+                    'total_amount' => $booking->total_price
                 ]
             );
 

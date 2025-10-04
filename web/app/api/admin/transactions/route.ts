@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '50';
 
     // Appeler l'API backend
-    const backendUrl = new URL(`${BACKEND_URL}/admin/transactions`);
+    const backendUrl = new URL(`${BACKEND_URL}/api/v1/admin/transactions`);
     if (status) backendUrl.searchParams.append('status', status);
     if (type) backendUrl.searchParams.append('type', type);
     backendUrl.searchParams.append('limit', limit);

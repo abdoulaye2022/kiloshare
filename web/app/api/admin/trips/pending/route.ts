@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Essayer d'abord l'API backend
     try {
       
-      const response = await fetch(`${BACKEND_URL}/admin/trips/pending`, {
+      const response = await fetch(`${BACKEND_URL}/api/v1/admin/trips/pending`, {
         method: 'GET',
         headers: {
           'Authorization': authHeader,

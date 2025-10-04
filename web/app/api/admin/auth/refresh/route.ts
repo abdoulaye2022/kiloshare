@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Appel à l'API backend pour le refresh
-    const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

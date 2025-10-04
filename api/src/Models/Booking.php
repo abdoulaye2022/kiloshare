@@ -22,8 +22,7 @@ class Booking extends Model
         'status',
         'payment_status',
         'weight_kg',
-        'proposed_price',
-        'final_price',
+        'total_price', // Prix total basé sur le prix par kg du voyage
         'payment_authorization_id',
         'payment_authorized_at',
         'payment_confirmed_at',
@@ -42,8 +41,7 @@ class Booking extends Model
 
     protected $casts = [
         'weight_kg' => 'decimal:2',
-        'proposed_price' => 'decimal:2',
-        'final_price' => 'decimal:2',
+        'total_price' => 'decimal:2',
         'commission_rate' => 'decimal:2',
         'commission_amount' => 'decimal:2',
         'pickup_date' => 'datetime',
@@ -177,12 +175,9 @@ class Booking extends Model
             && ($this->sender_id === $user->id || $this->receiver_id === $user->id);
     }
 
-    public function accept(?float $finalPrice = null): void
+    public function accept(): void
     {
         $this->status = self::STATUS_ACCEPTED;
-        if ($finalPrice !== null) {
-            $this->final_price = $finalPrice;
-        }
         $this->save();
     }
 

@@ -39,8 +39,7 @@ export function useBooking() {
 
 
   const acceptBooking = useCallback(async (
-    bookingId: number,
-    finalPrice?: number
+    bookingId: number
   ): Promise<AcceptNegotiationResponse | null> => {
     if (!token) {
       setError('Non authentifié');
@@ -59,7 +58,7 @@ export function useBooking() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(finalPrice ? { final_price: finalPrice } : {})
+          body: JSON.stringify({})
         }
       );
 

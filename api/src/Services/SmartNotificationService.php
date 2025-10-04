@@ -759,7 +759,7 @@ class SmartNotificationService
                 [
                     'booking_id' => $booking->id,
                     'trip_id' => $booking->trip_id,
-                    'amount' => $booking->final_price ?? $booking->proposed_price,
+                    'amount' => $booking->total_price,
                     'currency' => $booking->trip->currency ?? 'CAD',
                     'message' => $message,
                     'delivery_confirmed' => true,
@@ -787,7 +787,7 @@ class SmartNotificationService
                 [
                     'booking_id' => $booking->id,
                     'trip_id' => $booking->trip_id,
-                    'amount' => $booking->final_price ?? $booking->proposed_price,
+                    'amount' => $booking->total_price,
                     'currency' => $booking->trip->currency ?? 'CAD',
                     'message' => $message,
                     'delivery_confirmed' => true,

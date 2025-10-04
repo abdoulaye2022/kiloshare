@@ -221,7 +221,7 @@ class ScheduledJob extends Model
         ]);
     }
 
-    public static function scheduleConfirmationReminder(PaymentAuthorization $authorization, int $hoursBefore = 2): self
+    public static function scheduleConfirmationReminder(PaymentAuthorization $authorization, int $hoursBefore = 2): ?self
     {
         $reminderTime = $authorization->confirmation_deadline->copy()->subHours($hoursBefore);
 
@@ -243,7 +243,7 @@ class ScheduledJob extends Model
         ]);
     }
 
-    public static function schedulePaymentReminder(PaymentAuthorization $authorization, int $hoursBefore = 24): self
+    public static function schedulePaymentReminder(PaymentAuthorization $authorization, int $hoursBefore = 24): ?self
     {
         if (!$authorization->auto_capture_at) {
             return null;

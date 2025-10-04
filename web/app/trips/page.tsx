@@ -27,7 +27,7 @@ interface ProposalData {
   tripId: number;
   packageDescription: string;
   weightKg: number;
-  proposedPrice: number;
+  
   pickupAddress: string;
   deliveryAddress: string;
   specialInstructions?: string;
@@ -44,7 +44,7 @@ export default function TripsListPage() {
     tripId: 0,
     packageDescription: '',
     weightKg: 0,
-    proposedPrice: 0,
+    
     pickupAddress: '',
     deliveryAddress: '',
     specialInstructions: ''
@@ -78,7 +78,7 @@ export default function TripsListPage() {
       tripId: trip.id,
       packageDescription: '',
       weightKg: 0,
-      proposedPrice: trip.price_per_kg * 1, // Default to price per kg
+       // Default to price per kg
       pickupAddress: '',
       deliveryAddress: '',
       specialInstructions: ''
@@ -103,11 +103,10 @@ export default function TripsListPage() {
           trip_id: selectedTrip.id,
           receiver_id: selectedTrip.user_id,
           package_description: proposalData.packageDescription,
-          weight_kg: proposalData.weightKg,
-          proposed_price: proposalData.proposedPrice,
+          weight: proposalData.weightKg,
           pickup_address: proposalData.pickupAddress,
           delivery_address: proposalData.deliveryAddress,
-          special_instructions: proposalData.specialInstructions
+          pickup_notes: proposalData.specialInstructions
         })
       });
 
@@ -331,9 +330,8 @@ export default function TripsListPage() {
                   onChange={(e) => {
                     const weight = parseFloat(e.target.value);
                     setProposalData({
-                      ...proposalData, 
-                      weightKg: weight,
-                      proposedPrice: weight * selectedTrip.price_per_kg
+                      ...proposalData,
+                      weightKg: weight
                     });
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
@@ -342,30 +340,12 @@ export default function TripsListPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Maximum : {selectedTrip.available_weight_kg} kg
                 </p>
-              </div>
-
-              {/* Prix proposé */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prix total proposé *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={proposalData.proposedPrice}
-                  onChange={(e) => setProposalData({...proposalData, proposedPrice: parseFloat(e.target.value)})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  required
-                />
                 {proposalData.weightKg > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    ≈ {formatPrice(proposalData.proposedPrice / proposalData.weightKg)}/kg
-                    {proposalData.proposedPrice !== (proposalData.weightKg * selectedTrip.price_per_kg) && (
-                      <span className="text-orange-600 font-medium">
-                        {' '}(Prix différent du tarif affiché)
-                      </span>
-                    )}
+                  <p className="text-sm text-gray-700 mt-2 font-medium">
+                    Prix total: {(proposalData.weightKg * selectedTrip.price_per_kg).toFixed(2)} CAD
+                    <span className="text-xs text-gray-500 ml-2">
+                      ({selectedTrip.price_per_kg.toFixed(2)} CAD/kg)
+                    </span>
                   </p>
                 )}
               </div>

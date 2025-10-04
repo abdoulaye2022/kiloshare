@@ -433,16 +433,17 @@ class AdminController
         }
 
         try {
-            $trips = Trip::with(['user'])
+            $trips = Trip::with(['user', 'images'])
                 ->where('status', Trip::STATUS_PENDING_APPROVAL)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
             $formattedTrips = [];
             foreach ($trips as $trip) {
-                $formattedTrips[] = [
+                $tripData = [
                     'id' => $trip->id,
                     'uuid' => $trip->uuid,
+                    'title' => $trip->title,
                     'transport_type' => $trip->transport_type,
                     'departure_city' => $trip->departure_city,
                     'departure_country' => $trip->departure_country,
@@ -464,6 +465,23 @@ class AdminController
                     'created_at' => $trip->created_at,
                     'updated_at' => $trip->updated_at,
                 ];
+
+                // Ajouter les images
+                if ($trip->images && $trip->images->count() > 0) {
+                    $tripData['images'] = $trip->images->map(function ($image) {
+                        return [
+                            'id' => $image->id,
+                            'trip_id' => $image->trip_id,
+                            'url' => $image->url,
+                            'image_url' => $image->url, // Alias pour compatibilité
+                            'image_path' => $image->image_path,
+                            'is_primary' => $image->is_primary,
+                            'caption' => $image->alt_text,
+                        ];
+                    })->toArray();
+                }
+
+                $formattedTrips[] = $tripData;
             }
 
             return Response::success([
@@ -581,9 +599,10 @@ class AdminController
             $status = $queryParams['status'] ?? null;
             $limit = (int)($queryParams['limit'] ?? 50);
             $offset = (int)($queryParams['offset'] ?? 0);
+            $include = $queryParams['include'] ?? '';
 
-            $query = Trip::with(['user']);
-            
+            $query = Trip::with(['user', 'images']);
+
             if ($status && $status !== 'all') {
                 $query->where('status', $status);
             }
@@ -596,9 +615,11 @@ class AdminController
 
             $formattedTrips = [];
             foreach ($trips as $trip) {
-                $formattedTrips[] = [
+                $tripData = [
                     'id' => $trip->id,
                     'uuid' => $trip->uuid,
+                    'title' => $trip->title,
+                    'description' => $trip->description,
                     'transport_type' => $trip->transport_type,
                     'departure_city' => $trip->departure_city,
                     'departure_country' => $trip->departure_country,
@@ -617,6 +638,23 @@ class AdminController
                     'created_at' => $trip->created_at,
                     'updated_at' => $trip->updated_at,
                 ];
+
+                // Ajouter les images si demandées
+                if ($trip->images && $trip->images->count() > 0) {
+                    $tripData['images'] = $trip->images->map(function ($image) {
+                        return [
+                            'id' => $image->id,
+                            'trip_id' => $image->trip_id,
+                            'url' => $image->url,
+                            'image_url' => $image->url, // Alias pour compatibilité
+                            'image_path' => $image->image_path,
+                            'is_primary' => $image->is_primary,
+                            'caption' => $image->alt_text,
+                        ];
+                    })->toArray();
+                }
+
+                $formattedTrips[] = $tripData;
             }
 
             return Response::success([

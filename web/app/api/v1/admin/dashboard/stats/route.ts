@@ -35,6 +35,7 @@ function getAuthToken(request: NextRequest): string | null {
 export async function GET(request: NextRequest) {
   try {
     const token = getAuthToken(request);
+    console.log('🔍 Dashboard stats request - Token:', token ? 'Present' : 'Missing');
 
     if (!token) {
       return NextResponse.json(
@@ -45,7 +46,10 @@ export async function GET(request: NextRequest) {
 
     try {
       // Essayer l'API backend
-      const response = await fetch(`${BACKEND_URL}/api/v1/admin/dashboard/stats`, {
+      const backendUrl = `${BACKEND_URL}/api/v1/admin/dashboard/stats`;
+      console.log('🔍 Fetching from backend:', backendUrl);
+
+      const response = await fetch(backendUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -53,16 +57,23 @@ export async function GET(request: NextRequest) {
         },
       });
 
+      console.log('🔍 Backend response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Backend returned data successfully');
 
         return NextResponse.json({
           success: true,
           stats: data.data?.stats || data.stats || data
         });
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Backend error:', response.status, errorText.substring(0, 200));
       }
 
     } catch (fetchError) {
+      console.error('❌ Fetch error:', fetchError);
     }
 
     // Si le backend n'est pas disponible, générer des stats basées sur les données réelles
@@ -85,10 +96,12 @@ export async function GET(request: NextRequest) {
 // Générer des statistiques basées sur les vraies données disponibles
 async function generateRealStats(token: string) {
   try {
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
+
     // Récupérer les utilisateurs pour les stats
     let users: User[] = [];
     try {
-      const usersResponse = await fetch(`http://localhost:3001/api/v1/admin/users?status=all&limit=1000`, {
+      const usersResponse = await fetch(`${BACKEND_URL}/api/v1/admin/users?status=all&limit=1000`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -101,12 +114,13 @@ async function generateRealStats(token: string) {
         users = usersData.data?.users || [];
       }
     } catch (error) {
+      console.error('Error fetching users for stats:', error);
     }
 
     // Récupérer les voyages pour les stats
     let trips: Trip[] = [];
     try {
-      const tripsResponse = await fetch(`http://localhost:3001/api/v1/admin/trips?status=all&limit=1000`, {
+      const tripsResponse = await fetch(`${BACKEND_URL}/api/v1/admin/trips?status=all&limit=1000`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -119,6 +133,7 @@ async function generateRealStats(token: string) {
         trips = tripsData.data?.trips || [];
       }
     } catch (error) {
+      console.error('Error fetching trips for stats:', error);
     }
 
     // Calculer les statistiques réelles

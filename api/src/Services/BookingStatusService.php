@@ -25,7 +25,7 @@ class BookingStatusService
     /**
      * Accepter une réservation
      */
-    public function acceptBooking(Booking $booking, User $transporter, ?float $finalPrice = null): array
+    public function acceptBooking(Booking $booking, User $transporter): array
     {
         if (!$booking->canBeAccepted()) {
             throw new \Exception('Cette réservation ne peut plus être acceptée');
@@ -36,7 +36,7 @@ class BookingStatusService
         }
 
         // Mettre à jour la réservation
-        $booking->accept($finalPrice);
+        $booking->accept();
 
         // Créer l'autorisation de paiement automatiquement
         $sender = $booking->sender;

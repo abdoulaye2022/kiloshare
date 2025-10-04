@@ -6,8 +6,7 @@ class BookingModel {
   final String packageDescription;
   final double weightKg;
   final String? dimensionsCm;
-  final double proposedPrice;
-  final double? finalPrice;
+  final double totalPrice;
   final String? pickupAddress;
   final String? deliveryAddress;
   final String? specialInstructions;
@@ -35,8 +34,7 @@ class BookingModel {
     required this.packageDescription,
     required this.weightKg,
     this.dimensionsCm,
-    required this.proposedPrice,
-    this.finalPrice,
+    required this.totalPrice,
     this.pickupAddress,
     this.deliveryAddress,
     this.specialInstructions,
@@ -66,8 +64,7 @@ class BookingModel {
       packageDescription: json['package_description'] as String,
       weightKg: double.parse(json['weight_kg'].toString()),
       dimensionsCm: json['dimensions_cm'] as String?,
-      proposedPrice: json['proposed_price'] != null ? double.parse(json['proposed_price'].toString()) : 0.0,
-      finalPrice: json['final_price'] != null ? double.parse(json['final_price'].toString()) : null,
+      totalPrice: json['total_price'] != null ? double.parse(json['total_price'].toString()) : 0.0,
       pickupAddress: json['pickup_address'] as String?,
       deliveryAddress: json['delivery_address'] as String?,
       specialInstructions: json['special_instructions'] as String?,
@@ -94,8 +91,7 @@ class BookingModel {
       'package_description': packageDescription,
       'weight_kg': weightKg,
       'dimensions_cm': dimensionsCm,
-      'proposed_price': proposedPrice,
-      'final_price': finalPrice,
+      'total_price': totalPrice,
       'pickup_address': pickupAddress,
       'delivery_address': deliveryAddress,
       'special_instructions': specialInstructions,
@@ -113,8 +109,7 @@ class BookingModel {
     String? packageDescription,
     double? weightKg,
     String? dimensionsCm,
-    double? proposedPrice,
-    double? finalPrice,
+    double? totalPrice,
     String? pickupAddress,
     String? deliveryAddress,
     String? specialInstructions,
@@ -138,8 +133,7 @@ class BookingModel {
       packageDescription: packageDescription ?? this.packageDescription,
       weightKg: weightKg ?? this.weightKg,
       dimensionsCm: dimensionsCm ?? this.dimensionsCm,
-      proposedPrice: proposedPrice ?? this.proposedPrice,
-      finalPrice: finalPrice ?? this.finalPrice,
+      totalPrice: totalPrice ?? this.totalPrice,
       pickupAddress: pickupAddress ?? this.pickupAddress,
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
       specialInstructions: specialInstructions ?? this.specialInstructions,
@@ -158,7 +152,7 @@ class BookingModel {
   }
 
   // Getter helpers
-  double get effectivePrice => finalPrice ?? proposedPrice;
+  double get effectivePrice => totalPrice;
   bool get isPending => status == BookingStatus.pending;
   bool get isAccepted => status == BookingStatus.accepted;
   bool get isRejected => status == BookingStatus.rejected;

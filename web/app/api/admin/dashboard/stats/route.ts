@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Faire un appel à l'API backend pour récupérer les statistiques
-    const response = await fetch(`${BACKEND_URL}/admin/dashboard/stats`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/admin/dashboard/stats`, {
       headers: {
         'Authorization': authHeader,
         'Content-Type': 'application/json',

@@ -534,14 +534,14 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   Future<void> _acceptBooking(BookingModel booking) async {
     // D'abord, vérifier le statut Stripe
     final stripeStatus = await _stripeService.getAccountStatus();
-    
+
     if (stripeStatus['success'] != true) {
       _showStripeErrorDialog('Impossible de vérifier votre compte Stripe. Veuillez réessayer.');
       return;
     }
-    
+
     final canAcceptBookings = stripeStatus['transaction_ready'] == true;
-    
+
     if (!canAcceptBookings) {
       _showStripeSetupDialog(stripeStatus);
       return;
@@ -556,7 +556,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
 
     if (result != null && result['confirmed'] == true) {
       if (!mounted) return;
-      
+
       // Afficher loader
       showDialog(
         context: context,
@@ -567,7 +567,6 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
       try {
         final acceptResult = await _bookingService.acceptBooking(
           booking.id.toString(),
-          finalPrice: result['finalPrice'],
         );
 
         if (mounted) {
@@ -786,7 +785,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   }
 }
 
-// Dialog pour accepter une réservation avec possibilité de négocier le prix
+// Dialog pour accepter une réservation
 class _AcceptBookingDialog extends StatefulWidget {
   final BookingModel booking;
 
@@ -811,7 +810,7 @@ class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
           const SizedBox(height: 16),
 
           Text(
-            'Prix: ${widget.booking.proposedPrice.toStringAsFixed(2)} CAD',
+            'Prix total: ${widget.booking.totalPrice.toStringAsFixed(2)} CAD',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
 
@@ -832,7 +831,6 @@ class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
           onPressed: () {
             Navigator.of(context).pop({
               'confirmed': true,
-              'finalPrice': widget.booking.proposedPrice,
             });
           },
           style: ElevatedButton.styleFrom(
@@ -876,7 +874,7 @@ class _RejectBookingDialogState extends State<_RejectBookingDialog> {
           children: [
             Text('Colis: ${widget.booking.packageDescription}'),
             Text('Poids: ${widget.booking.weightKg} kg'),
-            Text('Prix proposé: ${widget.booking.proposedPrice.toStringAsFixed(2)} CAD'),
+            Text('Prix proposé: ${widget.booking.totalPrice.toStringAsFixed(2)} CAD'),
 
             const SizedBox(height: 16),
 

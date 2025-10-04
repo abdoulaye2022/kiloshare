@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 // Mock data pour les transactions
 const mockTransactions = [
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
     // Essayer d'abord l'API backend
     try {
-      const backendUrl = `${BACKEND_URL}/admin/payments/transactions${queryParams ? `?${queryParams}` : ''}`;
+      const backendUrl = `${BACKEND_URL}/api/v1/admin/payments/transactions${queryParams ? `?${queryParams}` : ''}`;
       const response = await fetch(backendUrl, {
         headers: {
           'Authorization': authHeader,

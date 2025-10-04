@@ -29,7 +29,6 @@ interface ProposalData {
   tripId: number;
   packageDescription: string;
   weightKg: number;
-  proposedPrice: number;
   pickupAddress: string;
   deliveryAddress: string;
   specialInstructions?: string;
@@ -47,7 +46,6 @@ export default function TripDetailPage() {
     tripId: 0,
     packageDescription: '',
     weightKg: 0,
-    proposedPrice: 0,
     pickupAddress: '',
     deliveryAddress: '',
     specialInstructions: ''
@@ -120,7 +118,6 @@ export default function TripDetailPage() {
       tripId: trip.id,
       packageDescription: '',
       weightKg: 0,
-      proposedPrice: trip.price_per_kg * 1,
       pickupAddress: '',
       deliveryAddress: '',
       specialInstructions: ''
@@ -144,11 +141,10 @@ export default function TripDetailPage() {
           trip_id: trip.id,
           receiver_id: trip.user_id,
           package_description: proposalData.packageDescription,
-          weight_kg: proposalData.weightKg,
-          proposed_price: proposalData.proposedPrice,
+          weight: proposalData.weightKg,
           pickup_address: proposalData.pickupAddress,
           delivery_address: proposalData.deliveryAddress,
-          special_instructions: proposalData.specialInstructions
+          pickup_notes: proposalData.specialInstructions
         })
       });
 
@@ -437,29 +433,16 @@ export default function TripDetailPage() {
                   onChange={(e) => {
                     const weight = parseFloat(e.target.value);
                     setProposalData({
-                      ...proposalData, 
-                      weightKg: weight,
-                      proposedPrice: weight * trip.price_per_kg
+                      ...proposalData,
+                      weightKg: weight
                     });
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
                   required
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prix total proposé *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={proposalData.proposedPrice}
-                  onChange={(e) => setProposalData({...proposalData, proposedPrice: parseFloat(e.target.value)})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+                <p className="mt-1 text-sm text-gray-600">
+                  Prix total: {(proposalData.weightKg * trip.price_per_kg).toFixed(2)} CAD
+                </p>
               </div>
 
               <div>

@@ -24,7 +24,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   final _packageDescriptionController = TextEditingController();
   final _weightController = TextEditingController();
   final _dimensionsController = TextEditingController();
-  final _proposedPriceController = TextEditingController();
   final _pickupAddressController = TextEditingController();
   final _deliveryAddressController = TextEditingController();
   final _specialInstructionsController = TextEditingController();
@@ -45,7 +44,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     _packageDescriptionController.dispose();
     _weightController.dispose();
     _dimensionsController.dispose();
-    _proposedPriceController.dispose();
     _pickupAddressController.dispose();
     _deliveryAddressController.dispose();
     _specialInstructionsController.dispose();
@@ -307,71 +305,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildProposedPriceField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _proposedPriceController,
-          decoration: InputDecoration(
-            labelText: 'Prix proposé (CAD) *',
-            hintText: '0.00',
-            border: const OutlineInputBorder(),
-            prefixIcon: const Icon(Icons.attach_money),
-            suffixText: 'CAD',
-            helperText: widget.trip.pricePerKg > 0 
-              ? 'Prix du voyage: ${widget.trip.pricePerKg.toStringAsFixed(2)}\$/kg'
-              : null,
-          ),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}$')),
-          ],
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Prix requis';
-            }
-            final price = double.tryParse(value);
-            if (price == null || price <= 0) {
-              return 'Prix invalide';
-            }
-            if (price < 5) {
-              return 'Prix minimum: 5\$ CAD';
-            }
-            if (price > 1000) {
-              return 'Prix maximum: 1000\$ CAD';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.amber.shade50,
-            border: Border.all(color: Colors.amber.shade200),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info, color: Colors.amber.shade700, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Le transporteur peut négocier ce prix. Vous serez notifié de toute contre-proposition.',
-                  style: TextStyle(
-                    color: Colors.amber.shade800,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

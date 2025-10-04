@@ -380,12 +380,12 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             const SizedBox(height: 12),
             _buildInfoRow(
               'Prix proposé', 
-              '${_booking!.proposedPrice.toStringAsFixed(2)} CAD'
+              '${_booking!.totalPrice.toStringAsFixed(2)} CAD'
             ),
-            if (_booking!.finalPrice != null && _booking!.finalPrice != _booking!.proposedPrice)
+            if (_booking!.totalPrice != null && _booking!.totalPrice != _booking!.totalPrice)
               _buildInfoRow(
                 'Prix final négocié', 
-                '${_booking!.finalPrice!.toStringAsFixed(2)} CAD'
+                '${_booking!.totalPrice!.toStringAsFixed(2)} CAD'
               ),
             _buildInfoRow(
               'Prix effectif', 
@@ -758,7 +758,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           ),
                         ),
                         Text(
-                          '${_booking!.finalPrice?.toStringAsFixed(2) ?? _booking!.proposedPrice.toStringAsFixed(2)} CAD',
+                          '${_booking!.totalPrice?.toStringAsFixed(2) ?? _booking!.totalPrice.toStringAsFixed(2)} CAD',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Colors.blue.shade800,
@@ -1320,18 +1320,44 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Future<void> _acceptBooking() async {
-    final result = await showDialog<Map<String, dynamic>>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => _AcceptBookingDialog(booking: _booking!),
+      builder: (context) => AlertDialog(
+        title: const Text('Accepter la réservation'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Colis: ${_booking!.packageDescription}'),
+            Text('Poids: ${_booking!.weightKg} kg'),
+            const SizedBox(height: 16),
+            Text(
+              'Prix total: ${_booking!.totalPrice.toStringAsFixed(2)} CAD',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            const Text('Voulez-vous accepter cette réservation ?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Accepter'),
+          ),
+        ],
+      ),
     );
 
-    if (result != null && result['confirmed'] == true) {
+    if (confirmed == true) {
       _showLoader();
 
       try {
         final acceptResult = await _bookingService.acceptBooking(
           _booking!.id.toString(),
-          finalPrice: result['finalPrice'],
         );
 
         _hideLoader();
@@ -1499,7 +1525,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       // Initialiser la feuille de paiement
       final initResult = await stripeService.initializePaymentSheet(
         clientSecret: paymentDetails['client_secret'],
-        amount: _booking!.finalPrice?.toDouble() ?? _booking!.proposedPrice,
+        amount: _booking!.totalPrice,
         currency: 'CAD',
         customerEmail: null, // Pourrait être récupéré du profil utilisateur
       );
@@ -1534,126 +1560,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
-}
-
-// Dialog pour accepter une réservation
-class _AcceptBookingDialog extends StatefulWidget {
-  final BookingModel booking;
-
-  const _AcceptBookingDialog({required this.booking});
-
-  @override
-  State<_AcceptBookingDialog> createState() => _AcceptBookingDialogState();
-}
-
-class _AcceptBookingDialogState extends State<_AcceptBookingDialog> {
-  final _priceController = TextEditingController();
-  bool _useOriginalPrice = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _priceController.text = widget.booking.proposedPrice.toStringAsFixed(2);
-  }
-
-  @override
-  void dispose() {
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Accepter la réservation'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Colis: ${widget.booking.packageDescription}'),
-              Text('Poids: ${widget.booking.weightKg} kg'),
-              const SizedBox(height: 16),
-              
-              Text(
-                'Prix proposé: ${widget.booking.proposedPrice.toStringAsFixed(2)} CAD',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              CheckboxListTile(
-                title: const Text('Accepter le prix proposé'),
-                value: _useOriginalPrice,
-                onChanged: (value) {
-                  setState(() {
-                    _useOriginalPrice = value ?? true;
-                    if (_useOriginalPrice) {
-                      _priceController.text = widget.booking.proposedPrice.toStringAsFixed(2);
-                    }
-                  });
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
-              
-              if (!_useOriginalPrice) ...[
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Votre prix (CAD)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.attach_money),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}$')),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final finalPrice = _useOriginalPrice 
-                ? null 
-                : double.tryParse(_priceController.text);
-                
-            if (!_useOriginalPrice && (finalPrice == null || finalPrice <= 0)) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Veuillez entrer un prix valide'),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  margin: EdgeInsets.only(bottom: 20, left: 16, right: 16),
-                ),
-              );
-              return;
-            }
-            
-            Navigator.of(context).pop({
-              'confirmed': true,
-              'finalPrice': finalPrice,
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Accepter'),
-        ),
-      ],
-    );
-  }
 }
 
 

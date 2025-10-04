@@ -919,7 +919,7 @@ class StripeController
                 $booking->receiver_id,
                 'payment_received',
                 [
-                    'amount' => $booking->final_price,
+                    'amount' => $booking->total_price,
                     'sender_name' => $booking->sender->first_name . ' ' . $booking->sender->last_name
                 ]
             );
@@ -934,7 +934,7 @@ class StripeController
                 $booking->sender_id,
                 'payment_confirmed',
                 [
-                    'amount' => $booking->final_price,
+                    'amount' => $booking->total_price,
                     'pickup_code' => $pickupCode
                 ]
             );

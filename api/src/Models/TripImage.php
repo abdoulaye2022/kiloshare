@@ -42,9 +42,17 @@ class TripImage extends Model
 
     protected $dates = ['deleted_at'];
 
+    protected $appends = ['image_url'];
+
     public function trip(): BelongsTo
     {
         return $this->belongsTo(Trip::class);
+    }
+
+    // Accesseur pour compatibilité avec l'ancien nom de champ
+    public function getImageUrlAttribute(): string
+    {
+        return $this->url;
     }
 
     public function scopePrimary($query)
