@@ -95,12 +95,12 @@ class Validator
 
     public static function date(): V
     {
-        return V::date('Y-m-d');
+        return V::date();
     }
 
     public static function datetime(): V
     {
-        return V::date('Y-m-d H:i:s');
+        return V::date();
     }
 
     public static function in(array $values): V
