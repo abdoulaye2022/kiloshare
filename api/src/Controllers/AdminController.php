@@ -9,6 +9,8 @@ use KiloShare\Models\Trip;
 use KiloShare\Models\Booking;
 use KiloShare\Models\Transaction;
 use KiloShare\Models\UserStripeAccount;
+use KiloShare\Models\DeliveryCode;
+use KiloShare\Models\PaymentAuthorization;
 use KiloShare\Utils\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -1586,6 +1588,205 @@ class AdminController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to force transfer: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Transfer funds to transporter after delivery confirmation
+     */
+    public function transferFundsAfterDelivery(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        if (!$user->hasRole('admin')) {
+            return Response::forbidden('Admin access required');
+        }
+
+        $bookingId = $request->getAttribute('id');
+
+        try {
+            // Récupérer la réservation avec toutes les relations
+            $booking = Booking::with(['trip.user', 'paymentAuthorization', 'deliveryCode'])
+                ->find($bookingId);
+
+            if (!$booking) {
+                return Response::notFound('Booking not found');
+            }
+
+            // Vérifier que la livraison a été confirmée
+            if ($booking->status !== Booking::STATUS_DELIVERED) {
+                return Response::badRequest('Booking must be delivered before transferring funds', [
+                    'current_status' => $booking->status
+                ]);
+            }
+
+            // Vérifier que le code de livraison a été validé
+            if (!$booking->deliveryCode || $booking->deliveryCode->status !== DeliveryCode::STATUS_USED) {
+                return Response::badRequest('Delivery code must be validated before transferring funds');
+            }
+
+            // Vérifier qu'une autorisation de paiement existe et a été capturée
+            if (!$booking->paymentAuthorization || !$booking->paymentAuthorization->isCaptured()) {
+                return Response::badRequest('Payment must be captured before transferring funds');
+            }
+
+            // Récupérer le transporteur
+            $transporter = $booking->trip->user;
+
+            // Vérifier que le transporteur a un compte Stripe connecté
+            $stripeAccount = UserStripeAccount::where('user_id', $transporter->id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$stripeAccount) {
+                return Response::badRequest('Transporter does not have an active Stripe account');
+            }
+
+            // Calculer le montant à transférer (montant total - commission 15%)
+            $totalAmount = $booking->total_price;
+            $commissionRate = $booking->commission_rate ?? 15;
+            $commission = $totalAmount * ($commissionRate / 100);
+            $transferAmount = $totalAmount - $commission;
+
+            // Convertir en centimes pour Stripe
+            $transferAmountCents = (int) round($transferAmount * 100);
+
+            // Initialiser Stripe
+            \Stripe\Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
+
+            // Créer le transfert Stripe vers le compte connecté
+            $stripeTransfer = \Stripe\Transfer::create([
+                'amount' => $transferAmountCents,
+                'currency' => strtolower($booking->paymentAuthorization->currency ?? 'CAD'),
+                'destination' => $stripeAccount->stripe_account_id,
+                'description' => "Delivery payment for booking #{$booking->id} - {$booking->trip->departure_city} to {$booking->trip->arrival_city}",
+                'metadata' => [
+                    'booking_id' => $booking->id,
+                    'trip_id' => $booking->trip->id,
+                    'transporter_user_id' => $transporter->id,
+                    'sender_user_id' => $booking->sender_id,
+                    'total_amount' => number_format($totalAmount, 2),
+                    'commission_amount' => number_format($commission, 2),
+                    'transfer_amount' => number_format($transferAmount, 2),
+                    'delivery_confirmed_at' => $booking->delivery_date?->toISOString(),
+                    'platform' => 'kiloshare'
+                ]
+            ]);
+
+            // Mettre à jour la réservation avec les infos de transfert
+            $booking->update([
+                'transfer_status' => 'completed',
+                'stripe_transfer_id' => $stripeTransfer->id,
+                'transferred_at' => Carbon::now()
+            ]);
+
+            // Logger l'événement
+            error_log("Funds transferred to transporter #{$transporter->id} for booking #{$booking->id}: CAD " . number_format($transferAmount, 2));
+
+            return Response::success([
+                'transfer' => [
+                    'id' => $stripeTransfer->id,
+                    'amount' => $transferAmount,
+                    'currency' => $booking->paymentAuthorization->currency ?? 'CAD',
+                    'destination_account' => $stripeAccount->stripe_account_id,
+                    'status' => $stripeTransfer->status ?? 'completed',
+                    'created_at' => Carbon::now()->toISOString(),
+                ],
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'transfer_status' => 'completed',
+                    'delivered_at' => $booking->delivery_date?->toISOString(),
+                ],
+                'commission' => [
+                    'rate' => $commissionRate . '%',
+                    'amount' => $commission,
+                ],
+                'message' => 'Funds successfully transferred to transporter'
+            ]);
+
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return Response::serverError('Stripe transfer failed: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to transfer funds: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get bookings ready for fund transfer (delivered and validated)
+     */
+    public function getBookingsReadyForTransfer(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        if (!$user->hasRole('admin')) {
+            return Response::forbidden('Admin access required');
+        }
+
+        try {
+            // Récupérer les réservations livrées avec code validé et sans transfert
+            $bookings = Booking::with(['trip.user', 'sender', 'deliveryCode', 'paymentAuthorization'])
+                ->where('status', Booking::STATUS_DELIVERED)
+                ->get()
+                ->filter(function ($booking) {
+                    // Vérifier que le code de livraison est validé
+                    if (!$booking->deliveryCode || $booking->deliveryCode->status !== DeliveryCode::STATUS_USED) {
+                        return false;
+                    }
+
+                    // Vérifier que le paiement est capturé
+                    if (!$booking->paymentAuthorization || $booking->paymentAuthorization->status !== PaymentAuthorization::STATUS_CAPTURED) {
+                        return false;
+                    }
+
+                    // Vérifier que le transfert n'est pas déjà fait
+                    if (isset($booking->transfer_status) && $booking->transfer_status === 'completed') {
+                        return false;
+                    }
+
+                    return true;
+                });
+
+            $readyForTransfer = $bookings->map(function ($booking) {
+                $totalAmount = $booking->total_price;
+                $commissionRate = $booking->commission_rate ?? 15;
+                $commission = $totalAmount * ($commissionRate / 100);
+                $transferAmount = $totalAmount - $commission;
+
+                return [
+                    'booking_id' => $booking->id,
+                    'booking_uuid' => $booking->uuid,
+                    'trip_id' => $booking->trip->id,
+                    'trip_route' => $booking->trip->departure_city . ' → ' . $booking->trip->arrival_city,
+                    'transporter' => [
+                        'id' => $booking->trip->user->id,
+                        'name' => $booking->trip->user->first_name . ' ' . $booking->trip->user->last_name,
+                        'email' => $booking->trip->user->email,
+                    ],
+                    'sender' => [
+                        'id' => $booking->sender->id,
+                        'name' => $booking->sender->first_name . ' ' . $booking->sender->last_name,
+                        'email' => $booking->sender->email,
+                    ],
+                    'delivery_confirmed_at' => $booking->delivery_date?->toISOString(),
+                    'delivery_code_validated' => $booking->deliveryCode?->status === DeliveryCode::STATUS_USED,
+                    'payment_status' => $booking->paymentAuthorization?->status,
+                    'amounts' => [
+                        'total' => $totalAmount,
+                        'commission' => $commission,
+                        'transfer' => $transferAmount,
+                        'currency' => $booking->paymentAuthorization?->currency ?? 'CAD',
+                    ],
+                ];
+            });
+
+            return Response::success([
+                'bookings' => $readyForTransfer,
+                'total_count' => $readyForTransfer->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to get bookings: ' . $e->getMessage());
         }
     }
 

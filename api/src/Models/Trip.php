@@ -68,6 +68,11 @@ class Trip extends Model
         'deleted_at',
     ];
 
+    protected $appends = [
+        'booked_weight',
+        'remaining_weight',
+    ];
+
     // Statuts possibles
     const STATUS_DRAFT = 'draft';
     const STATUS_PENDING_APPROVAL = 'pending_review';
@@ -179,6 +184,27 @@ class Trip extends Model
             // Si erreur SQL, retourner available_weight_kg par défaut
             return (float)($this->available_weight_kg ?? 0);
         }
+    }
+
+    // Accesseurs pour le poids
+    public function getBookedWeightAttribute(): float
+    {
+        return (float) $this->bookings()
+            ->whereIn('status', [
+                Booking::STATUS_ACCEPTED,
+                Booking::STATUS_PAYMENT_AUTHORIZED,
+                Booking::STATUS_PAYMENT_CONFIRMED,
+                Booking::STATUS_PAID,
+                Booking::STATUS_IN_TRANSIT,
+                Booking::STATUS_DELIVERED,
+                Booking::STATUS_COMPLETED
+            ])
+            ->sum('weight_kg');
+    }
+
+    public function getRemainingWeightAttribute(): float
+    {
+        return max(0, $this->available_weight_kg - $this->booked_weight);
     }
 
     // Méthodes utilitaires

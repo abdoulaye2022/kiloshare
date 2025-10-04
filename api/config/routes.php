@@ -209,6 +209,12 @@ return function (App $app) {
                     ->add(new AuthMiddleware());
                 $adminGroup->post('/payments/transfers/{id}/force', [AdminController::class, 'forceTransfer'])
                     ->add(new AuthMiddleware());
+
+                // Delivery-based fund transfers
+                $adminGroup->get('/bookings/ready-for-transfer', [AdminController::class, 'getBookingsReadyForTransfer'])
+                    ->add(new AuthMiddleware());
+                $adminGroup->post('/bookings/{id}/transfer-funds', [AdminController::class, 'transferFundsAfterDelivery'])
+                    ->add(new AuthMiddleware());
             });
 
             // Public trips (no auth required) - Routes statiques d'abord

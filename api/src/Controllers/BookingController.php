@@ -85,11 +85,32 @@ class BookingController
                 'pickup_address' => $data['pickup_address'] ?? '',
                 'delivery_address' => $data['delivery_address'] ?? '',
                 'special_instructions' => ($data['pickup_notes'] ?? '') . ' ' . ($data['delivery_notes'] ?? ''),
-                'pickup_date' => isset($data['requested_pickup_date']) 
+                'pickup_date' => isset($data['requested_pickup_date'])
                     ? Carbon::parse($data['requested_pickup_date']) : null,
-                'delivery_date' => isset($data['requested_delivery_date']) 
+                'delivery_date' => isset($data['requested_delivery_date'])
                     ? Carbon::parse($data['requested_delivery_date']) : null,
             ]);
+
+            // Créer immédiatement la pré-autorisation de paiement (workflow Airbnb/Uber)
+            try {
+                $authorization = $this->paymentAuthService->createAuthorization($booking, $user);
+
+                // Le statut passe automatiquement à PAYMENT_AUTHORIZED
+                $booking->refresh();
+
+            } catch (\Exception $authError) {
+                // Si l'autorisation échoue, annuler la réservation
+                $booking->delete();
+
+                return Response::error(
+                    'Impossible de créer l\'autorisation de paiement: ' . $authError->getMessage(),
+                    [
+                        'error_code' => 'payment_authorization_failed',
+                        'details' => $authError->getMessage()
+                    ],
+                    400
+                );
+            }
 
             // Envoyer notification au propriétaire du voyage (receiver)
             $this->notificationService->send(
@@ -117,6 +138,12 @@ class BookingController
                 ]
             );
 
+            // Récupérer le client_secret pour le paiement
+            $clientSecret = null;
+            if ($authorization) {
+                $clientSecret = $this->paymentAuthService->getClientSecret($authorization);
+            }
+
             return Response::created([
                 'booking' => [
                     'id' => $booking->id,
@@ -124,9 +151,16 @@ class BookingController
                     'status' => $booking->status,
                     'weight_kg' => $booking->weight_kg,
                     'total_price' => $booking->total_price,
+                    'payment_authorization_id' => $booking->payment_authorization_id,
                     'created_at' => $booking->created_at,
+                ],
+                'payment' => [
+                    'client_secret' => $clientSecret,
+                    'amount' => $booking->total_price,
+                    'currency' => 'CAD',
+                    'requires_payment_method' => !empty($clientSecret),
                 ]
-            ], 'Demande de réservation créée avec succès');
+            ], 'Demande de réservation créée avec succès. Veuillez compléter le paiement.');
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to create booking request: ' . $e->getMessage());
@@ -351,50 +385,55 @@ class BookingController
                 );
             }
 
-            // Accepter la réservation et passer au statut payment_authorized
+            // Vérifier qu'une autorisation de paiement existe déjà
+            if (!$booking->payment_authorization_id) {
+                return Response::error(
+                    'Aucune autorisation de paiement trouvée. L\'expéditeur doit d\'abord autoriser le paiement.',
+                    ['error_code' => 'no_payment_authorization'],
+                    400
+                );
+            }
+
+            $authorization = PaymentAuthorization::find($booking->payment_authorization_id);
+            if (!$authorization) {
+                return Response::error('Autorisation de paiement invalide', [], 400);
+            }
+
+            // Accepter la réservation
             $booking->accept();
 
-            // Créer l'autorisation de paiement avec capture différée
+            // NOUVEAU WORKFLOW: Capturer automatiquement le paiement
             try {
-                $sender = User::find($booking->sender_id);
-                if (!$sender) {
-                    throw new \Exception('Expéditeur non trouvé');
-                }
+                // Capturer le paiement immédiatement (workflow Airbnb/Uber)
+                $this->paymentAuthService->capturePayment(
+                    $authorization,
+                    PaymentAuthorization::CAPTURE_REASON_BOOKING_ACCEPTED
+                );
 
-                $authorization = $this->paymentAuthService->createAuthorization($booking, $sender);
-
-                // Recharger le booking pour avoir les valeurs mises à jour
+                // Recharger le booking pour avoir le statut mis à jour (devrait être PAID)
                 $booking->refresh();
-            } catch (\Exception $e) {
-                // Annuler l'acceptation si l'autorisation échoue
-                $booking->update(['status' => Booking::STATUS_PENDING]);
+
+            } catch (\Exception $captureError) {
+                // Si la capture échoue, annuler l'acceptation
+                $booking->update(['status' => Booking::STATUS_PAYMENT_AUTHORIZED]);
 
                 return Response::error(
-                    'Erreur lors de la création de l\'autorisation de paiement: ' . $e->getMessage(),
-                    [],
+                    'Erreur lors de la capture du paiement: ' . $captureError->getMessage(),
+                    ['error_code' => 'payment_capture_failed'],
                     500
                 );
             }
 
-            // Envoyer notification au sender avec instructions de confirmation
+            // Envoyer notification au sender que la réservation est confirmée et payée
             $this->notificationService->send(
                 $booking->sender_id,
-                'booking_accepted_payment_pending',
+                'booking_accepted_and_paid',
                 [
                     'trip_title' => $booking->trip->title ?? 'Votre voyage',
                     'total_amount' => $booking->total_price,
-                    'confirmation_deadline' => '4 heures'
+                    'transporter_name' => $user->first_name . ' ' . $user->last_name
                 ]
             );
-
-            // Récupérer le client_secret pour l'app mobile
-            $clientSecret = null;
-            if ($booking->payment_authorization_id) {
-                $authorization = PaymentAuthorization::find($booking->payment_authorization_id);
-                if ($authorization) {
-                    $clientSecret = $this->paymentAuthService->getClientSecret($authorization);
-                }
-            }
 
             return Response::success([
                 'booking' => [
@@ -403,14 +442,8 @@ class BookingController
                     'total_price' => $booking->total_price,
                     'payment_authorization_id' => $booking->payment_authorization_id,
                     'updated_at' => $booking->updated_at,
-                ],
-                'payment' => [
-                    'client_secret' => $clientSecret,
-                    'amount' => $booking->total_price,
-                    'currency' => 'CAD',
-                    'requires_payment_method' => !empty($clientSecret),
                 ]
-            ], 'Réservation acceptée avec succès. Autorisation de paiement créée.');
+            ], 'Réservation acceptée et paiement capturé avec succès.');
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to accept booking: ' . $e->getMessage());
@@ -838,8 +871,22 @@ class BookingController
         }
     }
 
+    /**
+     * @deprecated Cette méthode n'est plus nécessaire avec le nouveau workflow
+     * Le paiement est maintenant capturé automatiquement lors de l'acceptation
+     */
     public function confirmPayment(ServerRequestInterface $request): ResponseInterface
     {
+        return Response::error(
+            'Cette fonctionnalité est obsolète. Le paiement est désormais capturé automatiquement lorsque le transporteur accepte la réservation.',
+            [
+                'error_code' => 'deprecated_endpoint',
+                'message' => 'Le workflow de paiement a été simplifié. L\'expéditeur autorise le paiement lors de la création de la réservation, et le transporteur le capture en acceptant.'
+            ],
+            410 // HTTP 410 Gone
+        );
+
+        // Ancien code conservé pour référence mais inaccessible
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
 

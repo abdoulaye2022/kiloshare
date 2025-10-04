@@ -14,7 +14,8 @@ import {
   Shield,
   MessageSquare,
   MapPin,
-  X
+  X,
+  ArrowRightLeft
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -79,6 +80,12 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           href: '/admin/stripe-accounts',
           icon: Shield,
           active: isActive('/admin/stripe-accounts')
+        },
+        {
+          label: 'Transferts de fonds',
+          href: '/admin/fund-transfers',
+          icon: ArrowRightLeft,
+          active: isActive('/admin/fund-transfers')
         }
       ]
     },

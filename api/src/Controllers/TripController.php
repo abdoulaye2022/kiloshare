@@ -39,12 +39,9 @@ class TripController
 
             return Response::success([
                 'trips' => $trips->map(function ($trip) {
-                    // Calculer l'espace déjà réservé pour chaque voyage
-                    $totalBookedWeight = $trip->bookings()
-                        ->whereIn('status', ['accepted', 'paid', 'in_transit', 'delivered', 'completed'])
-                        ->sum('weight_kg') ?? 0;
-                    
-                    $totalCapacityKg = ($trip->available_weight_kg ?? 0) + $totalBookedWeight;
+                    // Utiliser les accesseurs du modèle
+                    $totalBookedWeight = $trip->booked_weight;
+                    $totalCapacityKg = ($trip->available_weight_kg ?? 0);
                     
                     return [
                         'id' => $trip->id,
@@ -1368,12 +1365,9 @@ class TripController
             }
 
             // Calculer l'espace déjà réservé
-            $totalBookedWeight = $trip->bookings()
-                ->whereIn('status', ['accepted', 'paid', 'in_transit', 'delivered', 'completed'])
-                ->sum('weight_kg') ?? 0;
-            
-            // Calculer la capacité totale originale
-            $totalCapacityKg = ($trip->available_weight_kg ?? 0) + $totalBookedWeight;
+            // Utiliser les accesseurs du modèle
+            $totalBookedWeight = $trip->booked_weight;
+            $totalCapacityKg = ($trip->available_weight_kg ?? 0);
 
             $tripData = [
                 'id' => (int) $trip->id,
@@ -1392,7 +1386,7 @@ class TripController
                 'currency' => (string) ($trip->currency ?? 'EUR'),
                 'status' => (string) ($trip->status ?? 'draft'),
                 'transport_type' => (string) ($trip->transport_type ?? 'flight'),
-                'remaining_weight' => (float) ($trip->available_weight_kg ?? 0),
+                'remaining_weight' => (float) $trip->remaining_weight,
                 // Nouvelles informations sur la capacité
                 'total_capacity_kg' => (float) $totalCapacityKg,
                 'booked_weight_kg' => (float) $totalBookedWeight,
@@ -1445,12 +1439,9 @@ class TripController
             error_log("TripController::getUserTrip - Trip images: " . json_encode($trip->images->toArray()));
             
             // Calculer l'espace déjà réservé
-            $totalBookedWeight = $trip->bookings()
-                ->whereIn('status', ['accepted', 'paid', 'in_transit', 'delivered', 'completed'])
-                ->sum('weight_kg') ?? 0;
-            
-            // Calculer la capacité totale originale
-            $totalCapacityKg = ($trip->available_weight_kg ?? 0) + $totalBookedWeight;
+            // Utiliser les accesseurs du modèle
+            $totalBookedWeight = $trip->booked_weight;
+            $totalCapacityKg = ($trip->available_weight_kg ?? 0);
             
             return Response::success([
                 'trip' => [
@@ -1505,6 +1496,8 @@ class TripController
                     'bookings_count' => $trip->bookings->count(),
                     'can_book' => false, // User's own trip, cannot book
                     'is_owner' => true,
+                    'view_count' => (int) ($trip->view_count ?? 0),
+                    'booking_count' => $trip->bookings->count(),
                 ]
             ]);
         } catch (\Exception $e) {

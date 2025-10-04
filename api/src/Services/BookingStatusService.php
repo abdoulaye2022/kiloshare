@@ -8,6 +8,7 @@ use KiloShare\Models\Booking;
 use KiloShare\Models\PaymentAuthorization;
 use KiloShare\Models\User;
 use KiloShare\Models\PaymentEventLog;
+use KiloShare\Models\DeliveryCode;
 
 class BookingStatusService
 {
@@ -23,7 +24,7 @@ class BookingStatusService
     }
 
     /**
-     * Accepter une réservation
+     * Accepter une réservation et capturer le paiement (nouveau workflow Airbnb/Uber)
      */
     public function acceptBooking(Booking $booking, User $transporter): array
     {
@@ -35,18 +36,31 @@ class BookingStatusService
             throw new \Exception('Seul le propriétaire du voyage peut accepter cette réservation');
         }
 
-        // Mettre à jour la réservation
+        // Vérifier qu'une autorisation existe déjà (créée lors de la demande)
+        if (!$booking->paymentAuthorization) {
+            throw new \Exception('Aucune autorisation de paiement trouvée pour cette réservation');
+        }
+
+        // Accepter la réservation
         $booking->accept();
 
-        // Créer l'autorisation de paiement automatiquement
-        $sender = $booking->sender;
-        $authorization = $this->paymentService->createAuthorization($booking, $sender);
+        // Capturer automatiquement le paiement (workflow Airbnb/Uber)
+        $this->paymentService->capturePayment(
+            $booking->paymentAuthorization,
+            PaymentAuthorization::CAPTURE_REASON_BOOKING_ACCEPTED
+        );
+
+        // Générer et envoyer le code de livraison à l'expéditeur
+        $deliveryCode = DeliveryCode::generateForBooking($booking);
+
+        // Envoyer le code par notification
+        $this->notificationService->sendDeliveryCodeNotification($booking, $deliveryCode);
 
         return [
             'success' => true,
             'booking' => $booking->fresh(),
-            'payment_authorization' => $authorization,
-            'message' => 'Réservation acceptée avec succès. Une autorisation de paiement a été créée.',
+            'delivery_code_sent' => true,
+            'message' => 'Réservation acceptée et paiement capturé avec succès. Code de livraison envoyé à l\'expéditeur.',
         ];
     }
 
@@ -81,30 +95,12 @@ class BookingStatusService
     }
 
     /**
-     * Confirmer un paiement par l'expéditeur
+     * @deprecated Cette méthode n'est plus nécessaire avec le nouveau workflow
+     * Le paiement est capturé automatiquement lors de l'acceptation
      */
     public function confirmPayment(Booking $booking, User $sender): array
     {
-        if (!$booking->canBePaymentConfirmed()) {
-            throw new \Exception('Le paiement de cette réservation ne peut plus être confirmé');
-        }
-
-        if ($booking->sender_id !== $sender->id) {
-            throw new \Exception('Seul l\'expéditeur peut confirmer le paiement');
-        }
-
-        if (!$booking->paymentAuthorization) {
-            throw new \Exception('Aucune autorisation de paiement trouvée pour cette réservation');
-        }
-
-        // Confirmer le paiement via le service
-        $this->paymentService->confirmAuthorization($booking->paymentAuthorization, $sender);
-
-        return [
-            'success' => true,
-            'booking' => $booking->fresh(),
-            'message' => 'Paiement confirmé avec succès',
-        ];
+        throw new \Exception('Cette fonctionnalité est obsolète. Le paiement est désormais capturé automatiquement lors de l\'acceptation par le transporteur.');
     }
 
     /**
@@ -298,19 +294,19 @@ class BookingStatusService
                 break;
 
             case Booking::STATUS_PAYMENT_AUTHORIZED:
-                if ($isSender) {
-                    $actions[] = 'confirm_payment';
-                    $actions[] = 'cancel_payment';
-                }
+                // Dans le nouveau workflow, l'expéditeur a déjà autorisé le paiement
+                // Seul le transporteur peut accepter (et capturer) ou annuler
                 if ($isTransporter) {
+                    $actions[] = 'accept'; // Ceci va capturer le paiement automatiquement
+                }
+                if ($isSender || $isTransporter) {
                     $actions[] = 'cancel';
                 }
                 break;
 
             case Booking::STATUS_PAYMENT_CONFIRMED:
-                if ($isTransporter) {
-                    $actions[] = 'capture_payment'; // Action manuelle si nécessaire
-                }
+                // Ce statut ne devrait plus être utilisé dans le nouveau workflow
+                // Mais on le garde pour compatibilité
                 if ($isSender || $isTransporter) {
                     $actions[] = 'cancel';
                 }
