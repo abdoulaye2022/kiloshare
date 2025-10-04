@@ -188,14 +188,12 @@ CREATE TABLE `bookings` (
   `id` int NOT NULL AUTO_INCREMENT,
   `uuid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `trip_id` int NOT NULL,
-  `booking_negotiation_id` int DEFAULT NULL,
   `sender_id` int NOT NULL,
   `receiver_id` int NOT NULL,
   `package_description` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `weight_kg` decimal(5,2) NOT NULL,
+  `total_price` decimal(8,2) NOT NULL,
   `dimensions_cm` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `proposed_price` decimal(8,2) NOT NULL,
-  `final_price` decimal(8,2) DEFAULT NULL,
   `payment_authorization_id` bigint unsigned DEFAULT NULL,
   `payment_authorized_at` timestamp NULL DEFAULT NULL,
   `payment_confirmed_at` timestamp NULL DEFAULT NULL,
@@ -223,7 +221,6 @@ CREATE TABLE `bookings` (
   KEY `idx_booking_status` (`status`),
   KEY `idx_booking_dates` (`pickup_date`,`delivery_date`),
   KEY `idx_bookings_created_at` (`created_at`),
-  KEY `booking_negotiation_id` (`booking_negotiation_id`),
   KEY `idx_bookings_rejection_reason` (`rejection_reason`(255)),
   KEY `idx_payment_authorization` (`payment_authorization_id`),
   KEY `idx_booking_status_timestamps` (`status`,`payment_confirmed_at`,`payment_captured_at`),
@@ -232,27 +229,8 @@ CREATE TABLE `bookings` (
   CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `bookings_ibfk_3` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_booking_payment_authorization` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table principale des réservations de transport de colis';
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table principale des réservations de transport de colis';
 /*!40101 SET character_set_client = @saved_cs_client */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `tr_bookings_calculate_commission` BEFORE UPDATE ON `bookings` FOR EACH ROW BEGIN
-    IF NEW.final_price IS NOT NULL AND NEW.final_price > 0 THEN
-        SET NEW.commission_amount = NEW.final_price * (NEW.commission_rate / 100);
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `cancellation_attempts`
@@ -380,7 +358,7 @@ CREATE TABLE `conversation_participants` (
   KEY `idx_conversation_user` (`conversation_id`,`user_id`),
   KEY `idx_user_active` (`user_id`,`is_active`),
   CONSTRAINT `conversation_participants_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -406,7 +384,7 @@ CREATE TABLE `conversations` (
   KEY `idx_last_message` (`last_message_at`),
   KEY `idx_trip_id` (`trip_id`),
   CONSTRAINT `chk_conversation_reference` CHECK (((`booking_id` is not null) or (`trip_id` is not null)))
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -581,7 +559,7 @@ CREATE TABLE `notification_logs` (
   KEY `notification_id` (`notification_id`),
   CONSTRAINT `notification_logs_ibfk_1` FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `notification_logs_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=170 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=177 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -659,7 +637,7 @@ CREATE TABLE `notifications` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_expires_at` (`expires_at`),
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=125 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -700,7 +678,7 @@ CREATE TABLE `payment_authorizations` (
   KEY `idx_status_auto_capture` (`status`,`auto_capture_at`),
   KEY `idx_status_expires` (`status`,`expires_at`),
   CONSTRAINT `payment_authorizations_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -762,7 +740,7 @@ CREATE TABLE `payment_events_log` (
   CONSTRAINT `payment_events_log_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `payment_events_log_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE,
   CONSTRAINT `payment_events_log_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -820,44 +798,6 @@ CREATE TABLE `reviews` (
   CONSTRAINT `reviews_chk_3` CHECK ((char_length(`comment`) <= 500))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `after_review_insert` AFTER INSERT ON `reviews` FOR EACH ROW BEGIN
-    IF NEW.is_visible = TRUE THEN
-        CALL CalculateUserRating(NEW.reviewed_id);
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `after_review_visible_update` AFTER UPDATE ON `reviews` FOR EACH ROW BEGIN
-    IF NEW.is_visible = TRUE AND OLD.is_visible = FALSE THEN
-        CALL CalculateUserRating(NEW.reviewed_id);
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `scheduled_jobs`
@@ -892,7 +832,7 @@ CREATE TABLE `scheduled_jobs` (
   KEY `idx_job_cleanup` (`status`,`created_at`),
   CONSTRAINT `scheduled_jobs_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `scheduled_jobs_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -943,7 +883,7 @@ CREATE TABLE `transactions` (
   KEY `idx_transactions_type_status` (`type`,`status`),
   CONSTRAINT `fk_transaction_payment_authorization` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Transactions financières et paiements Stripe';
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Transactions financières et paiements Stripe';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1026,7 +966,7 @@ CREATE TABLE `trip_images` (
   KEY `idx_trip_images_primary` (`is_primary`),
   KEY `idx_trip_images_order` (`order`),
   CONSTRAINT `trip_images_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1188,155 +1128,8 @@ CREATE TABLE `trips` (
   CONSTRAINT `fk_trips_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `trips_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `trips_ibfk_2` FOREIGN KEY (`original_trip_id`) REFERENCES `trips` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `generate_trip_slug` BEFORE INSERT ON `trips` FOR EACH ROW BEGIN
-    IF NEW.slug IS NULL THEN
-        SET NEW.slug = CONCAT(
-            LOWER(REPLACE(NEW.departure_city, ' ', '-')),
-            '-to-',
-            LOWER(REPLACE(NEW.arrival_city, ' ', '-')),
-            '-',
-            DATE_FORMAT(NEW.departure_date, '%Y%m%d'),
-            '-',
-            SUBSTRING(MD5(CONCAT(NEW.uuid, NOW())), 1, 6)
-        );
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `auto_expire_trips` BEFORE UPDATE ON `trips` FOR EACH ROW BEGIN
-    -- Si la date de départ est passée et statut actif sans réservation
-    IF NEW.departure_date < NOW() 
-       AND NEW.status = 'active' 
-       AND NEW.booking_count = 0 
-       AND NEW.auto_expire = TRUE THEN
-        SET NEW.status = 'expired';
-        SET NEW.expired_at = NOW();
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_user_type_on_trip_completion` AFTER UPDATE ON `trips` FOR EACH ROW BEGIN
-    IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
-        -- Compter les voyages complétés
-        SET @completed_trips = (
-            SELECT COUNT(*)
-            FROM trips
-            WHERE user_id = NEW.user_id AND status = 'completed'
-        );
-
-        -- Calculer l'ancienneté du compte en mois
-        SET @account_age_months = (
-            SELECT TIMESTAMPDIFF(MONTH, created_at, NOW())
-            FROM users
-            WHERE id = NEW.user_id
-        );
-
-        -- Mettre à jour le type d'utilisateur
-        UPDATE users
-        SET user_type = CASE
-            WHEN @completed_trips >= 10 AND @account_age_months >= 6 THEN 'expert'
-            WHEN @completed_trips >= 3 AND @account_age_months >= 2 THEN 'confirmed'
-            ELSE 'new'
-        END
-        WHERE id = NEW.user_id;
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `notify_favorites_on_trip_cancellation` AFTER UPDATE ON `trips` FOR EACH ROW BEGIN
-    IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' THEN
-        -- Marquer les favoris comme devant être notifiés
-        UPDATE trip_favorites
-        SET notified_on_cancellation = TRUE
-        WHERE trip_id = NEW.id AND notified_on_cancellation = FALSE;
-
-        -- Insérer les notifications pour les utilisateurs ayant mis en favoris
-        INSERT INTO cancellation_notifications (trip_id, user_id, notification_type, channel, content)
-        SELECT NEW.id, user_id, 'trip_cancelled', 'push',
-               JSON_OBJECT('message', 'Un voyage que vous avez mis en favoris a été annulé')
-        FROM trip_favorites
-        WHERE trip_id = NEW.id;
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `after_trip_cancellation` AFTER UPDATE ON `trips` FOR EACH ROW BEGIN
-    -- Si un voyage est annulé par le voyageur avec des réservations
-    IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' AND NEW.cancelled_by = 'traveler' THEN
-        -- Vérifier s'il y avait des réservations confirmées (incluant 'paid')
-        IF (SELECT COUNT(*) FROM bookings WHERE trip_id = NEW.id AND status IN ('accepted', 'in_progress', 'paid')) > 0 THEN
-            UPDATE users
-            SET
-                cancellation_count = cancellation_count + 1,
-                last_cancellation_date = NOW()
-            WHERE id = NEW.user_id;
-        END IF;
-    END IF;
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `user_fcm_tokens`
@@ -1369,7 +1162,7 @@ CREATE TABLE `user_fcm_tokens` (
   KEY `idx_user_fcm_active` (`user_id`,`is_active`),
   KEY `idx_platform_active` (`platform`,`is_active`),
   CONSTRAINT `fk_user_fcm_tokens_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1550,7 +1343,7 @@ CREATE TABLE `user_tokens` (
   KEY `idx_type` (`type`),
   KEY `idx_expires_at` (`expires_at`),
   CONSTRAINT `user_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1643,7 +1436,7 @@ CREATE TABLE `users` (
   KEY `idx_users_profile_visibility` (`profile_visibility`),
   KEY `idx_users_stripe_setup` (`stripe_setup_completed`),
   KEY `idx_users_reliability` (`reliability_score`,`user_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table des utilisateurs avec système de rôles';
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table des utilisateurs avec système de rôles';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1698,236 +1491,6 @@ CREATE TABLE `verification_codes` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping routines for database 'kiloshare'
---
-/*!50003 DROP PROCEDURE IF EXISTS `CalculateUserRating` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `CalculateUserRating`(IN target_user_id INT)
-BEGIN
-    DECLARE total_count INT DEFAULT 0;
-    DECLARE avg_rating DECIMAL(3,2) DEFAULT 0.00;
-    DECLARE traveler_count INT DEFAULT 0;
-    DECLARE traveler_rating DECIMAL(3,2) DEFAULT 0.00;
-    DECLARE sender_count INT DEFAULT 0;
-    DECLARE sender_rating DECIMAL(3,2) DEFAULT 0.00;
-    
-    -- Calcul des stats générales
-    SELECT COUNT(*), COALESCE(AVG(rating), 0)
-    INTO total_count, avg_rating
-    FROM reviews r
-    WHERE r.reviewed_id = target_user_id AND r.is_visible = TRUE;
-    
-    -- Calcul des stats en tant que voyageur (celui qui transporte)
-    SELECT COUNT(*), COALESCE(AVG(r.rating), 0)
-    INTO traveler_count, traveler_rating
-    FROM reviews r
-    JOIN bookings b ON r.booking_id = b.id
-    JOIN trips t ON b.trip_id = t.id
-    WHERE r.reviewed_id = target_user_id 
-    AND t.user_id = target_user_id -- L'utilisateur est le propriétaire du voyage
-    AND r.is_visible = TRUE;
-    
-    -- Calcul des stats en tant qu'expéditeur
-    SELECT COUNT(*), COALESCE(AVG(r.rating), 0)
-    INTO sender_count, sender_rating
-    FROM reviews r
-    JOIN bookings b ON r.booking_id = b.id
-    WHERE r.reviewed_id = target_user_id 
-    AND b.user_id = target_user_id -- L'utilisateur est celui qui a booké
-    AND r.is_visible = TRUE;
-    
-    -- Mise à jour ou insertion dans user_ratings
-    INSERT INTO user_ratings (
-        user_id, average_rating, total_reviews,
-        as_traveler_rating, as_traveler_count,
-        as_sender_rating, as_sender_count,
-        last_calculated_at
-    ) VALUES (
-        target_user_id, avg_rating, total_count,
-        traveler_rating, traveler_count,
-        sender_rating, sender_count,
-        NOW()
-    ) ON DUPLICATE KEY UPDATE
-        average_rating = avg_rating,
-        total_reviews = total_count,
-        as_traveler_rating = traveler_rating,
-        as_traveler_count = traveler_count,
-        as_sender_rating = sender_rating,
-        as_sender_count = sender_count,
-        last_calculated_at = NOW();
-        
-END ;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `CheckCloudinaryQuotas` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `CheckCloudinaryQuotas`()
-BEGIN
-    DECLARE storage_used BIGINT DEFAULT 0;
-    DECLARE bandwidth_used BIGINT DEFAULT 0;
-    DECLARE storage_percentage DECIMAL(5,2) DEFAULT 0;
-    DECLARE bandwidth_percentage DECIMAL(5,2) DEFAULT 0;
-    
-    -- Calculer l'usage actuel du stockage
-    SELECT COALESCE(SUM(file_size), 0) INTO storage_used 
-    FROM image_uploads 
-    WHERE deleted_at IS NULL;
-    
-    -- Calculer l'usage actuel de la bande passante (approximation basée sur les downloads)
-    SELECT COALESCE(SUM(file_size * download_count), 0) INTO bandwidth_used 
-    FROM image_uploads 
-    WHERE deleted_at IS NULL 
-    AND MONTH(last_accessed_at) = MONTH(NOW()) 
-    AND YEAR(last_accessed_at) = YEAR(NOW());
-    
-    -- Calculer les pourcentages
-    SET storage_percentage = (storage_used / 26843545600) * 100;
-    SET bandwidth_percentage = (bandwidth_used / 26843545600) * 100;
-    
-    -- Déclencher des alertes selon les seuils
-    IF storage_percentage >= 95 THEN
-        INSERT INTO cloudinary_alerts (alert_type, alert_level, current_storage_usage, current_bandwidth_usage, title, message, recommended_actions)
-        VALUES ('storage_critical', 'emergency', storage_used, bandwidth_used, 
-                'Quota de stockage critique (95%+)', 
-                CONCAT('Le stockage Cloudinary a atteint ', ROUND(storage_percentage, 2), '% de la limite.'),
-                '["Activer le nettoyage d\'urgence", "Supprimer les images temporaires", "Augmenter la compression"]');
-                
-    ELSEIF storage_percentage >= 85 THEN
-        INSERT INTO cloudinary_alerts (alert_type, alert_level, current_storage_usage, current_bandwidth_usage, title, message, recommended_actions)
-        VALUES ('storage_warning', 'critical', storage_used, bandwidth_used,
-                'Quota de stockage élevé (85%+)', 
-                CONCAT('Le stockage Cloudinary a atteint ', ROUND(storage_percentage, 2), '% de la limite.'),
-                '["Programmer le nettoyage", "Réviser les règles de rétention"]');
-                
-    ELSEIF storage_percentage >= 70 THEN
-        INSERT INTO cloudinary_alerts (alert_type, alert_level, current_storage_usage, current_bandwidth_usage, title, message)
-        VALUES ('storage_warning', 'warning', storage_used, bandwidth_used,
-                'Quota de stockage modéré (70%+)', 
-                CONCAT('Le stockage Cloudinary a atteint ', ROUND(storage_percentage, 2), '% de la limite.'));
-    END IF;
-    
-    -- Alertes similaires pour la bande passante
-    IF bandwidth_percentage >= 95 THEN
-        INSERT INTO cloudinary_alerts (alert_type, alert_level, current_storage_usage, current_bandwidth_usage, title, message, recommended_actions)
-        VALUES ('bandwidth_critical', 'emergency', storage_used, bandwidth_used,
-                'Quota de bande passante critique (95%+)', 
-                CONCAT('La bande passante Cloudinary a atteint ', ROUND(bandwidth_percentage, 2), '% de la limite mensuelle.'),
-                '["Réduire la qualité des images", "Implémenter plus de cache", "Optimiser les transformations"]');
-    END IF;
-    
-    -- Mettre à jour les statistiques du jour
-    INSERT INTO cloudinary_usage_stats (date, storage_used, bandwidth_used)
-    VALUES (CURDATE(), storage_used, bandwidth_used)
-    ON DUPLICATE KEY UPDATE
-        storage_used = VALUES(storage_used),
-        bandwidth_used = VALUES(bandwidth_used),
-        updated_at = NOW();
-        
-END ;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `CleanupOldNotifications` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `CleanupOldNotifications`()
-BEGIN
-    DECLARE rows_affected INT DEFAULT 0;
-    
-    -- Supprimer les notifications expirées
-    DELETE FROM notifications 
-    WHERE expires_at IS NOT NULL 
-      AND expires_at < NOW() 
-      AND deleted_at IS NULL;
-    
-    SET rows_affected = ROW_COUNT();
-    
-    -- Marquer comme supprimées les notifications lues de plus de 30 jours
-    UPDATE notifications 
-    SET deleted_at = NOW() 
-    WHERE is_read = TRUE 
-      AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
-      AND deleted_at IS NULL;
-    
-    SET rows_affected = rows_affected + ROW_COUNT();
-    
-    -- Supprimer les logs de plus de 90 jours (sauf les erreurs)
-    DELETE FROM notification_logs 
-    WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)
-      AND status != 'failed';
-    
-    SET rows_affected = rows_affected + ROW_COUNT();
-    
-    SELECT CONCAT('Cleaned up ', rows_affected, ' records') as result;
-END ;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `cleanup_expired_trips` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `cleanup_expired_trips`()
-BEGIN
-    -- Marquer comme expirées les annonces dont la date est passée
-    UPDATE trips 
-    SET status = 'expired',
-        expired_at = NOW()
-    WHERE status = 'active' 
-      AND departure_date < NOW()
-      AND booking_count = 0
-      AND auto_expire = TRUE;
-      
-    -- Archiver les annonces expirées depuis plus de 30 jours
-    UPDATE trips
-    SET archived_at = NOW()
-    WHERE status = 'expired'
-      AND expired_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
-      AND archived_at IS NULL;
-END ;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-
---
 -- Final view structure for view `active_trips_overview`
 --
 
@@ -1939,7 +1502,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `active_trips_overview` AS select `t`.`id` AS `id`,`t`.`uuid` AS `uuid`,`t`.`user_id` AS `user_id`,`t`.`departure_city` AS `departure_city`,`t`.`departure_country` AS `departure_country`,`t`.`departure_airport_code` AS `departure_airport_code`,`t`.`departure_date` AS `departure_date`,`t`.`arrival_city` AS `arrival_city`,`t`.`arrival_country` AS `arrival_country`,`t`.`arrival_airport_code` AS `arrival_airport_code`,`t`.`arrival_date` AS `arrival_date`,`t`.`available_weight_kg` AS `available_weight_kg`,`t`.`price_per_kg` AS `price_per_kg`,`t`.`currency` AS `currency`,`t`.`flight_number` AS `flight_number`,`t`.`airline` AS `airline`,`t`.`ticket_verified` AS `ticket_verified`,`t`.`ticket_verification_date` AS `ticket_verification_date`,`t`.`status` AS `status`,`t`.`view_count` AS `view_count`,`t`.`booking_count` AS `booking_count`,`t`.`description` AS `description`,`t`.`special_notes` AS `special_notes`,`t`.`created_at` AS `created_at`,`t`.`updated_at` AS `updated_at`,`t`.`published_at` AS `published_at`,`t`.`paused_at` AS `paused_at`,`t`.`cancelled_at` AS `cancelled_at`,`t`.`archived_at` AS `archived_at`,`t`.`expired_at` AS `expired_at`,`t`.`rejected_at` AS `rejected_at`,`t`.`completed_at` AS `completed_at`,`t`.`rejection_reason` AS `rejection_reason`,`t`.`rejection_details` AS `rejection_details`,`t`.`cancellation_reason` AS `cancellation_reason`,`t`.`cancellation_details` AS `cancellation_details`,`t`.`pause_reason` AS `pause_reason`,`t`.`auto_approved` AS `auto_approved`,`t`.`moderated_by` AS `moderated_by`,`t`.`moderation_notes` AS `moderation_notes`,`t`.`trust_score_at_creation` AS `trust_score_at_creation`,`t`.`requires_manual_review` AS `requires_manual_review`,`t`.`review_priority` AS `review_priority`,`t`.`share_count` AS `share_count`,`t`.`favorite_count` AS `favorite_count`,`t`.`report_count` AS `report_count`,`t`.`duplicate_count` AS `duplicate_count`,`t`.`edit_count` AS `edit_count`,`t`.`total_booked_weight` AS `total_booked_weight`,`t`.`remaining_weight` AS `remaining_weight`,`t`.`is_urgent` AS `is_urgent`,`t`.`is_featured` AS `is_featured`,`t`.`is_verified` AS `is_verified`,`t`.`auto_expire` AS `auto_expire`,`t`.`allow_partial_booking` AS `allow_partial_booking`,`t`.`instant_booking` AS `instant_booking`,`t`.`visibility` AS `visibility`,`t`.`min_user_rating` AS `min_user_rating`,`t`.`min_user_trips` AS `min_user_trips`,`t`.`blocked_users` AS `blocked_users`,`t`.`slug` AS `slug`,`t`.`meta_title` AS `meta_title`,`t`.`meta_description` AS `meta_description`,`t`.`share_token` AS `share_token`,`t`.`version` AS `version`,`t`.`last_major_edit` AS `last_major_edit`,`t`.`original_trip_id` AS `original_trip_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`profile_picture` AS `profile_picture`,timestampdiff(HOUR,now(),`t`.`departure_date`) AS `hours_until_departure`,((`t`.`total_booked_weight` / `t`.`available_weight_kg`) * 100) AS `booking_percentage` from (`trips` `t` join `users` `u` on((`t`.`user_id` = `u`.`id`))) where ((`t`.`status` = 'active') and (`t`.`departure_date` > now())) order by `t`.`departure_date` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -1957,8 +1520,8 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `booking_summary` AS select `b`.`id` AS `id`,`b`.`uuid` AS `uuid`,`b`.`status` AS `status`,`b`.`package_description` AS `package_description`,`b`.`weight_kg` AS `weight_kg`,`b`.`final_price` AS `final_price`,`b`.`commission_amount` AS `commission_amount`,`t_sender`.`email` AS `sender_email`,`t_receiver`.`email` AS `receiver_email`,`tr`.`departure_city` AS `departure_city`,`tr`.`arrival_city` AS `arrival_city`,`b`.`created_at` AS `created_at` from (((`bookings` `b` left join `users` `t_sender` on((`b`.`sender_id` = `t_sender`.`id`))) left join `users` `t_receiver` on((`b`.`receiver_id` = `t_receiver`.`id`))) left join `trips` `tr` on((`b`.`trip_id` = `tr`.`id`))) */;
+/*!50013 */
+/*!50001 VIEW `booking_summary` AS select `b`.`id` AS `id`,`b`.`uuid` AS `uuid`,`b`.`status` AS `status`,`b`.`package_description` AS `package_description`,`b`.`weight_kg` AS `weight_kg`,`b`.`total_price` AS `final_price`,`b`.`commission_amount` AS `commission_amount`,`t_sender`.`email` AS `sender_email`,`t_receiver`.`email` AS `receiver_email`,`tr`.`departure_city` AS `departure_city`,`tr`.`arrival_city` AS `arrival_city`,`b`.`created_at` AS `created_at` from (((`bookings` `b` left join `users` `t_sender` on((`b`.`sender_id` = `t_sender`.`id`))) left join `users` `t_receiver` on((`b`.`receiver_id` = `t_receiver`.`id`))) left join `trips` `tr` on((`b`.`trip_id` = `tr`.`id`))) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -1975,7 +1538,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `notification_stats_by_channel` AS select `notification_logs`.`channel` AS `channel`,cast(`notification_logs`.`sent_at` as date) AS `date`,count(0) AS `total_sent`,count((case when (`notification_logs`.`status` = 'delivered') then 1 end)) AS `delivered`,count((case when (`notification_logs`.`status` = 'opened') then 1 end)) AS `opened`,count((case when (`notification_logs`.`status` = 'failed') then 1 end)) AS `failed`,round(((count((case when (`notification_logs`.`status` = 'delivered') then 1 end)) * 100.0) / count(0)),2) AS `delivery_rate`,round(((count((case when (`notification_logs`.`status` = 'opened') then 1 end)) * 100.0) / count((case when (`notification_logs`.`status` = 'delivered') then 1 end))),2) AS `open_rate` from `notification_logs` where (`notification_logs`.`sent_at` >= (now() - interval 30 day)) group by `notification_logs`.`channel`,cast(`notification_logs`.`sent_at` as date) order by `date` desc,`notification_logs`.`channel` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -1993,7 +1556,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `trip_status_summary` AS select `trips`.`user_id` AS `user_id`,`trips`.`status` AS `status`,count(0) AS `count`,sum(`trips`.`view_count`) AS `total_views`,sum(`trips`.`booking_count`) AS `total_bookings`,avg(`trips`.`price_per_kg`) AS `avg_price` from `trips` where (`trips`.`archived_at` is null) group by `trips`.`user_id`,`trips`.`status` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -2011,7 +1574,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `user_rating_summary` AS select `ur`.`user_id` AS `user_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`ur`.`average_rating` AS `average_rating`,`ur`.`total_reviews` AS `total_reviews`,`ur`.`as_traveler_rating` AS `as_traveler_rating`,`ur`.`as_traveler_count` AS `as_traveler_count`,`ur`.`as_sender_rating` AS `as_sender_rating`,`ur`.`as_sender_count` AS `as_sender_count`,`ur`.`last_calculated_at` AS `last_calculated_at`,(case when ((`ur`.`average_rating` >= 4.5) and (`ur`.`total_reviews` >= 5)) then 'super_traveler' when ((`ur`.`average_rating` < 2.5) and (`ur`.`total_reviews` >= 3)) then 'suspended' when ((`ur`.`average_rating` < 3.0) and (`ur`.`total_reviews` >= 3)) then 'warning' else 'normal' end) AS `rating_status` from (`user_ratings` `ur` join `users` `u` on((`ur`.`user_id` = `u`.`id`))) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -2029,7 +1592,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `user_reliability_stats` AS select `u`.`id` AS `user_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`email` AS `email`,`u`.`user_type` AS `user_type`,coalesce(`ur`.`reliability_score`,100) AS `reliability_score`,count(`t`.`id`) AS `total_trips`,count((case when (`t`.`status` = 'completed') then 1 end)) AS `completed_trips`,count((case when (`t`.`status` = 'cancelled') then 1 end)) AS `cancelled_trips`,round((case when (count(`t`.`id`) > 0) then ((count((case when (`t`.`status` = 'completed') then 1 end)) / count(`t`.`id`)) * 100) else 100 end),2) AS `completion_rate`,(select count(0) from `cancellation_attempts` `ca` where ((`ca`.`user_id` = `u`.`id`) and (`ca`.`is_allowed` = true) and (`ca`.`created_at` >= (now() - interval 3 month)))) AS `recent_cancellations`,`u`.`created_at` AS `member_since` from ((`users` `u` left join `user_ratings` `ur` on((`u`.`id` = `ur`.`user_id`))) left join `trips` `t` on((`u`.`id` = `t`.`user_id`))) group by `u`.`id`,`u`.`first_name`,`u`.`last_name`,`u`.`email`,`u`.`user_type`,`ur`.`reliability_score`,`u`.`created_at` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -2047,7 +1610,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `user_unread_notifications` AS select `notifications`.`user_id` AS `user_id`,count(0) AS `unread_count`,count((case when (`notifications`.`priority` = 'critical') then 1 end)) AS `critical_count`,count((case when (`notifications`.`priority` = 'high') then 1 end)) AS `high_count`,max(`notifications`.`created_at`) AS `latest_notification` from `notifications` where ((`notifications`.`is_read` = false) and (`notifications`.`deleted_at` is null) and ((`notifications`.`expires_at` is null) or (`notifications`.`expires_at` > now()))) group by `notifications`.`user_id` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -2065,7 +1628,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 */
 /*!50001 VIEW `users_with_stripe_status` AS select `u`.`id` AS `id`,`u`.`email` AS `email`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`stripe_setup_completed` AS `stripe_setup_completed`,`u`.`stripe_onboarding_completed_at` AS `stripe_onboarding_completed_at`,`usa`.`stripe_account_id` AS `stripe_account_id`,`usa`.`status` AS `stripe_status`,`usa`.`charges_enabled` AS `charges_enabled`,`usa`.`payouts_enabled` AS `payouts_enabled`,`usa`.`details_submitted` AS `details_submitted`,(case when ((`usa`.`charges_enabled` = true) and (`usa`.`payouts_enabled` = true)) then 'ready_for_transactions' when (`usa`.`details_submitted` = true) then 'pending_verification' when (`usa`.`stripe_account_id` is not null) then 'onboarding_incomplete' else 'no_account' end) AS `transaction_readiness` from (`users` `u` left join `user_stripe_accounts` `usa` on((`u`.`id` = `usa`.`user_id`))) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -2080,4 +1643,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-09-22 16:42:25
+-- Dump completed on 2025-10-04 11:40:19
