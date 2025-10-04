@@ -63,7 +63,6 @@ export default function ConnectedAccountsManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Connected accounts API response:', data);
         // Handle nested data structure: data.data.accounts
         const accounts = data.data?.data?.accounts || data.data?.accounts || [];
         setAccounts(accounts);
@@ -83,7 +82,6 @@ export default function ConnectedAccountsManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Connected accounts stats API response:', data);
         setStats(data.data?.stats);
       }
     } catch (error) {
@@ -97,7 +95,6 @@ export default function ConnectedAccountsManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Pending transfers API response:', data);
         setPendingTransfers(data.data?.transfers || data.transfers || []);
       }
     } catch (error) {
@@ -137,7 +134,6 @@ export default function ConnectedAccountsManagement() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`Transfer ${action} successful:`, result);
         
         // Show success message
         if (action === 'approve') {

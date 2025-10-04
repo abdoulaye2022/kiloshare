@@ -86,7 +86,6 @@ export default function NotificationPreferencesManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Notification preferences stats:', data);
         setStats(data.data?.stats);
       } else {
         console.error('Failed to fetch notification preferences stats');
@@ -104,7 +103,6 @@ export default function NotificationPreferencesManagement() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('User preferences:', data);
         setSelectedUserPrefs(data.data);
         setShowUserModal(true);
       } else {

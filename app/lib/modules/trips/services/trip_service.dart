@@ -33,6 +33,43 @@ class TripService {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
+  /// Get valid token with retry logic for refresh scenarios
+  Future<String> _getTokenWithRetry({int maxRetries = 3}) async {
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      final token = await _authService.getValidAccessToken();
+
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+
+      // Si on n'a pas de token, attendre un peu avant de réessayer
+      // (au cas où un refresh est en cours)
+      if (attempt < maxRetries - 1) {
+        await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+      }
+    }
+
+    // Après tous les essais, si toujours pas de token, vérifier s'il y a une session
+    final storedToken = await _authService.getAccessToken();
+    if (storedToken != null && storedToken.isNotEmpty) {
+      // Il y a un token stocké, mais il est peut-être expiré
+      // Retourner quand même pour que l'intercepteur puisse le gérer
+      return storedToken;
+    }
+
+    throw const TripException('Authentication token is required. Please log in again.');
+  }
+
+  /// Get authorization headers with token
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await _getTokenWithRetry();
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+  }
+
   /// Format DateTime for backend (PHP expects Y-m-d H:i:s format)
   String formatDateForBackend(DateTime date) {
     // Convert to UTC and format as Y-m-d H:i:s (no microseconds, no timezone)
@@ -64,12 +101,8 @@ class TripService {
     List<Map<String, dynamic>>? images,
   }) async {
     try {
-      // Récupérer le token d'authentification
-      final token = await _authService.getValidAccessToken();
-      
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      // Récupérer le token d'authentification avec retry
+      final token = await _getTokenWithRetry();
 
       // Générer un titre automatiquement si la description est vide
       final tripTitle = (description != null && description.isNotEmpty) 
@@ -140,10 +173,7 @@ class TripService {
   /// Get user's trips
   Future<List<Trip>> getUserTrips({int page = 1, int limit = 20}) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.get('/user/trips', 
         queryParameters: {
@@ -376,10 +406,7 @@ class TripService {
   Future<Trip> updateTrip(String tripId, Map<String, dynamic> updates) async {
     try {
       
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.put('/trips/$tripId', 
         data: updates,
@@ -412,10 +439,7 @@ class TripService {
   /// Delete trip
   Future<void> deleteTrip(String tripId) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.delete('/trips/$tripId',
         options: Options(
@@ -441,10 +465,7 @@ class TripService {
     String? airline,
   }) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final data = <String, dynamic>{};
       if (flightNumber != null) data['flight_number'] = flightNumber;
@@ -535,10 +556,7 @@ class TripService {
   Future<Trip> publishTrip(String tripId) async {
     try {
       
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/publish',
         options: Options(
@@ -579,11 +597,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/pause',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -602,11 +616,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/resume',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -625,11 +635,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/cancel',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -648,11 +654,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/complete',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -669,10 +671,7 @@ class TripService {
   /// Add trip to favorites
   Future<void> addToFavorites(String tripId) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/favorite',
         options: Options(
@@ -695,10 +694,7 @@ class TripService {
   /// Remove trip from favorites
   Future<void> removeFromFavorites(String tripId) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.delete('/trips/$tripId/favorite',
         options: Options(
@@ -724,10 +720,7 @@ class TripService {
     String? description,
   }) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final data = {
         'report_type': reportType,
@@ -756,10 +749,7 @@ class TripService {
   /// Get user's drafts
   Future<List<Trip>> getDrafts({int page = 1, int limit = 20}) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.get('/user/trips',
         queryParameters: {
@@ -796,10 +786,7 @@ class TripService {
   /// Get user's favorites
   Future<List<Trip>> getFavorites({int page = 1, int limit = 20}) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.get('/trips/favorites',
         queryParameters: {
@@ -833,10 +820,7 @@ class TripService {
   /// Get trip analytics
   Future<Map<String, dynamic>> getTripAnalytics(String tripId) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.get('/trips/$tripId/analytics',
         options: Options(
@@ -861,10 +845,7 @@ class TripService {
   /// Share trip
   Future<String> shareTrip(String tripId) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/share',
         options: Options(
@@ -890,10 +871,7 @@ class TripService {
   Future<Trip> duplicateTrip(String tripId) async {
     try {
       
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/duplicate',
         options: Options(
@@ -1008,11 +986,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/submit-for-review',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1037,11 +1011,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/mark-as-booked',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1060,11 +1030,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/mark-as-expired',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1083,11 +1049,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/reactivate',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1106,11 +1068,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/start-journey',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1129,11 +1087,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/complete-delivery',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1152,11 +1106,7 @@ class TripService {
     try {
       final response = await _dio.post('/trips/$tripId/back-to-draft',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1175,11 +1125,7 @@ class TripService {
     try {
       final response = await _dio.get('/trips/$tripId/actions',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ${await _authService.getValidAccessToken()}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
@@ -1199,10 +1145,7 @@ class TripService {
     required List<Map<String, dynamic>> images,
   }) async {
     try {
-      final token = await _authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw const TripException('Authentication token is required. Please log in again.');
-      }
+      final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/cloudinary-images',
         data: {

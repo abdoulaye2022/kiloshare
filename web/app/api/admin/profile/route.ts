@@ -69,7 +69,6 @@ export async function GET(request: NextRequest) {
       });
 
     } catch (fetchError) {
-      console.log('Backend not available, using mock data:', fetchError);
       // Si le backend n'est pas disponible, renvoyer des données de test
       return NextResponse.json({
         success: true,
@@ -175,7 +174,6 @@ export async function PUT(request: NextRequest) {
       });
 
     } catch (fetchError) {
-      console.log('Backend not available for PUT, using mock response:', fetchError);
       // Si le backend n'est pas disponible, simuler le succès
       return NextResponse.json({
         success: true,

@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, AlertCircle, Smartphone } from 'lucide-react';
 
-export default function WalletPage() {
+function WalletContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -94,5 +94,23 @@ export default function WalletPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function WalletPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Chargement...</h2>
+            <p className="text-gray-600">Vérification du statut de votre configuration Stripe</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <WalletContent />
+    </Suspense>
   );
 }

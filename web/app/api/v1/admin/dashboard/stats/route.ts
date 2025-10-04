@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
+interface User {
+  id: number;
+  status: string;
+  is_verified: boolean;
+  stripe_account_id?: string;
+  stripe_account_status?: string;
+  created_at: string;
+  [key: string]: any;
+}
+
+interface Trip {
+  id: number;
+  status: string;
+  created_at: string;
+  departure_city: string;
+  arrival_city: string;
+  transport_type: string;
+  price_per_kg: number;
+  available_weight_kg?: number;
+  [key: string]: any;
+}
+
 function getAuthToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -33,7 +55,6 @@ export async function GET(request: NextRequest) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend dashboard stats received:', data);
 
         return NextResponse.json({
           success: true,
@@ -41,13 +62,10 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.log('❌ Backend dashboard stats not available, status:', response.status);
     } catch (fetchError) {
-      console.log('🚨 Backend dashboard stats fetch failed:', fetchError);
     }
 
     // Si le backend n'est pas disponible, générer des stats basées sur les données réelles
-    console.log('⚠️ Génération des statistiques basées sur les vraies données');
 
     const stats = await generateRealStats(token);
 
@@ -57,7 +75,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Dashboard stats API error:', error);
     return NextResponse.json(
       { success: false, message: 'Erreur du serveur' },
       { status: 500 }
@@ -69,7 +86,7 @@ export async function GET(request: NextRequest) {
 async function generateRealStats(token: string) {
   try {
     // Récupérer les utilisateurs pour les stats
-    let users = [];
+    let users: User[] = [];
     try {
       const usersResponse = await fetch(`http://localhost:3001/api/v1/admin/users?status=all&limit=1000`, {
         method: 'GET',
@@ -84,11 +101,10 @@ async function generateRealStats(token: string) {
         users = usersData.data?.users || [];
       }
     } catch (error) {
-      console.log('Failed to fetch users for stats:', error);
     }
 
     // Récupérer les voyages pour les stats
-    let trips = [];
+    let trips: Trip[] = [];
     try {
       const tripsResponse = await fetch(`http://localhost:3001/api/v1/admin/trips?status=all&limit=1000`, {
         method: 'GET',
@@ -103,7 +119,6 @@ async function generateRealStats(token: string) {
         trips = tripsData.data?.trips || [];
       }
     } catch (error) {
-      console.log('Failed to fetch trips for stats:', error);
     }
 
     // Calculer les statistiques réelles
@@ -217,7 +232,7 @@ async function generateRealStats(token: string) {
 }
 
 // Fonctions utilitaires pour générer les graphiques
-function generateUserGrowthChart(users) {
+function generateUserGrowthChart(users: User[]) {
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
@@ -230,7 +245,7 @@ function generateUserGrowthChart(users) {
   return last7Days;
 }
 
-function generateTripGrowthChart(trips) {
+function generateTripGrowthChart(trips: Trip[]) {
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
@@ -247,7 +262,7 @@ function generateTripGrowthChart(trips) {
   return last7Days;
 }
 
-function generateRevenueGrowthChart(weeklyRevenue) {
+function generateRevenueGrowthChart(weeklyRevenue: number) {
   const dailyAvg = weeklyRevenue / 7;
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
@@ -264,8 +279,8 @@ function generateRevenueGrowthChart(weeklyRevenue) {
   return last7Days;
 }
 
-function generatePopularRoutes(trips) {
-  const routeMap = {};
+function generatePopularRoutes(trips: Trip[]) {
+  const routeMap: Record<string, { count: number; revenue: number }> = {};
 
   trips.forEach(trip => {
     const route = `${trip.departure_city} → ${trip.arrival_city}`;
@@ -282,8 +297,8 @@ function generatePopularRoutes(trips) {
     .slice(0, 10);
 }
 
-function generateTransportDistribution(trips) {
-  const transportMap = {};
+function generateTransportDistribution(trips: Trip[]) {
+  const transportMap: Record<string, number> = {};
 
   trips.forEach(trip => {
     if (!transportMap[trip.transport_type]) {

@@ -10,7 +10,7 @@ export default function AdminAuthDebug() {
   const [storageData, setStorageData] = useState({
     localStorage: null as string | null,
     sessionStorage: null as string | null,
-    cookie: null as string | undefined
+    cookie: undefined as string | undefined
   });
   
   // Only render after hydration
@@ -40,10 +40,10 @@ export default function AdminAuthDebug() {
         <div>Store Auth: <span className={isAuthenticated ? 'text-green-400' : 'text-red-400'}>{isAuthenticated ? 'YES' : 'NO'}</span></div>
         <div>Loading: <span className={isLoading ? 'text-yellow-400' : 'text-gray-400'}>{isLoading ? 'YES' : 'NO'}</span></div>
         <div>User: {user?.email || 'None'}</div>
-        <div>Store Token: {token ? `${token.substring(0, 10)}...` : 'None'}</div>
-        <div>localStorage: {storageData.localStorage ? `${storageData.localStorage.substring(0, 10)}...` : 'None'}</div>
-        <div>sessionStorage: {storageData.sessionStorage ? `${storageData.sessionStorage.substring(0, 10)}...` : 'None'}</div>
-        <div>Cookie: {storageData.cookie ? `${storageData.cookie.substring(0, 10)}...` : 'None'}</div>
+        <div>Store Token: {token ? (token!.length > 10 ? `${token!.substring(0, 10)}...` : token) : 'None'}</div>
+        <div>localStorage: {storageData.localStorage ? `${storageData.localStorage!.substring(0, 10)}...` : 'None'}</div>
+        <div>sessionStorage: {storageData.sessionStorage ? `${storageData.sessionStorage!.substring(0, 10)}...` : 'None'}</div>
+        <div>Cookie: {storageData.cookie ? `${storageData.cookie!.substring(0, 10)}...` : 'None'}</div>
       </div>
     </div>
   );

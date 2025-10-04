@@ -202,7 +202,8 @@ export default function TripWorkflowActions({
         message: 'Pourquoi voulez-vous mettre cette annonce en pause ?',
         placeholder: 'Raison de la mise en pause (optionnel)',
         confirmText: 'Mettre en pause',
-        requiresReason: false
+        requiresReason: false,
+        hasDetails: false
       },
       cancel: {
         title: 'Annuler l\'annonce',
@@ -217,13 +218,16 @@ export default function TripWorkflowActions({
         message: 'Comment s\'est déroulé le voyage ?',
         placeholder: 'Commentaires sur le voyage (optionnel)',
         confirmText: 'Marquer comme terminé',
-        requiresReason: false
+        requiresReason: false,
+        hasDetails: false
       },
       start_progress: {
         title: 'Commencer le voyage',
         message: 'Êtes-vous prêt à commencer le voyage ?',
         confirmText: 'Commencer le voyage',
-        requiresReason: false
+        requiresReason: false,
+        placeholder: undefined,
+        hasDetails: false
       }
     };
 
@@ -231,7 +235,9 @@ export default function TripWorkflowActions({
       title: 'Confirmer l\'action',
       message: 'Êtes-vous sûr de vouloir effectuer cette action ?',
       confirmText: 'Confirmer',
-      requiresReason: false
+      requiresReason: false,
+      placeholder: undefined,
+      hasDetails: false
     };
   };
 

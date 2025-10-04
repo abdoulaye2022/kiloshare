@@ -58,7 +58,6 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Transactions API response:', data);
         const transactions = data.data?.transactions || data.transactions || [];
         setTransactions(transactions);
       } else {
@@ -77,7 +76,6 @@ export default function TransactionManagement({ adminInfo }: TransactionManageme
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Stats API response:', data);
         const stats = data.data?.stats || data.stats;
         setStats(stats);
       }

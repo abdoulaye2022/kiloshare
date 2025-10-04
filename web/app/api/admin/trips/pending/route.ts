@@ -36,8 +36,6 @@ export async function GET(request: NextRequest) {
 
     // Essayer d'abord l'API backend
     try {
-      console.log('🔍 Tentative d\'appel backend:', `${BACKEND_URL}/admin/trips/pending`);
-      console.log('🔑 Auth header:', authHeader);
       
       const response = await fetch(`${BACKEND_URL}/admin/trips/pending`, {
         method: 'GET',
@@ -47,11 +45,9 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      console.log('📡 Backend response status:', response.status);
 
       if (response.ok) {
         const backendData = await response.json();
-        console.log('✅ Backend data received:', backendData);
         return NextResponse.json({
           success: true,
           trips: backendData.trips || backendData.data || []
@@ -60,25 +56,20 @@ export async function GET(request: NextRequest) {
 
       // Lire la réponse d'erreur
       const errorText = await response.text();
-      console.error('❌ Backend error status:', response.status, 'Response:', errorText);
       
       // Si l'endpoint n'existe pas (404), utiliser les données demo
       if (response.status !== 404) {
-        console.error('Backend error details:', errorText);
       }
     } catch (error) {
-      console.error('🚨 Backend call failed completely:', error);
     }
 
     // Si on arrive ici, le backend n'est pas disponible - retourner une liste vide
-    console.log('⚠️  Backend non disponible, retour de liste vide au lieu des données de démo');
     return NextResponse.json({
       success: true,
       trips: []
     });
 
   } catch (error) {
-    console.error('Pending trips API error:', error);
     
     // En cas d'erreur, retourner une liste vide
     return NextResponse.json({

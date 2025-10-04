@@ -41,9 +41,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.log('Backend stripe accounts not available, status:', response.status);
     } catch (fetchError) {
-      console.log('Backend stripe accounts fetch failed:', fetchError);
     }
 
     // Données de démonstration pour les comptes Stripe

@@ -62,6 +62,7 @@ interface Trip {
 export default function TripManagement() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'draft' | 'pending_review' | 'published' | 'active' | 'rejected' | 'paused' | 'completed' | 'cancelled' | 'expired'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -94,7 +95,6 @@ export default function TripManagement() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Trips API response:', data);
         setTrips(data.data?.trips || data.trips || []);
       } else {
         console.error('Failed to fetch trips');

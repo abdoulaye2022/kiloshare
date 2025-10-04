@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
-  Lock, 
+import {
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Lock,
   ArrowRight,
   RefreshCw,
   Luggage,
@@ -19,7 +19,7 @@ interface ResetResult {
   error_code?: string;
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'form' | 'success' | 'error' | 'missing-token'>('loading');
   const [result, setResult] = useState<ResetResult | null>(null);
@@ -342,5 +342,37 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Luggage className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold gradient-text">KiloShare</h1>
+            </div>
+            <h2 className="text-lg text-gray-600">Réinitialisation du mot de passe</h2>
+          </div>
+
+          <div className="text-center">
+            <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Validation du lien...
+            </h2>
+            <p className="text-gray-600">
+              Nous vérifions votre lien de réinitialisation, veuillez patienter.
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

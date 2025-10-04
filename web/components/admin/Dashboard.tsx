@@ -78,7 +78,6 @@ export default function Dashboard() {
       const token = await adminAuth.getValidAccessToken();
 
       if (!token) {
-        console.error('No valid token for fetching dashboard stats');
         return;
       }
 
@@ -92,16 +91,13 @@ export default function Dashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Dashboard stats:', data);
         setStats(data.data?.stats || data.stats);
         setCharts(data.data?.charts || data.charts);
         setError(null);
       } else {
-        console.error('Failed to fetch dashboard stats:', response.status);
         setError('Erreur lors du chargement des statistiques');
       }
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
       setError('Erreur de connexion');
     } finally {
       setLoading(false);
@@ -144,11 +140,14 @@ export default function Dashboard() {
 
     const formatValue = (val: number | string) => {
       if (typeof val === 'string') return val;
+      if (val === undefined || val === null || isNaN(Number(val))) {
+        return '0';
+      }
       switch (format) {
         case 'currency':
           return formatCurrency(val);
         case 'percentage':
-          return `${val.toFixed(1)}%`;
+          return `${Number(val).toFixed(1)}%`;
         default:
           return formatNumber(val);
       }
@@ -363,6 +362,50 @@ export default function Dashboard() {
             icon="🏦"
             color="info"
             format="currency"
+          />
+        </div>
+      </div>
+
+      {/* Statistiques Stripe */}
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <h3 className="h4 fw-bold mb-3">Comptes Stripe</h3>
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Total comptes Stripe"
+            value={stats.total_stripe_accounts}
+            icon="💳"
+            color="primary"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Comptes actifs"
+            value={stats.active_stripe_accounts}
+            icon="✅"
+            color="success"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Comptes en attente"
+            value={stats.pending_stripe_accounts}
+            icon="⏳"
+            color="warning"
+          />
+        </div>
+
+        <div className="col-lg-3 col-md-6">
+          <StatCard
+            title="Taux d'adoption"
+            value={stats.stripe_onboarding_rate}
+            icon="📊"
+            color="info"
+            format="percentage"
           />
         </div>
       </div>

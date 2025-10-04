@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
     try {
       // Essayer l'API backend
       const backendUrl = `${BACKEND_URL}/api/v1/admin/users?status=${status}&limit=${limit}&include=stripe_account`;
-      console.log('🔍 Appel backend users:', backendUrl);
 
       const response = await fetch(backendUrl, {
         method: 'GET',
@@ -41,7 +40,6 @@ export async function GET(request: NextRequest) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend users data received:', data);
 
         return NextResponse.json({
           success: true,
@@ -51,13 +49,10 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.log('❌ Backend users not available, status:', response.status);
     } catch (fetchError) {
-      console.log('🚨 Backend users fetch failed:', fetchError);
     }
 
     // Si le backend n'est pas disponible, utiliser des données de démonstration
-    console.log('⚠️ Utilisation des données de démonstration pour les users');
 
     const demoUsers = generateDemoUsers(status);
 

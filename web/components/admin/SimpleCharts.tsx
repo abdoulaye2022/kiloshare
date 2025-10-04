@@ -87,15 +87,16 @@ export const PieChart = ({ data, title }: ChartProps) => {
               currentAngle += angle;
               
               return (
-                <path
-                  key={index}
-                  d={pathData}
-                  fill={color}
-                  stroke="#f3f4f6"
-                  strokeWidth="2"
-                  className="hover:opacity-80 transition-opacity cursor-pointer"
-                  title={`${item.label}: ${item.value} (${(percentage * 100).toFixed(1)}%)`}
-                />
+                <g key={index}>
+                  <title>{`${item.label}: ${item.value} (${(percentage * 100).toFixed(1)}%)`}</title>
+                  <path
+                    d={pathData}
+                    fill={color}
+                    stroke="#f3f4f6"
+                    strokeWidth="2"
+                    className="hover:opacity-80 transition-opacity cursor-pointer"
+                  />
+                </g>
               );
             })}
           </svg>
@@ -188,17 +189,18 @@ export const LineChart = ({ data, title, height = 200 }: ChartProps) => {
             const y = range > 0 ? (1 - (item.value - minValue) / range) * 100 : 50;
             
             return (
-              <circle
-                key={index}
-                cx={`${x}%`}
-                cy={`${y}%`}
-                r="4"
-                fill="#3B82F6"
-                stroke="#f3f4f6"
-                strokeWidth="2"
-                className="hover:r-6 transition-all cursor-pointer"
-                title={`${item.label}: ${item.value}`}
-              />
+              <g key={index}>
+                <title>{`${item.label}: ${item.value}`}</title>
+                <circle
+                  cx={`${x}%`}
+                  cy={`${y}%`}
+                  r="4"
+                  fill="#3B82F6"
+                  stroke="#f3f4f6"
+                  strokeWidth="2"
+                  className="hover:r-6 transition-all cursor-pointer"
+                />
+              </g>
             );
           })}
         </svg>

@@ -35,6 +35,14 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
 
+  // États pour les modales
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '', type: 'info' as 'info' | 'success' | 'error' });
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [pendingAction, setPendingAction] = useState<{ userId: number; action: 'block' | 'unblock' | 'verify' } | null>(null);
+
   useEffect(() => {
     fetchUsers();
   }, [filter]);
@@ -59,8 +67,10 @@ export default function UserManagement() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Users API response:', data);
-        setUsers(data.data?.users || []);
+        const users = data.data?.users || [];
+        console.log('🔍 Users received:', users);
+        console.log('🔍 Users with Stripe accounts:', users.filter((u: User) => u.stripe_account_id));
+        setUsers(users);
       } else {
         console.error('Failed to fetch users', response.status);
       }
@@ -71,7 +81,50 @@ export default function UserManagement() {
     }
   };
 
-  const handleUserAction = async (userId: number, action: 'block' | 'unblock' | 'verify') => {
+  // Fonctions pour les modales
+  const showAlert = (title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setModalContent({ title, message, type });
+    setAlertMessage(message);
+    setShowAlertModal(true);
+  };
+
+  const confirmAction = (userId: number, action: 'block' | 'unblock' | 'verify') => {
+    const user = users.find(u => u.id === userId);
+    const userName = user ? `${user.first_name} ${user.last_name}` : 'cet utilisateur';
+
+    let title = '';
+    let message = '';
+
+    switch (action) {
+      case 'block':
+        title = 'Bloquer l\'utilisateur';
+        message = `Êtes-vous sûr de vouloir bloquer ${userName} ? Cette action empêchera l'utilisateur d'accéder à la plateforme.`;
+        break;
+      case 'unblock':
+        title = 'Débloquer l\'utilisateur';
+        message = `Êtes-vous sûr de vouloir débloquer ${userName} ? L'utilisateur pourra à nouveau accéder à la plateforme.`;
+        break;
+      case 'verify':
+        title = 'Vérifier l\'utilisateur';
+        message = `Êtes-vous sûr de vouloir vérifier ${userName} ? Cette action marquera le compte comme vérifié.`;
+        break;
+    }
+
+    setModalContent({ title, message, type: 'info' });
+    setConfirmMessage(message);
+    setPendingAction({ userId, action });
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmedAction = async () => {
+    if (!pendingAction) return;
+
+    setShowConfirmModal(false);
+    await executeUserAction(pendingAction.userId, pendingAction.action);
+    setPendingAction(null);
+  };
+
+  const executeUserAction = async (userId: number, action: 'block' | 'unblock' | 'verify') => {
     try {
       let endpoint = '';
       let method = 'POST';
@@ -100,10 +153,10 @@ export default function UserManagement() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`User ${action} successful:`, result);
 
         // Show success message
-        alert(`Utilisateur ${action === 'block' ? 'bloqué' : action === 'unblock' ? 'débloqué' : 'vérifié'} avec succès`);
+        const successMessage = `Utilisateur ${action === 'block' ? 'bloqué' : action === 'unblock' ? 'débloqué' : 'vérifié'} avec succès`;
+        showAlert('Succès', successMessage, 'success');
 
         fetchUsers(); // Refresh the list
         if (selectedUser && selectedUser.id === userId) {
@@ -114,11 +167,11 @@ export default function UserManagement() {
       } else {
         const errorData = await response.json();
         console.error(`${action} action failed:`, errorData);
-        alert(`Erreur lors de l'action: ${errorData.message || 'Une erreur inconnue s\'est produite'}`);
+        showAlert('Erreur', `Erreur lors de l'action: ${errorData.message || 'Une erreur inconnue s\'est produite'}`, 'error');
       }
     } catch (error) {
       console.error(`Error ${action}ing user:`, error);
-      alert(`Erreur de connexion lors de l'action sur l'utilisateur`);
+      showAlert('Erreur de connexion', 'Erreur de connexion lors de l\'action sur l\'utilisateur', 'error');
     }
   };
 
@@ -347,7 +400,7 @@ export default function UserManagement() {
                             </button>
                             {!user.email_verified_at && (
                               <button
-                                onClick={() => handleUserAction(user.id, 'verify')}
+                                onClick={() => confirmAction(user.id, 'verify')}
                                 className="btn btn-outline-warning"
                                 title="Vérifier l'utilisateur"
                               >
@@ -356,7 +409,7 @@ export default function UserManagement() {
                             )}
                             {user.status === 'active' ? (
                               <button
-                                onClick={() => handleUserAction(user.id, 'block')}
+                                onClick={() => confirmAction(user.id, 'block')}
                                 className="btn btn-outline-danger"
                                 title="Bloquer l'utilisateur"
                               >
@@ -364,7 +417,7 @@ export default function UserManagement() {
                               </button>
                             ) : user.status === 'blocked' ? (
                               <button
-                                onClick={() => handleUserAction(user.id, 'unblock')}
+                                onClick={() => confirmAction(user.id, 'unblock')}
                                 className="btn btn-outline-success"
                                 title="Débloquer l'utilisateur"
                               >
@@ -487,7 +540,7 @@ export default function UserManagement() {
                 <div className="d-flex gap-2">
                   {!selectedUser.email_verified_at && (
                     <button
-                      onClick={() => handleUserAction(selectedUser.id, 'verify')}
+                      onClick={() => confirmAction(selectedUser.id, 'verify')}
                       className="btn btn-warning"
                     >
                       <i className="bi bi-patch-check me-1"></i>
@@ -496,7 +549,7 @@ export default function UserManagement() {
                   )}
                   {selectedUser.status === 'active' ? (
                     <button
-                      onClick={() => handleUserAction(selectedUser.id, 'block')}
+                      onClick={() => confirmAction(selectedUser.id, 'block')}
                       className="btn btn-danger"
                     >
                       <i className="bi bi-x-circle me-1"></i>
@@ -504,7 +557,7 @@ export default function UserManagement() {
                     </button>
                   ) : selectedUser.status === 'blocked' ? (
                     <button
-                      onClick={() => handleUserAction(selectedUser.id, 'unblock')}
+                      onClick={() => confirmAction(selectedUser.id, 'unblock')}
                       className="btn btn-success"
                     >
                       <i className="bi bi-check-circle me-1"></i>
@@ -518,6 +571,73 @@ export default function UserManagement() {
                     Fermer
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation */}
+      {showConfirmModal && (
+        <div className="modal show d-block" tabIndex={-1} style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Confirmation</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowConfirmModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>{confirmMessage}</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowConfirmModal(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleConfirmedAction}
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'alerte */}
+      {showAlertModal && (
+        <div className="modal show d-block" tabIndex={-1} style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Information</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowAlertModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>{alertMessage}</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowAlertModal(false)}
+                >
+                  OK
+                </button>
               </div>
             </div>
           </div>

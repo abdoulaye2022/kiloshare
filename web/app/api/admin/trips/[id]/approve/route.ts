@@ -4,9 +4,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/ap
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    console.log('🚀 Admin Approve API called');
     const params = await context.params;
-    console.log('🔢 Trip ID:', params?.id);
     
     const { id } = params;
     const authHeader = request.headers.get('authorization');

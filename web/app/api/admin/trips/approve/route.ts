@@ -4,14 +4,11 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080/ap
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚀 Admin Approve API called');
     
     const body = await request.json();
     const { id } = body;
     const authHeader = request.headers.get('authorization');
     
-    console.log('🔢 Trip ID:', id);
-    console.log('🔑 Auth header present:', !!authHeader);
     
     if (!authHeader) {
       return NextResponse.json(
@@ -28,7 +25,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the backend
-    console.log('🚀 Forwarding to backend:', `${BACKEND_URL}/admin/trips/${id}/approve`);
     
     const response = await fetch(`${BACKEND_URL}/admin/trips/${id}/approve`, {
       method: 'POST',

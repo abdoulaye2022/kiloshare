@@ -26,7 +26,6 @@ dependencies:
   # HTTP & API
   dio: ^5.3.4
   http: ^1.2.1
-  json_annotation: ^4.8.1
   crypto: ^3.0.3
   
   # Internationalization

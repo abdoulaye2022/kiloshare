@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
     try {
       // Essayer d'abord l'API backend
       const backendUrl = `${BACKEND_URL}/api/v1/admin/trips?status=${status}&limit=${limit}&include=${include}`;
-      console.log('🔍 Appel backend trips:', backendUrl);
 
       const response = await fetch(backendUrl, {
         method: 'GET',
@@ -42,7 +41,6 @@ export async function GET(request: NextRequest) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend trips data received:', data);
 
         // Normaliser la réponse
         return NextResponse.json({
@@ -53,13 +51,10 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.log('❌ Backend trips not available, status:', response.status);
     } catch (fetchError) {
-      console.log('🚨 Backend trips fetch failed:', fetchError);
     }
 
     // Si le backend n'est pas disponible, utiliser des données de démonstration
-    console.log('⚠️ Utilisation des données de démonstration pour les trips');
 
     const demoTrips = generateDemoTrips(status);
 
