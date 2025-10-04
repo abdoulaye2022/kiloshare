@@ -86,6 +86,9 @@ terraform.tfvars*
 
 # Fichiers de sauvegarde avec données sensibles
 *.sql
+!database/migrations/*.sql
+!api/database/migrations/*.sql
+!**/migrations/*.sql
 *.sql.gz
 *.sql.bz2
 *.sql.backup
