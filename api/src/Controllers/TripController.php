@@ -219,17 +219,34 @@ class TripController
         $data = json_decode($request->getBody()->getContents(), true);
         error_log("Parsed data: " . json_encode($data, JSON_PRETTY_PRINT));
         error_log("Data keys: " . implode(', ', array_keys($data ?? [])));
-        
+
+        // Debug dates
+        error_log("DEBUG: departure_date value = " . ($data['departure_date'] ?? 'NULL'));
+        error_log("DEBUG: arrival_date value = " . ($data['arrival_date'] ?? 'NULL'));
+        error_log("DEBUG: departure_date type = " . gettype($data['departure_date'] ?? null));
+        error_log("DEBUG: arrival_date type = " . gettype($data['arrival_date'] ?? null));
+
+        // Test regex manually
+        $dateRegex = '/^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}:\d{2})?$/';
+        if (isset($data['departure_date'])) {
+            $depMatch = preg_match($dateRegex, $data['departure_date']);
+            error_log("DEBUG: departure_date regex match = " . ($depMatch ? 'YES' : 'NO'));
+        }
+        if (isset($data['arrival_date'])) {
+            $arrMatch = preg_match($dateRegex, $data['arrival_date']);
+            error_log("DEBUG: arrival_date regex match = " . ($arrMatch ? 'YES' : 'NO'));
+        }
+
         // Validation
         $validator = new Validator();
         $rules = [
             'transport_type' => Validator::required()->stringType(),
             'departure_city' => Validator::required()->stringType(),
             'departure_country' => Validator::required()->stringType(),
-            'departure_date' => Validator::required()->stringType()->regex('/^\d{4}-\d{2}-\d{2}$/'),
+            'departure_date' => Validator::required()->stringType()->regex('/^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}:\d{2})?$/'),
             'arrival_city' => Validator::required()->stringType(),
             'arrival_country' => Validator::required()->stringType(),
-            'arrival_date' => Validator::required()->stringType()->regex('/^\d{4}-\d{2}-\d{2}$/'),
+            'arrival_date' => Validator::required()->stringType()->regex('/^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}:\d{2})?$/'),
             'available_weight_kg' => Validator::required()->positive(),
             'price_per_kg' => Validator::required()->positive(),
             'currency' => Validator::required()->stringType(),

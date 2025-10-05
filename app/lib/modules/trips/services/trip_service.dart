@@ -70,11 +70,11 @@ class TripService {
     };
   }
 
-  /// Format DateTime for backend (PHP expects Y-m-d format)
+  /// Format DateTime for backend (PHP expects Y-m-d H:i:s format)
   String formatDateForBackend(DateTime date) {
-    // Convert to UTC and format as Y-m-d (date only, no time)
+    // Convert to UTC and format as Y-m-d H:i:s (no microseconds, no timezone)
     final utc = date.toUtc();
-    return '${utc.year.toString().padLeft(4, '0')}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')}';
+    return '${utc.year.toString().padLeft(4, '0')}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')} ${utc.hour.toString().padLeft(2, '0')}:${utc.minute.toString().padLeft(2, '0')}:${utc.second.toString().padLeft(2, '0')}';
   }
 
   /// Create a new trip
