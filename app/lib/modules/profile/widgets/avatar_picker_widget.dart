@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/profile_service.dart';
 
 class AvatarPickerWidget extends StatefulWidget {
@@ -286,10 +286,16 @@ class _AvatarPickerWidgetState extends State<AvatarPickerWidget> {
                       ),
                     )
                   : _currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty
-                      ? OptimizedCloudinaryImage(
+                      ? CachedNetworkImage(
                           imageUrl: _currentAvatarUrl!,
-                          imageType: 'avatar',
                           fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => _buildDefaultAvatar(),
                         )
                       : _buildDefaultAvatar(),
             ),

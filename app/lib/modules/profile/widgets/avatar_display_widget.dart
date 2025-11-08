@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Widget d'affichage d'avatar en lecture seule
-/// Utilise OptimizedCloudinaryImage pour un affichage optimisé
+/// Utilise CachedNetworkImage pour un affichage optimisé
 class AvatarDisplayWidget extends StatelessWidget {
   final String? avatarUrl;
   final String? userName;
@@ -46,10 +46,16 @@ class AvatarDisplayWidget extends StatelessWidget {
         ),
         child: ClipOval(
           child: avatarUrl != null && avatarUrl!.isNotEmpty
-              ? OptimizedCloudinaryImage(
+              ? CachedNetworkImage(
                   imageUrl: avatarUrl!,
-                  imageType: 'avatar',
                   fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => _buildDefaultAvatar(),
                 )
               : _buildDefaultAvatar(),
         ),

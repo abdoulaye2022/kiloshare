@@ -9,7 +9,6 @@ import '../widgets/trip_image_picker.dart';
 import '../models/transport_models.dart';
 import '../services/destination_validator_service.dart';
 import '../services/multi_transport_service.dart';
-import '../../../services/direct_cloudinary_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +45,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   // Images
   List<File> _selectedImages = [];
   List<TripImage> _existingImages = [];
-  late final DirectCloudinaryService _cloudinaryService;
 
   // Form controllers
   final _flightNumberController = TextEditingController();
@@ -60,10 +58,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   @override
   void initState() {
     super.initState();
-    
-    // Initialize DirectCloudinaryService
-    _cloudinaryService = DirectCloudinaryService();
-    
+
     // Initialize transport type if provided
     if (widget.initialTransportType != null) {
       _tripData['transport_type'] = widget.initialTransportType!.value;
@@ -1208,32 +1203,14 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
         await _tripService.updateTrip(widget.tripId!, updateData);
 
-        // Handle images for edit mode - upload to Cloudinary and update trip
+        // Handle images for edit mode - upload to GCS via API
         if (_selectedImages.isNotEmpty) {
           try {
-            final uploadResults = await _cloudinaryService.uploadTripPhotos(
-              _selectedImages,
-            );
-            
-            
-            // Prepare image data for API
-            final imageData = uploadResults.map((uploadResult) => {
-              'url': uploadResult['url'],
-              'thumbnail': uploadResult['thumbnail'],
-              'public_id': uploadResult['public_id'],
-              'image_name': uploadResult['public_id'].split('/').last,
-              'width': uploadResult['width'],
-              'height': uploadResult['height'],
-              'file_size': uploadResult['file_size'],
-              'format': uploadResult['format'],
-              'is_primary': uploadResult['is_primary'],
-              'alt_text': uploadResult['alt_text'],
-            }).toList();
-            
-            // Add images to the trip via API
-            await _tripService.addCloudinaryImages(
+            // Upload images via API (multipart/form-data)
+            // The API will handle GCS upload
+            await _tripService.addTripImages(
               tripId: widget.tripId!,
-              images: imageData,
+              imageFiles: _selectedImages,
             );
             
             print('DEBUG: All images uploaded and added to trip successfully');
@@ -1264,24 +1241,10 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       } else {
         // Create new trip
         print('DEBUG: Creating new trip...');
-        
-        // Handle images - upload to Cloudinary first if any selected
-        List<Map<String, dynamic>>? imageData;
-        if (_selectedImages.isNotEmpty) {
-          try {
-            final uploadResults = await _cloudinaryService.uploadTripPhotos(
-              _selectedImages,
-            );
-            
-            // Les résultats sont déjà au bon format
-            imageData = uploadResults.cast<Map<String, dynamic>>();
-            
-          } catch (e) {
-            // Continue without images if upload fails
-            imageData = null;
-          }
-        }
-        
+
+        // Images will be uploaded by the API during trip creation using multipart/form-data
+        // The backend will handle GCS upload
+
         try {
           print('DEBUG: About to call _tripService.createTrip with:');
           print('DEBUG: transportType: ${_tripData['transport_type']}');
@@ -1302,7 +1265,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           print('DEBUG: currency: ${_tripData['currency'] ?? 'CAD'}');
           print(
               'DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
-          if (imageData != null) print('DEBUG: images: ${imageData.length} uploaded images');
+          if (_selectedImages.isNotEmpty) print('DEBUG: images: ${_selectedImages.length} images selected');
 
           final createdTrip = await _tripService.createTrip(
             transportType: _tripData['transport_type'],
@@ -1341,12 +1304,24 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                     ? List<String>.from(_tripData['restricted_categories'])
                     : null,
             restrictedItems: null,
-            images: imageData,
           );
           print('DEBUG: _tripService.createTrip completed successfully');
 
-          // Images were already uploaded to Cloudinary and included in trip creation
-          print('DEBUG: Trip created successfully with images');
+          // Upload images if any were selected
+          if (_selectedImages.isNotEmpty) {
+            try {
+              await _tripService.addTripImages(
+                tripId: createdTrip.id.toString(),
+                imageFiles: _selectedImages,
+              );
+              print('DEBUG: Images uploaded successfully to GCS');
+            } catch (e) {
+              print('ERROR: Image upload failed: $e');
+              // Continue anyway - trip was created successfully
+            }
+          }
+
+          print('DEBUG: Trip created successfully');
         } catch (e) {
           print('DEBUG: ERROR in createTrip: $e');
           print('DEBUG: Error type: ${e.runtimeType}');

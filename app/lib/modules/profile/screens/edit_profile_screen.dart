@@ -10,7 +10,7 @@ import '../../auth/blocs/auth/auth_event.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../../../themes/modern_theme.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -358,10 +358,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           radius: 48,
                           backgroundImage: FileImage(_selectedImage!),
                         )
-                      : CloudinaryAvatar(
-                          imageUrl: _currentProfile?.avatarUrl,
-                          userName: _currentProfile?.displayName ?? 'User',
+                      : CircleAvatar(
                           radius: 48,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: _currentProfile?.avatarUrl != null && _currentProfile!.avatarUrl!.isNotEmpty
+                              ? CachedNetworkImageProvider(_currentProfile!.avatarUrl!)
+                              : null,
+                          child: _currentProfile?.avatarUrl == null || _currentProfile!.avatarUrl!.isEmpty
+                              ? Text(
+                                  _getInitials(_currentProfile?.displayName ?? 'User'),
+                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey),
+                                )
+                              : null,
                         ),
                 ),
                 Positioned(
@@ -847,5 +855,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
   }
 }

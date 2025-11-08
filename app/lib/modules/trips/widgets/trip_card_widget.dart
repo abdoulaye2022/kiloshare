@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:kiloshare/widgets/ellipsis_button.dart';
 import '../models/trip_model.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../profile/widgets/avatar_display_widget.dart';
 
 class TripCardWidget extends StatelessWidget {
@@ -41,9 +41,8 @@ class TripCardWidget extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 12),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: OptimizedCloudinaryImage(
+                  child: CachedNetworkImage(
                     imageUrl: trip.primaryImage!.thumbnail ?? trip.primaryImage!.url,
-                    imageType: 'trip_photo',
                     width: 80,
                     height: 120,
                     fit: BoxFit.cover,

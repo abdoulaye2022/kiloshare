@@ -9,21 +9,21 @@ use Psr\Http\Message\ServerRequestInterface;
 use KiloShare\Models\Booking;
 use KiloShare\Models\DeliveryCode;
 use KiloShare\Services\DeliveryCodeService;
-use KiloShare\Services\CloudinaryService;
+use KiloShare\Services\GoogleCloudStorageService;
 use Respect\Validation\Validator;
 use Exception;
 
 class DeliveryCodeController extends BaseController
 {
     private DeliveryCodeService $deliveryCodeService;
-    private CloudinaryService $cloudinaryService;
+    private GoogleCloudStorageService $gcsService;
 
     public function __construct(
         DeliveryCodeService $deliveryCodeService,
-        CloudinaryService $cloudinaryService
+        GoogleCloudStorageService $gcsService
     ) {
         $this->deliveryCodeService = $deliveryCodeService;
-        $this->cloudinaryService = $cloudinaryService;
+        $this->gcsService = $gcsService;
     }
 
     /**
@@ -106,22 +106,38 @@ class DeliveryCodeController extends BaseController
             // Traitement des photos si fournies
             $photos = [];
             if (!empty($data['photos']) && is_array($data['photos'])) {
-                foreach ($data['photos'] as $photoBase64) {
+                // Utiliser le stockage local si GCS n'est pas configuré
+                try {
+                    $storageService = new \KiloShare\Services\GoogleCloudStorageService();
+                } catch (\Exception $e) {
+                    error_log("GCS not available, using local storage: " . $e->getMessage());
+                    $storageService = new \KiloShare\Services\LocalStorageService();
+                }
+
+                foreach ($data['photos'] as $index => $photoBase64) {
                     if (!empty($photoBase64)) {
-                        $uploadResult = $this->cloudinaryService->uploadBase64Image(
-                            $photoBase64,
-                            'delivery_confirmations',
-                            [
-                                'booking_id' => $booking->id,
-                                'user_id' => $currentUser->id,
-                                'timestamp' => time(),
+                        // Décoder et sauvegarder l'image base64
+                        $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $photoBase64));
+                        $tempPath = sys_get_temp_dir() . '/delivery_' . uniqid() . '.jpg';
+                        file_put_contents($tempPath, $imageData);
+
+                        // Upload vers le service de stockage (GCS ou Local)
+                        $destination = 'delivery_confirmations/' . $booking->id . '/' . time() . '_' . $index . '.jpg';
+                        $uploadResult = $storageService->uploadImage($tempPath, $destination, [
+                            'metadata' => [
+                                'booking_id' => (string) $booking->id,
+                                'user_id' => (string) $currentUser->id,
+                                'timestamp' => (string) time(),
                             ]
-                        );
+                        ]);
+
+                        // Nettoyer le fichier temporaire
+                        @unlink($tempPath);
 
                         if ($uploadResult['success']) {
                             $photos[] = [
                                 'url' => $uploadResult['url'],
-                                'public_id' => $uploadResult['public_id'],
+                                'path' => $uploadResult['path'],
                                 'uploaded_at' => now()->toISOString(),
                             ];
                         }

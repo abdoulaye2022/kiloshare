@@ -94,6 +94,26 @@ $errorHandler->setDefaultErrorRenderer('application/json', function ($exception,
     return json_encode($error, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 });
 
+// Route pour servir les fichiers uploadés localement
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+
+$app->get('/storage/uploads/{path:.*}', function (Request $request, Response $response, $args) {
+    $filePath = __DIR__ . '/../storage/uploads/' . $args['path'];
+
+    if (!file_exists($filePath) || !is_file($filePath)) {
+        $response->getBody()->write(json_encode(['error' => 'File not found']));
+        return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
+    }
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $filePath);
+    finfo_close($finfo);
+
+    $response->getBody()->write(file_get_contents($filePath));
+    return $response->withHeader('Content-Type', $mimeType);
+});
+
 // Chargement des routes
 $routes = require __DIR__ . '/../config/routes.php';
 $routes($app);

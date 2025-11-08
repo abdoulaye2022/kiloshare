@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../../config/app_config.dart';
 import '../models/trip_model.dart';
@@ -1139,27 +1140,38 @@ class TripService {
     }
   }
 
-  /// Add Cloudinary images to an existing trip
-  Future<void> addCloudinaryImages({
+  /// Add images to an existing trip (multipart upload)
+  Future<void> addTripImages({
     required String tripId,
-    required List<Map<String, dynamic>> images,
+    required List<File> imageFiles,
   }) async {
     try {
       final token = await _getTokenWithRetry();
 
-      final response = await _dio.post('/trips/$tripId/cloudinary-images',
-        data: {
-          'images': images,
-        },
+      // Create multipart request
+      var formData = FormData();
+
+      for (var imageFile in imageFiles) {
+        formData.files.add(MapEntry(
+          'images[]',
+          await MultipartFile.fromFile(
+            imageFile.path,
+            filename: imageFile.path.split('/').last,
+          ),
+        ));
+      }
+
+      final response = await _dio.post(
+        '/trips/$tripId/images',
+        data: formData,
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
           },
         ),
       );
-      
+
       if (response.data['success'] != true) {
         throw TripException(response.data['message'] ?? 'Failed to add images to trip');
       }

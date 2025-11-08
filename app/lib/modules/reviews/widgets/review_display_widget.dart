@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/review_model.dart';
 import '../widgets/star_rating_widget.dart';
-import '../../../widgets/optimized_cloudinary_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ReviewDisplayWidget extends StatelessWidget {
   final ReviewModel review;
@@ -39,10 +39,18 @@ class ReviewDisplayWidget extends StatelessWidget {
           Row(
             children: [
               // Avatar
-              CloudinaryAvatar(
-                imageUrl: review.reviewerAvatar,
-                userName: review.reviewerFullName,
+              CircleAvatar(
                 radius: 20,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: review.reviewerAvatar != null && review.reviewerAvatar!.isNotEmpty
+                    ? CachedNetworkImageProvider(review.reviewerAvatar!)
+                    : null,
+                child: review.reviewerAvatar == null || review.reviewerAvatar!.isEmpty
+                    ? Text(
+                        _getInitials(review.reviewerFullName),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+                      )
+                    : null,
               ),
               
               const SizedBox(width: 12),
@@ -141,6 +149,13 @@ class ReviewDisplayWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
   }
 }
 

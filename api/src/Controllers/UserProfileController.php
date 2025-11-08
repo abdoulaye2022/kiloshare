@@ -291,16 +291,27 @@ class UserProfileController
                 // Déplacer le fichier uploadé vers le fichier temporaire
                 $avatar->moveTo($tempFile);
 
-                // Upload vers Cloudinary
-                $cloudinaryService = new \KiloShare\Services\CloudinaryService();
-                $uploadResult = $cloudinaryService->uploadAvatar($tempFile, (int)$user->id);
+                // Upload vers le service de stockage (GCS ou Local)
+                try {
+                    $storageService = new \KiloShare\Services\GoogleCloudStorageService();
+                } catch (\Exception $e) {
+                    error_log("GCS not available, using local storage: " . $e->getMessage());
+                    $storageService = new \KiloShare\Services\LocalStorageService();
+                }
+
+                $destination = 'avatars/' . $user->id . '/' . time() . '.jpg';
+                $uploadResult = $storageService->uploadImage($tempFile, $destination);
+
+                if (!$uploadResult['success']) {
+                    throw new \Exception($uploadResult['error']);
+                }
 
                 // Supprimer l'ancien avatar si il existe
                 if ($user->profile_picture) {
-                    // Extraire le public_id de l'ancienne URL
-                    $oldPublicId = $this->extractPublicIdFromUrl($user->profile_picture);
-                    if ($oldPublicId) {
-                        $cloudinaryService->deleteImage($oldPublicId);
+                    // Extraire le chemin de l'ancienne URL
+                    $oldPath = $this->extractPathFromGcsUrl($user->profile_picture);
+                    if ($oldPath) {
+                        $storageService->deleteImage($oldPath);
                     }
                 }
 
@@ -315,7 +326,7 @@ class UserProfileController
                     'user' => [
                         'id' => $user->id,
                         'profile_picture' => $user->profile_picture,
-                        'profile_picture_thumbnail' => $uploadResult['thumbnail'] ?? null,
+                        'profile_picture_thumbnail' => $uploadResult['url'], // GCS n'a pas de thumbnail automatique
                     ]
                 ], 'Profile picture uploaded successfully');
 
@@ -333,21 +344,15 @@ class UserProfileController
     }
 
     /**
-     * Extraire le public_id depuis une URL Cloudinary
+     * Extraire le chemin depuis une URL Google Cloud Storage
      */
-    private function extractPublicIdFromUrl(string $url): ?string
+    private function extractPathFromGcsUrl(string $url): ?string
     {
-        // Pattern pour extraire le public_id d'une URL Cloudinary
-        // Format: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{format}
-        if (preg_match('/\/v\d+\/(.+)\.[a-zA-Z]{3,4}$/', $url, $matches)) {
+        // Format GCS: https://storage.googleapis.com/{bucket_name}/{path}
+        if (preg_match('/storage\.googleapis\.com\/[^\/]+\/(.+)$/', $url, $matches)) {
             return $matches[1];
         }
-        
-        // Pattern alternatif sans version
-        if (preg_match('/\/upload\/(.+)\.[a-zA-Z]{3,4}$/', $url, $matches)) {
-            return $matches[1];
-        }
-        
+
         return null;
     }
 

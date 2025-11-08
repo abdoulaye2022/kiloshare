@@ -249,7 +249,6 @@ return function (App $app) {
 
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
-                $tripGroup->post('/{id}/cloudinary-images', [TripController::class, 'addCloudinaryImages']);
                 $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'removeTripImage']);
 
                 // === NEW STATUS TRANSITION ACTIONS ===

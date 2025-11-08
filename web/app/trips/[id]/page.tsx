@@ -67,7 +67,7 @@ export default function TripDetailPage() {
   const fetchTripDetails = async () => {
     try {
       // Récupérer les détails du voyage directement (inclut les images)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/trips/${tripId}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/trips/${tripId}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -93,7 +93,7 @@ export default function TripDetailPage() {
       if (!token) return;
 
       // Récupérer les infos de l'utilisateur connecté
-      const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/user/profile`, {
+      const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/user/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -131,7 +131,7 @@ export default function TripDetailPage() {
     try {
       const token = localStorage.getItem('auth_token') || 'demo_token';
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/bookings/request`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/bookings/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

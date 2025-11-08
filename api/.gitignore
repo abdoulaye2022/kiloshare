@@ -32,7 +32,10 @@ composer.lock
 *auth*.md
 credentials.json
 service-account.json
+gcs-service-account.json
 config_secrets.php
+config/gcs-service-account.json
+config/firebase-service-account.json
 
 # IDE
 .vscode/

@@ -136,7 +136,7 @@ class ProfileService {
     }
   }
 
-  // Avatar Upload avec Cloudinary
+  // Avatar Upload avec GCS
   Future<Map<String, dynamic>> uploadAvatar(File imageFile) async {
     try {
       final token = await _getAccessToken();

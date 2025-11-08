@@ -57,7 +57,7 @@ export default function TripsListPage() {
   const fetchPublicTrips = async () => {
     try {
       // Utiliser l'API de recherche publique pour obtenir les voyages disponibles
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/search/trips?status=active&limit=50`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/search/trips?status=active&limit=50`);
       
       if (response.ok) {
         const data = await response.json();
@@ -93,7 +93,7 @@ export default function TripsListPage() {
       // On utilisera un token d'auth réel dans l'implémentation finale
       const token = localStorage.getItem('auth_token') || 'demo_token';
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/bookings/request`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/bookings/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

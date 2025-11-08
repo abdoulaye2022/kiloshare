@@ -42,7 +42,7 @@ export default function ImageUpload({
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/trips/${tripId}/cloudinary-images`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/trips/${tripId}/cloudinary-images`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
@@ -124,7 +124,7 @@ export default function ImageUpload({
     if (imageToRemove && tripId && !imageToRemove.id.startsWith('temp-')) {
       try {
         // Supprimer de l'API si ce n'est pas une image temporaire
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/trips/${tripId}/images/${imageId}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080'}/api/v1/trips/${tripId}/images/${imageId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`

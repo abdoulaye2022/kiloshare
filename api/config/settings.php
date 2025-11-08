@@ -40,11 +40,10 @@ return [
         'connect_client_id' => $_ENV['STRIPE_CONNECT_CLIENT_ID'] ?? '',
     ],
 
-    'cloudinary' => [
-        'cloud_name' => $_ENV['CLOUDINARY_CLOUD_NAME'] ?? '',
-        'api_key' => $_ENV['CLOUDINARY_API_KEY'] ?? '',
-        'api_secret' => $_ENV['CLOUDINARY_API_SECRET'] ?? '',
-        'upload_preset' => $_ENV['CLOUDINARY_UPLOAD_PRESET'] ?? 'kiloshare_uploads',
+    'gcs' => [
+        'project_id' => $_ENV['GCS_PROJECT_ID'] ?? '',
+        'bucket_name' => $_ENV['GCS_BUCKET_NAME'] ?? 'kiloshare',
+        'key_file' => $_ENV['GCS_KEY_FILE'] ?? 'config/gcs-service-account.json',
     ],
 
     'cors' => [

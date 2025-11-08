@@ -4,17 +4,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// Configuration des variables d'environnement pour l'application mobile
 class Environment {
   // URL de l'API backend
-  static String get apiUrl => dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000/api/v1';
+  static String get apiUrl => dotenv.env['API_URL'] ?? 'http://127.0.0.1:8080/api/v1';
   
-  // Configuration Cloudinary
-  static String get cloudinaryCloudName => dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
-  static String get cloudinaryApiKey => dotenv.env['CLOUDINARY_API_KEY'] ?? '';
-  static String get cloudinaryApiSecret => dotenv.env['CLOUDINARY_API_SECRET'] ?? '';
-  static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'kiloshare_uploads';
-  
-  // URL Cloudinary construite dynamiquement
-  static String get cloudinaryUploadUrl => 
-    'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload';
+  // Configuration Google Cloud Storage
+  static String get gcsProjectId => dotenv.env['GCS_PROJECT_ID'] ?? '';
+  static String get gcsBucketName => dotenv.env['GCS_BUCKET_NAME'] ?? 'kiloshare';
+  static String get gcsKeyFile => dotenv.env['GCS_KEY_FILE'] ?? '';
+
+  // URL GCS pour l'accès public
+  static String get gcsPublicUrl =>
+    'https://storage.googleapis.com/$gcsBucketName';
   
   // Configuration Firebase
   static String get firebaseApiKey => dotenv.env['FIREBASE_API_KEY'] ?? '';
@@ -68,9 +67,8 @@ class Environment {
     if (isDebug) {
       debugPrint('=== Configuration Environment ===');
       debugPrint('API URL: $apiUrl');
-      debugPrint('Cloudinary Cloud Name: $cloudinaryCloudName');
-      debugPrint('Cloudinary API Key: ${cloudinaryApiKey.isEmpty ? "Non défini" : "${cloudinaryApiKey.substring(0, 6)}..."}');
-      debugPrint('Cloudinary Upload Preset: $cloudinaryUploadPreset');
+      debugPrint('GCS Bucket Name: $gcsBucketName');
+      debugPrint('GCS Project ID: ${gcsProjectId.isEmpty ? "Non défini" : gcsProjectId}');
       debugPrint('Firebase Project ID: $firebaseProjectId');
       debugPrint('Debug Mode: $isDebug');
       debugPrint('===================================');

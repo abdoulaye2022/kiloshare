@@ -54,12 +54,6 @@ class EnvironmentConfig {
     }
   }
 
-  /// Obtenir la configuration Cloudinary
-  static String get cloudinaryCloudName => dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
-  static String get cloudinaryApiKey => dotenv.env['CLOUDINARY_API_KEY'] ?? '';
-  static String get cloudinaryApiSecret => dotenv.env['CLOUDINARY_API_SECRET'] ?? '';
-  static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
-
   /// Obtenir la configuration Firebase
   static String get firebaseApiKey => dotenv.env['FIREBASE_API_KEY'] ?? '';
   static String get firebaseProjectId => dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
@@ -110,9 +104,6 @@ class EnvironmentConfig {
       debugPrint('Is Production: $isProduction');
       debugPrint('API URL: $apiUrl');
       debugPrint('Web URL: $webUrl');
-      debugPrint('Cloudinary Cloud Name: $cloudinaryCloudName');
-      debugPrint('Cloudinary API Key: ${cloudinaryApiKey.isEmpty ? "Non défini" : "${cloudinaryApiKey.substring(0, 6)}..."}');
-      debugPrint('Cloudinary Upload Preset: $cloudinaryUploadPreset');
       debugPrint('Firebase Project ID: $firebaseProjectId');
       debugPrint('Debug Mode: $isDebugMode');
       debugPrint('===================================');

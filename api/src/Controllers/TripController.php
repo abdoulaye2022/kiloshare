@@ -9,7 +9,7 @@ use KiloShare\Models\User;
 use KiloShare\Models\TripImage;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
-use KiloShare\Services\CloudinaryService;
+use KiloShare\Services\GoogleCloudStorageService;
 use KiloShare\Services\CancellationService;
 use KiloShare\Services\SmartNotificationService;
 use Psr\Http\Message\ResponseInterface;
@@ -297,7 +297,7 @@ class TripController
                 'status' => Trip::STATUS_DRAFT,
             ]);
 
-            // Gérer les images si présentes (URLs Cloudinary)
+            // Gérer les images si présentes (URLs GCS)
             $images = [];
             if (!empty($data['images']) && is_array($data['images'])) {
                 error_log("TripController: Processing " . count($data['images']) . " images");
@@ -923,7 +923,15 @@ class TripController
     {
         $images = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
         $uploadedImages = [];
-        $cloudinaryService = new CloudinaryService();
+
+        // Utiliser le stockage local si GCS n'est pas configuré
+        try {
+            $storageService = new GoogleCloudStorageService();
+        } catch (\Exception $e) {
+            error_log("GCS not available, using local storage: " . $e->getMessage());
+            $storageService = new \KiloShare\Services\LocalStorageService();
+        }
+
         $currentImageCount = $trip->images()->count();
 
         foreach ($images as $index => $uploadedFile) {
@@ -948,21 +956,31 @@ class TripController
             $uploadedFile->moveTo($tempPath);
 
             try {
-                // Upload vers Cloudinary
-                $cloudinaryResult = $cloudinaryService->uploadTripImage($tempPath, $trip->id, $index);
+                // Upload vers le service de stockage (GCS ou Local)
+                $destination = 'trips/' . $trip->id . '/' . $filename;
+                $uploadResult = $storageService->uploadImage($tempPath, $destination, [
+                    'metadata' => [
+                        'trip_id' => $trip->id,
+                        'index' => $index
+                    ]
+                ]);
+
+                if (!$uploadResult['success']) {
+                    throw new \Exception($uploadResult['error']);
+                }
 
                 // Créer l'enregistrement en base
                 $tripImage = TripImage::create([
                     'trip_id' => $trip->id,
-                    'image_path' => $cloudinaryResult['public_id'],
-                    'url' => $cloudinaryResult['url'],
-                    'thumbnail' => $cloudinaryResult['thumbnail'],
+                    'image_path' => $uploadResult['path'],
+                    'url' => $uploadResult['url'],
+                    'thumbnail' => $uploadResult['url'], // Pas de thumbnail automatique
                     'image_name' => $filename,
                     'is_primary' => ($currentImageCount + count($uploadedImages)) === 0,
                     'order' => $currentImageCount + count($uploadedImages) + 1,
-                    'file_size' => $cloudinaryResult['file_size'],
-                    'width' => $cloudinaryResult['width'] ?? null,
-                    'height' => $cloudinaryResult['height'] ?? null,
+                    'file_size' => filesize($tempPath),
+                    'width' => null,
+                    'height' => null,
                     'mime_type' => $mimeType,
                 ]);
 
@@ -970,13 +988,12 @@ class TripController
                     'id' => $tripImage->id,
                     'url' => $tripImage->url,
                     'thumbnail' => $tripImage->thumbnail,
-                    'medium' => $cloudinaryResult['medium'] ?? null,
                     'is_primary' => $tripImage->is_primary,
                     'order' => $tripImage->order,
                 ];
 
             } catch (\Exception $e) {
-                error_log("Cloudinary upload failed for trip image: " . $e->getMessage());
+                error_log("Image upload failed for trip: " . $e->getMessage());
                 continue;
             } finally {
                 // Nettoyer le fichier temporaire
@@ -990,7 +1007,7 @@ class TripController
     }
 
     /**
-     * Traiter les URLs d'images Cloudinary pour un trip
+     * Traiter les URLs d'images GCS pour un trip
      */
     private function handleTripImageUrls(array $imageUrls, Trip $trip): array
     {
@@ -1015,10 +1032,10 @@ class TripController
             }
 
             try {
-                // Créer l'enregistrement en base avec les données Cloudinary
+                // Créer l'enregistrement en base avec les données GCS
                 $tripImage = TripImage::create([
                     'trip_id' => $trip->id,
-                    'image_path' => $imageData['public_id'] ?? '',
+                    'image_path' => $imageData['path'] ?? '',
                     'url' => $imageData['url'],
                     'thumbnail' => $imageData['thumbnail'] ?? null,
                     'image_name' => basename(parse_url($imageData['url'], PHP_URL_PATH)),
@@ -1092,70 +1109,12 @@ class TripController
             ], 'Images uploaded successfully');
 
         } catch (\Exception $e) {
+            error_log("ERROR in addTripImage: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             return Response::serverError('Failed to upload images: ' . $e->getMessage());
         }
     }
 
-    public function addCloudinaryImages(ServerRequestInterface $request): ResponseInterface
-    {
-        $user = $request->getAttribute('user');
-        $tripId = (int) $request->getAttribute('id');
-        
-        try {
-            $trip = Trip::find($tripId);
-            if (!$trip) {
-                return Response::notFound('Trip not found');
-            }
-
-            if (!$trip->isOwner($user)) {
-                return Response::forbidden('You can only add images to your own trips');
-            }
-
-            // Vérifier le nombre d'images existantes (max 5)
-            $currentImageCount = $trip->images()->count();
-            
-            $body = json_decode($request->getBody()->getContents(), true);
-            $images = $body['images'] ?? [];
-            
-            if (empty($images)) {
-                return Response::badRequest('No images data provided');
-            }
-            
-            if ($currentImageCount + count($images) > 5) {
-                return Response::error('Maximum 5 images allowed per trip');
-            }
-
-            $createdImages = [];
-            
-            foreach ($images as $index => $imageData) {
-                $tripImage = TripImage::create([
-                    'trip_id' => $trip->id,
-                    'image_path' => $imageData['url'],
-                    'image_name' => $imageData['image_name'] ?? basename($imageData['public_id']),
-                    'public_id' => $imageData['public_id'],
-                    'url' => $imageData['url'],
-                    'thumbnail' => $imageData['thumbnail'],
-                    'width' => $imageData['width'] ?? null,
-                    'height' => $imageData['height'] ?? null,
-                    'file_size' => $imageData['file_size'] ?? null,
-                    'format' => $imageData['format'] ?? 'jpg',
-                    'mime_type' => 'image/' . ($imageData['format'] ?? 'jpeg'),
-                    'is_primary' => $imageData['is_primary'] ?? false,
-                    'alt_text' => $imageData['alt_text'],
-                    'order' => $currentImageCount + $index,
-                ]);
-
-                $createdImages[] = $tripImage;
-            }
-
-            return Response::success([
-                'images' => $createdImages
-            ], 'Images added successfully');
-
-        } catch (\Exception $e) {
-            return Response::serverError('Failed to add images: ' . $e->getMessage());
-        }
-    }
 
     public function removeTripImage(ServerRequestInterface $request): ResponseInterface
     {
@@ -1174,12 +1133,12 @@ class TripController
                 return Response::notFound('Image not found');
             }
 
-            // Supprimer l'image de Cloudinary
-            $cloudinaryService = new CloudinaryService();
+            // Supprimer l'image de Google Cloud Storage
+            $gcsService = new GoogleCloudStorageService();
             try {
-                $cloudinaryService->deleteImage($image->image_path);
+                $gcsService->deleteImage($image->image_path);
             } catch (\Exception $e) {
-                error_log("Failed to delete image from Cloudinary: " . $e->getMessage());
+                error_log("Failed to delete image from GCS: " . $e->getMessage());
                 // Continuer quand même pour supprimer l'enregistrement local
             }
 
