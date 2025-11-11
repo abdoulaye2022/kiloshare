@@ -66,6 +66,7 @@ class ProfileService {
             'phone': userData['phone'],
             'email': userData['email'],
             'profile_picture': userData['profile_picture'],
+            'profile_picture_url': userData['profile_picture_url'],
             'is_verified': userData['is_verified'],
             'gender': userData['gender'],
             'date_of_birth': userData['date_of_birth'],
@@ -186,7 +187,7 @@ class ProfileService {
       if (response.data['success'] == true && response.data['data'] != null) {
         final data = response.data['data']['user'] ?? response.data['data'];
         return {
-          'profile_picture': data['profile_picture'],
+          'profile_picture': data['profile_picture_url'] ?? data['profile_picture'],
           'profile_picture_thumbnail': data['profile_picture_thumbnail'],
           'message': response.data['message'] ?? 'Avatar uploaded successfully',
         };

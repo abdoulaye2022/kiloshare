@@ -96,7 +96,7 @@ class UserProfile {
       country: json['country'],
       postalCode: json['postal_code'],
       nationality: json['nationality'],
-      avatarUrl: json['profile_picture'],
+      avatarUrl: json['profile_picture_url'] ?? json['profile_picture'],
       bio: json['bio'],
       profession: json['profession'],
       company: json['company'],

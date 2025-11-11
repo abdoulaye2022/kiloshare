@@ -84,17 +84,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       if (token != null && !_authService.isTokenExpired(token)) {
         var user = await _authService.getCurrentUser();
-        
-        // Si pas d'utilisateur en local, récupérer depuis l'API
-        if (user == null) {
+
+        // TEMPORAIRE: Toujours rafraîchir pour corriger le bug de cache
+        // Une fois que tous les utilisateurs auront des données correctes, on pourra optimiser
+        bool needsRefresh = true;
+
+        if (needsRefresh) {
           try {
-            user = await _authService.getCurrentUserFromApi();
-            // Sauvegarder l'utilisateur récupéré
-            await _authService.saveUser(user);
+            // Rafraîchir les données utilisateur depuis l'API
+            final refreshedUser = await _authService.refreshUserData();
+            if (refreshedUser != null) {
+              user = refreshedUser;
+            } else if (user == null) {
+              // Si pas d'utilisateur du tout et échec du refresh, déconnecter
+              emit(AuthUnauthenticated());
+              return;
+            }
           } catch (e) {
-            // Si échec de récupération, considérer comme non authentifié
-            emit(AuthUnauthenticated());
-            return;
+            // Si échec de récupération et pas d'utilisateur local, considérer comme non authentifié
+            if (user == null) {
+              emit(AuthUnauthenticated());
+              return;
+            }
+            // Sinon, continuer avec l'utilisateur local même si le refresh a échoué
           }
         }
         

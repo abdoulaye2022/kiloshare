@@ -64,42 +64,66 @@ class User {
     }
   }
 
-  factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json['id'] as int,
-    uuid: json['uuid'] as String? ?? '',
-    email: json['email'] as String,
-    phone: json['phone'] as String? ?? json['phone_number'] as String?,
-    firstName: json['first_name'] as String?,
-    lastName: json['last_name'] as String?,
-    isVerified: json['is_verified'] is bool 
-        ? json['is_verified'] as bool 
-        : json['is_verified'] != null 
-            ? (json['is_verified'] as int) == 1
-            : false,
-    emailVerifiedAt: json['email_verified_at'] != null
-        ? DateTime.parse(json['email_verified_at'] as String)
-        : null,
-    phoneVerifiedAt: json['phone_verified_at'] != null
-        ? DateTime.parse(json['phone_verified_at'] as String)
-        : null,
-    profilePicture: json['profile_picture_url'] as String? ?? json['profile_picture'] as String?,
-    status: json['status'] as String? ?? 'active',
-    lastLoginAt: json['last_login_at'] != null 
-        ? DateTime.parse(json['last_login_at'] as String) 
-        : null,
-    role: _parseUserRole(json['role'] as String?),
-    trustScore: json['trust_score'] as int? ?? 0,
-    completedTrips: json['completed_trips'] as int? ?? 0,
-    totalTrips: json['total_trips'] as int? ?? 0,
-    createdAt: json['created_at'] != null 
-        ? DateTime.parse(json['created_at'] as String)
-        : DateTime.now(),
-    updatedAt: json['updated_at'] != null 
-        ? DateTime.parse(json['updated_at'] as String)
-        : (json['created_at'] != null 
-            ? DateTime.parse(json['created_at'] as String)
-            : DateTime.now()),
-  );
+  factory User.fromJson(Map<String, dynamic> json) {
+    // Debug: voir ce qui est reçu de l'API
+    print('🔍 User.fromJson - profile_picture: ${json['profile_picture']}');
+    print('🔍 User.fromJson - profile_picture_url: ${json['profile_picture_url']}');
+
+    // Déterminer la valeur de profilePicture de manière intelligente
+    String? profilePictureValue;
+    final profilePic = json['profile_picture'] as String?;
+    final profilePicUrl = json['profile_picture_url'] as String?;
+
+    if (profilePicUrl != null && profilePicUrl.isNotEmpty) {
+      // Priorité à profile_picture_url s'il existe
+      profilePictureValue = profilePicUrl;
+    } else if (profilePic != null && profilePic.isNotEmpty) {
+      // Si profile_picture contient déjà une URL complète, l'utiliser
+      if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
+        profilePictureValue = profilePic;
+      } else {
+        // Sinon, c'est juste un chemin, on le laisse null pour forcer un rechargement
+        profilePictureValue = null;
+      }
+    }
+
+    return User(
+      id: json['id'] as int,
+      uuid: json['uuid'] as String? ?? '',
+      email: json['email'] as String,
+      phone: json['phone'] as String? ?? json['phone_number'] as String?,
+      firstName: json['first_name'] as String?,
+      lastName: json['last_name'] as String?,
+      isVerified: json['is_verified'] is bool
+          ? json['is_verified'] as bool
+          : json['is_verified'] != null
+              ? (json['is_verified'] as int) == 1
+              : false,
+      emailVerifiedAt: json['email_verified_at'] != null
+          ? DateTime.parse(json['email_verified_at'] as String)
+          : null,
+      phoneVerifiedAt: json['phone_verified_at'] != null
+          ? DateTime.parse(json['phone_verified_at'] as String)
+          : null,
+      profilePicture: profilePictureValue,
+      status: json['status'] as String? ?? 'active',
+      lastLoginAt: json['last_login_at'] != null
+          ? DateTime.parse(json['last_login_at'] as String)
+          : null,
+      role: _parseUserRole(json['role'] as String?),
+      trustScore: json['trust_score'] as int? ?? 0,
+      completedTrips: json['completed_trips'] as int? ?? 0,
+      totalTrips: json['total_trips'] as int? ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : (json['created_at'] != null
+              ? DateTime.parse(json['created_at'] as String)
+              : DateTime.now()),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

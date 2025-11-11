@@ -809,7 +809,7 @@ class TripUser {
     return TripUser(
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
-      profilePicture: json['profile_picture'],
+      profilePicture: json['profile_picture_url'] ?? json['profile_picture'],
       isVerified: _parseBool(json['is_verified']),
     );
   }

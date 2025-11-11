@@ -73,13 +73,14 @@ class TripController
                             'first_name' => $trip->user->first_name,
                             'last_name' => $trip->user->last_name,
                             'profile_picture' => $trip->user->profile_picture,
+                            'profile_picture_url' => $trip->user->profile_picture_url,
                             'is_verified' => $trip->user->is_verified,
                         ],
                         'images' => $trip->images->map(function ($image) {
                             return [
                                 'id' => $image->id,
-                                'url' => $image->url,
-                                'thumbnail' => $image->thumbnail,
+                                'url' => $image->image_url,
+                                'thumbnail' => $image->thumbnail_url,
                             ];
                         }),
                     ];
@@ -421,6 +422,7 @@ class TripController
                         'first_name' => $trip->user->first_name,
                         'last_name' => $trip->user->last_name,
                         'profile_picture' => $trip->user->profile_picture,
+                        'profile_picture_url' => $trip->user->profile_picture_url,
                         'is_verified' => $trip->user->is_verified,
                     ],
                     'images' => $trip->images,
@@ -1211,8 +1213,8 @@ class TripController
                 'images' => $images->map(function ($image) {
                     return [
                         'id' => $image->id,
-                        'url' => $image->url,
-                        'thumbnail' => $image->thumbnail,
+                        'url' => $image->image_url,
+                        'thumbnail' => $image->thumbnail_url,
                         'alt_text' => $image->alt_text,
                         'is_primary' => $image->is_primary,
                         'order' => $image->order
@@ -1373,6 +1375,7 @@ class TripController
                     'last_name' => $trip->user->last_name ?? '',
                     'email' => $trip->user->email ?? '',
                     'profile_picture' => $trip->user->profile_picture ?? null,
+                    'profile_picture_url' => $trip->user->profile_picture_url ?? null,
                     'is_verified' => (bool) ($trip->user->is_verified ?? false)
                 ];
             }
@@ -1488,20 +1491,21 @@ class TripController
                         'first_name' => $trip->user->first_name,
                         'last_name' => $trip->user->last_name,
                         'profile_picture' => $trip->user->profile_picture,
+                        'profile_picture_url' => $trip->user->profile_picture_url,
                         'is_verified' => $trip->user->is_verified,
                     ],
                     'images' => $trip->images->map(function ($image) {
                         return [
                             'id' => $image->id,
-                            'url' => $image->url,
-                            'thumbnail' => $image->thumbnail,
+                            'url' => $image->image_url, // Utilise l'accesseur qui génère l'URL complète
+                            'thumbnail' => $image->thumbnail_url, // Utilise l'accesseur
                             'alt_text' => $image->alt_text,
                             'is_primary' => $image->is_primary,
                             'order' => $image->order
                         ];
                     })->toArray(),
                     // URLs simples pour compatibilité Flutter
-                    'image_urls' => $trip->images->pluck('url')->toArray(),
+                    'image_urls' => $trip->images->pluck('image_url')->toArray(),
                     // Nouvelles informations sur la capacité
                     'total_capacity_kg' => (float) $totalCapacityKg,
                     'booked_weight_kg' => (float) $totalBookedWeight,
@@ -1950,6 +1954,7 @@ class TripController
                         'last_name' => $newTripWithRelations->user->last_name ?? '',
                         'email' => $newTripWithRelations->user->email ?? '',
                         'profile_picture' => $newTripWithRelations->user->profile_picture ?? null,
+                        'profile_picture_url' => $newTripWithRelations->user->profile_picture_url ?? null,
                         'is_verified' => (bool) ($newTripWithRelations->user->is_verified ?? false)
                     ] : null,
                     'created_at' => $newTripWithRelations->created_at,

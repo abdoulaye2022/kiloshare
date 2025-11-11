@@ -48,6 +48,7 @@ class UserProfileController
                     'newsletter_subscribed' => $user->newsletter_subscribed,
                     'marketing_emails' => $user->marketing_emails,
                     'profile_picture' => $user->profile_picture,
+                    'profile_picture_url' => $user->profile_picture_url,
                     'is_verified' => $user->is_verified,
                     'email_verified_at' => $user->email_verified_at,
                     'phone_verified_at' => $user->phone_verified_at,
@@ -422,7 +423,17 @@ class UserProfileController
             $reviews = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $reviewsArray = [];
+            $gcs = new \KiloShare\Services\GoogleCloudStorageService();
             foreach ($reviews as $review) {
+                $reviewerPictureUrl = null;
+                if (!empty($review['reviewer_picture'])) {
+                    try {
+                        $reviewerPictureUrl = $gcs->getPublicUrl($review['reviewer_picture']);
+                    } catch (\Exception $e) {
+                        error_log("Error generating reviewer picture URL: " . $e->getMessage());
+                    }
+                }
+
                 $reviewsArray[] = [
                     'id' => $review['id'],
                     'rating' => (int)$review['rating'],
@@ -431,6 +442,7 @@ class UserProfileController
                     'reviewer' => [
                         'first_name' => $review['reviewer_first_name'] ?? 'Utilisateur',
                         'profile_picture' => $review['reviewer_picture'],
+                        'profile_picture_url' => $reviewerPictureUrl,
                     ],
                 ];
             }
@@ -441,6 +453,7 @@ class UserProfileController
                     'uuid' => $user->uuid,
                     'first_name' => $user->first_name,
                     'profile_picture' => $user->profile_picture,
+                    'profile_picture_url' => $user->profile_picture_url,
                     'is_verified' => $user->is_verified,
                     'created_at' => $user->created_at->toISOString(),
                     'stats' => [

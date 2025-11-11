@@ -588,10 +588,34 @@ class AuthService {
     }
   }
 
+  // Nouvelle méthode pour forcer le rechargement des données utilisateur depuis l'API
+  Future<User?> refreshUserData() async {
+    final token = await getAccessToken();
+    if (token == null) return null;
+
+    try {
+      final response = await _dio.get('/auth/me',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      // L'API renvoie les données utilisateur dans data.data
+      if (response.data['success'] == true && response.data['data'] != null) {
+        final user = User.fromJson(response.data['data'] as Map<String, dynamic>);
+        await _saveUser(user);
+        return user;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Failed to refresh user data: $e');
+      return null;
+    }
+  }
+
   Future<void> forgotPassword(String email) async {
     try {
       final response = await _dio.post('/auth/forgot-password', data: {'email': email});
-      
+
       final apiResponse = ApiResponse.fromJson(response.data, (json) => json);
 
       if (!apiResponse.success) {
