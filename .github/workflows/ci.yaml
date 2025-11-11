@@ -3,7 +3,7 @@ name: Deploy API to OVH
 on:
   push:
     branches:
-      - development
+      - master
 
 jobs:
   deploy:
