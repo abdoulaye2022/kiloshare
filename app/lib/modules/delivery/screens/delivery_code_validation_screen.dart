@@ -31,6 +31,8 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
   List<File> _selectedPhotos = [];
   Position? _currentPosition;
   bool _isGettingLocation = false;
+  DeliveryCodeModel? _deliveryCode;
+  bool _isCodeAlreadyUsed = false;
 
   @override
   void initState() {
@@ -55,8 +57,17 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
     if (result['success'] && mounted) {
       final deliveryCode = result['delivery_code'] as DeliveryCodeModel;
       setState(() {
+        _deliveryCode = deliveryCode;
         _attemptsRemaining = deliveryCode.attemptsRemaining;
+        _isCodeAlreadyUsed = deliveryCode.hasBeenUsed;
       });
+
+      // Si le code a déjà été utilisé, afficher un message et empêcher la validation
+      if (_isCodeAlreadyUsed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showAlreadyValidatedDialog();
+        });
+      }
     }
   }
 
@@ -300,6 +311,43 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
         ],
       ),
     );
+  }
+
+  void _showAlreadyValidatedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: Icon(
+          Icons.check_circle,
+          color: ModernTheme.success,
+          size: 64,
+        ),
+        title: const Text('Code déjà validé'),
+        content: Text(
+          'Ce code de livraison a déjà été validé${_deliveryCode?.usedAt != null ? ' le ${_formatDate(_deliveryCode!.usedAt!)}' : ''}. '
+          'La livraison a été confirmée avec succès.\n\n'
+          'Vous pouvez fermer cet écran.'
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Fermer dialog
+              Navigator.of(context).pop(); // Retourner à l'écran précédent
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ModernTheme.success,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retour'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -729,38 +777,72 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
                        _currentPosition != null &&
                        _selectedPhotos.isNotEmpty &&
                        !_isLoading &&
-                       _attemptsRemaining > 0;
+                       _attemptsRemaining > 0 &&
+                       !_isCodeAlreadyUsed;
 
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: canValidate ? _validateCode : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ModernTheme.primaryBlue,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(ModernTheme.radiusMedium),
+    return Column(
+      children: [
+        // Message si le code est déjà utilisé
+        if (_isCodeAlreadyUsed) ...[
+          Container(
+            padding: const EdgeInsets.all(ModernTheme.spacing16),
+            margin: const EdgeInsets.only(bottom: ModernTheme.spacing16),
+            decoration: BoxDecoration(
+              color: ModernTheme.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(ModernTheme.radiusMedium),
+              border: Border.all(color: ModernTheme.success.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: ModernTheme.success),
+                const SizedBox(width: ModernTheme.spacing8),
+                Expanded(
+                  child: Text(
+                    'Ce code a déjà été validé. La livraison est confirmée.',
+                    style: TextStyle(
+                      color: ModernTheme.success,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          elevation: canValidate ? 4 : 0,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Text(
-                'Confirmer la livraison',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+        ],
+
+        // Bouton de validation
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: canValidate ? _validateCode : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isCodeAlreadyUsed ? ModernTheme.gray400 : ModernTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ModernTheme.radiusMedium),
               ),
-      ),
+              elevation: canValidate ? 4 : 0,
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    _isCodeAlreadyUsed ? 'Code déjà validé' : 'Confirmer la livraison',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

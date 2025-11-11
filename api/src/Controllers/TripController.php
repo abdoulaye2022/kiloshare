@@ -2073,12 +2073,13 @@ class TripController
                 return Response::error('Le voyage doit être en cours pour être complété', [], 400);
             }
 
-            // Récupérer toutes les réservations confirmées
+            // Récupérer toutes les réservations confirmées (y compris celles déjà complétées)
             $confirmedBookings = $trip->bookings()
                 ->whereIn('status', [
                     Booking::STATUS_ACCEPTED,
                     Booking::STATUS_PAYMENT_AUTHORIZED,
-                    Booking::STATUS_PAYMENT_CONFIRMED
+                    Booking::STATUS_PAYMENT_CONFIRMED,
+                    Booking::STATUS_COMPLETED  // Inclure les réservations déjà livrées
                 ])
                 ->get();
 
