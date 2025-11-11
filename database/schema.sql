@@ -1,3 +1,12 @@
+-- =====================================================
+-- KiloShare Database Schema
+-- Generated: 2025-11-11
+-- Purpose: Complete database structure for production
+-- =====================================================
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- MySQL dump 10.13  Distrib 9.3.0, for macos15.2 (arm64)
 --
 -- Host: localhost    Database: kiloshare
@@ -16,93 +25,9 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Temporary view structure for view `active_trips_overview`
---
-
-DROP TABLE IF EXISTS `active_trips_overview`;
-/*!50001 DROP VIEW IF EXISTS `active_trips_overview`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `active_trips_overview` AS SELECT 
- 1 AS `id`,
- 1 AS `uuid`,
- 1 AS `user_id`,
- 1 AS `departure_city`,
- 1 AS `departure_country`,
- 1 AS `departure_airport_code`,
- 1 AS `departure_date`,
- 1 AS `arrival_city`,
- 1 AS `arrival_country`,
- 1 AS `arrival_airport_code`,
- 1 AS `arrival_date`,
- 1 AS `available_weight_kg`,
- 1 AS `price_per_kg`,
- 1 AS `currency`,
- 1 AS `flight_number`,
- 1 AS `airline`,
- 1 AS `ticket_verified`,
- 1 AS `ticket_verification_date`,
- 1 AS `status`,
- 1 AS `view_count`,
- 1 AS `booking_count`,
- 1 AS `description`,
- 1 AS `special_notes`,
- 1 AS `created_at`,
- 1 AS `updated_at`,
- 1 AS `published_at`,
- 1 AS `paused_at`,
- 1 AS `cancelled_at`,
- 1 AS `archived_at`,
- 1 AS `expired_at`,
- 1 AS `rejected_at`,
- 1 AS `completed_at`,
- 1 AS `rejection_reason`,
- 1 AS `rejection_details`,
- 1 AS `cancellation_reason`,
- 1 AS `cancellation_details`,
- 1 AS `pause_reason`,
- 1 AS `auto_approved`,
- 1 AS `moderated_by`,
- 1 AS `moderation_notes`,
- 1 AS `trust_score_at_creation`,
- 1 AS `requires_manual_review`,
- 1 AS `review_priority`,
- 1 AS `share_count`,
- 1 AS `favorite_count`,
- 1 AS `report_count`,
- 1 AS `duplicate_count`,
- 1 AS `edit_count`,
- 1 AS `total_booked_weight`,
- 1 AS `remaining_weight`,
- 1 AS `is_urgent`,
- 1 AS `is_featured`,
- 1 AS `is_verified`,
- 1 AS `auto_expire`,
- 1 AS `allow_partial_booking`,
- 1 AS `instant_booking`,
- 1 AS `visibility`,
- 1 AS `min_user_rating`,
- 1 AS `min_user_trips`,
- 1 AS `blocked_users`,
- 1 AS `slug`,
- 1 AS `meta_title`,
- 1 AS `meta_description`,
- 1 AS `share_token`,
- 1 AS `version`,
- 1 AS `last_major_edit`,
- 1 AS `original_trip_id`,
- 1 AS `first_name`,
- 1 AS `last_name`,
- 1 AS `profile_picture`,
- 1 AS `hours_until_departure`,
- 1 AS `booking_percentage`*/;
-SET character_set_client = @saved_cs_client;
-
---
 -- Table structure for table `admin_actions`
 --
 
-DROP TABLE IF EXISTS `admin_actions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `admin_actions` (
@@ -120,99 +45,44 @@ CREATE TABLE `admin_actions` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `auto_support_tickets`
---
-
-DROP TABLE IF EXISTS `auto_support_tickets`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `auto_support_tickets` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `trip_id` int DEFAULT NULL,
-  `booking_id` int DEFAULT NULL,
-  `user_id` int NOT NULL,
-  `category` enum('critical_cancellation','refund_issue','user_dispute','technical_issue') NOT NULL,
-  `priority` enum('low','medium','high','critical') DEFAULT 'medium',
-  `title` varchar(255) NOT NULL,
-  `description` text NOT NULL,
-  `status` enum('open','in_progress','resolved','closed') DEFAULT 'open',
-  `assigned_to` int DEFAULT NULL COMMENT 'Admin user ID',
-  `auto_generated` tinyint(1) DEFAULT '1',
-  `resolution_notes` text,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `resolved_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `trip_id` (`trip_id`),
-  KEY `booking_id` (`booking_id`),
-  KEY `user_id` (`user_id`),
-  KEY `idx_status_priority` (`status`,`priority`),
-  KEY `idx_auto_generated` (`auto_generated`,`created_at`),
-  CONSTRAINT `auto_support_tickets_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `auto_support_tickets_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `auto_support_tickets_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary view structure for view `booking_summary`
---
-
-DROP TABLE IF EXISTS `booking_summary`;
-/*!50001 DROP VIEW IF EXISTS `booking_summary`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `booking_summary` AS SELECT 
- 1 AS `id`,
- 1 AS `uuid`,
- 1 AS `status`,
- 1 AS `package_description`,
- 1 AS `weight_kg`,
- 1 AS `final_price`,
- 1 AS `commission_amount`,
- 1 AS `sender_email`,
- 1 AS `receiver_email`,
- 1 AS `departure_city`,
- 1 AS `arrival_city`,
- 1 AS `created_at`*/;
-SET character_set_client = @saved_cs_client;
-
---
 -- Table structure for table `bookings`
 --
 
-DROP TABLE IF EXISTS `bookings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bookings` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `uuid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `trip_id` int NOT NULL,
   `sender_id` int NOT NULL,
   `receiver_id` int NOT NULL,
-  `package_description` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `package_description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `weight_kg` decimal(5,2) NOT NULL,
   `total_price` decimal(8,2) NOT NULL,
-  `dimensions_cm` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dimensions_cm` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `payment_authorization_id` bigint unsigned DEFAULT NULL,
   `payment_authorized_at` timestamp NULL DEFAULT NULL,
   `payment_confirmed_at` timestamp NULL DEFAULT NULL,
   `payment_captured_at` timestamp NULL DEFAULT NULL,
   `commission_rate` decimal(4,2) DEFAULT '15.00',
   `commission_amount` decimal(8,2) DEFAULT NULL,
-  `status` enum('pending','accepted','payment_authorized','payment_confirmed','paid','in_transit','delivered','completed','cancelled','payment_failed','payment_expired','payment_cancelled','refunded') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  `pickup_address` text COLLATE utf8mb4_unicode_ci,
-  `delivery_address` text COLLATE utf8mb4_unicode_ci,
+  `status` enum('pending','accepted','rejected','payment_authorized','payment_confirmed','paid','in_transit','delivered','completed','cancelled','payment_failed','payment_expired','payment_cancelled','refunded') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `pickup_address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `delivery_address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `pickup_date` datetime DEFAULT NULL,
   `delivery_date` datetime DEFAULT NULL,
-  `pickup_code` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `delivery_code` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `special_instructions` text COLLATE utf8mb4_unicode_ci,
+  `special_instructions` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `expires_at` timestamp NULL DEFAULT NULL,
-  `payment_status` enum('pending','paid','refunded','failed') COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
-  `rejection_reason` text COLLATE utf8mb4_unicode_ci COMMENT 'Raison optionnelle fournie lors du rejet d''une réservation',
+  `payment_status` enum('pending','paid','refunded','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `rejection_reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT 'Raison optionnelle fournie lors du rejet d''une réservation',
+  `archived_by_sender` tinyint(1) DEFAULT '0' COMMENT 'Archivé par l''expéditeur',
+  `archived_by_sender_at` timestamp NULL DEFAULT NULL COMMENT 'Date d''archivage par l''expéditeur',
+  `archived_by_receiver` tinyint(1) DEFAULT '0' COMMENT 'Archivé par le transporteur',
+  `archived_by_receiver_at` timestamp NULL DEFAULT NULL COMMENT 'Date d''archivage par le transporteur',
+  `delivery_confirmed_at` timestamp NULL DEFAULT NULL,
+  `delivery_confirmed_by` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `idx_trip_bookings` (`trip_id`),
@@ -225,18 +95,20 @@ CREATE TABLE `bookings` (
   KEY `idx_payment_authorization` (`payment_authorization_id`),
   KEY `idx_booking_status_timestamps` (`status`,`payment_confirmed_at`,`payment_captured_at`),
   KEY `idx_bookings_trip_status` (`trip_id`,`status`),
+  KEY `idx_bookings_archived_sender` (`sender_id`,`archived_by_sender`,`status`),
+  KEY `idx_bookings_archived_receiver` (`receiver_id`,`archived_by_receiver`,`status`),
+  KEY `idx_delivery_confirmed_at` (`delivery_confirmed_at`),
   CONSTRAINT `bookings_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
   CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `bookings_ibfk_3` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_booking_payment_authorization` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table principale des réservations de transport de colis';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table principale des réservations de transport de colis';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `cancellation_attempts`
 --
 
-DROP TABLE IF EXISTS `cancellation_attempts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cancellation_attempts` (
@@ -255,69 +127,13 @@ CREATE TABLE `cancellation_attempts` (
   CONSTRAINT `cancellation_attempts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cancellation_attempts_ibfk_2` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE SET NULL,
   CONSTRAINT `cancellation_attempts_ibfk_3` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `cancellation_notifications`
---
-
-DROP TABLE IF EXISTS `cancellation_notifications`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `cancellation_notifications` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `trip_id` int NOT NULL,
-  `user_id` int NOT NULL,
-  `notification_type` enum('trip_cancelled','alternative_suggested','refund_processed','penalty_applied') NOT NULL,
-  `channel` enum('email','push','in_app','sms') NOT NULL,
-  `status` enum('pending','sent','delivered','failed') DEFAULT 'pending',
-  `content` json DEFAULT NULL COMMENT 'Contenu personnalisé de la notification',
-  `sent_at` datetime DEFAULT NULL,
-  `delivered_at` datetime DEFAULT NULL,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `trip_id` (`trip_id`),
-  KEY `idx_status_type` (`status`,`notification_type`),
-  KEY `idx_user_notifications` (`user_id`,`sent_at`),
-  CONSTRAINT `cancellation_notifications_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `cancellation_notifications_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `cancellation_policies`
---
-
-DROP TABLE IF EXISTS `cancellation_policies`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `cancellation_policies` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `policy_name` varchar(100) NOT NULL,
-  `hours_before_departure_min` int NOT NULL,
-  `hours_before_departure_max` int DEFAULT NULL,
-  `has_bookings` tinyint(1) NOT NULL DEFAULT '0',
-  `has_payments` tinyint(1) NOT NULL DEFAULT '0',
-  `penalty_duration_days` int DEFAULT '0',
-  `reliability_impact` int DEFAULT '0',
-  `refund_percentage` decimal(5,2) DEFAULT '100.00',
-  `compensation_percentage` decimal(5,2) DEFAULT '0.00',
-  `restriction_type` enum('none','warning','publication_restriction','account_suspension') DEFAULT 'none',
-  `is_active` tinyint(1) DEFAULT '1',
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_policy` (`hours_before_departure_min`,`hours_before_departure_max`,`has_bookings`,`has_payments`),
-  KEY `idx_active_policies` (`is_active`,`hours_before_departure_min`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `contact_revelations`
 --
 
-DROP TABLE IF EXISTS `contact_revelations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `contact_revelations` (
@@ -342,7 +158,6 @@ CREATE TABLE `contact_revelations` (
 -- Table structure for table `conversation_participants`
 --
 
-DROP TABLE IF EXISTS `conversation_participants`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversation_participants` (
@@ -358,14 +173,13 @@ CREATE TABLE `conversation_participants` (
   KEY `idx_conversation_user` (`conversation_id`,`user_id`),
   KEY `idx_user_active` (`user_id`,`is_active`),
   CONSTRAINT `conversation_participants_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `conversations`
 --
 
-DROP TABLE IF EXISTS `conversations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversations` (
@@ -384,14 +198,54 @@ CREATE TABLE `conversations` (
   KEY `idx_last_message` (`last_message_at`),
   KEY `idx_trip_id` (`trip_id`),
   CONSTRAINT `chk_conversation_reference` CHECK (((`booking_id` is not null) or (`trip_id` is not null)))
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `delivery_codes`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `delivery_codes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `booking_id` int NOT NULL,
+  `code` varchar(6) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attempts_count` int DEFAULT '0',
+  `max_attempts` int DEFAULT '3',
+  `status` enum('active','used','expired','regenerated') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
+  `generated_by` int NOT NULL,
+  `generated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` timestamp NOT NULL,
+  `used_at` timestamp NULL DEFAULT NULL,
+  `used_by` int DEFAULT NULL,
+  `delivery_latitude` decimal(10,8) DEFAULT NULL,
+  `delivery_longitude` decimal(11,8) DEFAULT NULL,
+  `delivery_photos` json DEFAULT NULL,
+  `verification_photos` json DEFAULT NULL,
+  `delivery_location_lat` decimal(10,8) DEFAULT NULL,
+  `delivery_location_lng` decimal(11,8) DEFAULT NULL,
+  `delivery_photo_url` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_active_booking` (`booking_id`,`status`),
+  KEY `idx_booking_id` (`booking_id`),
+  KEY `idx_code` (`code`),
+  KEY `idx_status` (`status`),
+  KEY `idx_expires_at` (`expires_at`),
+  KEY `generated_by` (`generated_by`),
+  KEY `used_by` (`used_by`),
+  CONSTRAINT `delivery_codes_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `delivery_codes_ibfk_2` FOREIGN KEY (`generated_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `delivery_codes_ibfk_3` FOREIGN KEY (`used_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `email_verifications`
 --
 
-DROP TABLE IF EXISTS `email_verifications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `email_verifications` (
@@ -409,14 +263,13 @@ CREATE TABLE `email_verifications` (
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_cleanup` (`expires_at`,`is_used`),
   CONSTRAINT `email_verifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `escrow_accounts`
 --
 
-DROP TABLE IF EXISTS `escrow_accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `escrow_accounts` (
@@ -424,51 +277,22 @@ CREATE TABLE `escrow_accounts` (
   `transaction_id` int NOT NULL,
   `amount_held` decimal(8,2) NOT NULL,
   `amount_released` decimal(8,2) DEFAULT '0.00',
-  `hold_reason` enum('payment_security','delivery_confirmation','dispute_resolution') COLLATE utf8mb4_unicode_ci DEFAULT 'delivery_confirmation',
-  `status` enum('holding','partial_release','fully_released','disputed') COLLATE utf8mb4_unicode_ci DEFAULT 'holding',
+  `hold_reason` enum('payment_security','delivery_confirmation','dispute_resolution') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'delivery_confirmation',
+  `status` enum('holding','partial_release','fully_released','disputed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'holding',
   `held_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `released_at` timestamp NULL DEFAULT NULL,
-  `release_notes` text COLLATE utf8mb4_unicode_ci,
+  `release_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`id`),
   KEY `idx_escrow_transaction` (`transaction_id`),
   KEY `idx_escrow_status` (`status`),
   CONSTRAINT `escrow_accounts_ibfk_1` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Système de rétention de fonds jusqu''à livraison confirmée';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `message_attachments`
---
-
-DROP TABLE IF EXISTS `message_attachments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `message_attachments` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `message_id` bigint NOT NULL,
-  `file_name` varchar(255) NOT NULL,
-  `file_path` varchar(500) NOT NULL,
-  `file_type` varchar(100) NOT NULL,
-  `file_size` bigint NOT NULL,
-  `image_width` int DEFAULT NULL,
-  `image_height` int DEFAULT NULL,
-  `thumbnail_path` varchar(500) DEFAULT NULL,
-  `is_scanned` tinyint(1) DEFAULT '0',
-  `scan_status` enum('pending','clean','malware','suspicious') DEFAULT 'pending',
-  `uploaded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_message` (`message_id`),
-  KEY `idx_type` (`file_type`),
-  KEY `idx_scan_status` (`scan_status`),
-  CONSTRAINT `message_attachments_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `messages` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Système de rétention de fonds jusqu''à livraison confirmée';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `message_reads`
 --
 
-DROP TABLE IF EXISTS `message_reads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `message_reads` (
@@ -481,14 +305,13 @@ CREATE TABLE `message_reads` (
   KEY `idx_user_read` (`user_id`,`read_at`),
   KEY `idx_message` (`message_id`),
   CONSTRAINT `message_reads_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `messages` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `messages`
 --
 
-DROP TABLE IF EXISTS `messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `messages` (
@@ -524,7 +347,6 @@ CREATE TABLE `messages` (
 -- Table structure for table `notification_logs`
 --
 
-DROP TABLE IF EXISTS `notification_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_logs` (
@@ -559,33 +381,13 @@ CREATE TABLE `notification_logs` (
   KEY `notification_id` (`notification_id`),
   CONSTRAINT `notification_logs_ibfk_1` FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `notification_logs_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=177 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary view structure for view `notification_stats_by_channel`
---
-
-DROP TABLE IF EXISTS `notification_stats_by_channel`;
-/*!50001 DROP VIEW IF EXISTS `notification_stats_by_channel`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `notification_stats_by_channel` AS SELECT 
- 1 AS `channel`,
- 1 AS `date`,
- 1 AS `total_sent`,
- 1 AS `delivered`,
- 1 AS `opened`,
- 1 AS `failed`,
- 1 AS `delivery_rate`,
- 1 AS `open_rate`*/;
-SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `notification_templates`
 --
 
-DROP TABLE IF EXISTS `notification_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_templates` (
@@ -607,14 +409,13 @@ CREATE TABLE `notification_templates` (
   KEY `idx_channel` (`channel`),
   KEY `idx_language` (`language`),
   KEY `idx_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=96 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `notifications`
 --
 
-DROP TABLE IF EXISTS `notifications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
@@ -637,20 +438,19 @@ CREATE TABLE `notifications` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_expires_at` (`expires_at`),
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=125 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `payment_authorizations`
 --
 
-DROP TABLE IF EXISTS `payment_authorizations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_authorizations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `booking_id` int NOT NULL,
-  `payment_intent_id` varchar(255) NOT NULL,
+  `payment_intent_id` varchar(255) DEFAULT NULL,
   `stripe_account_id` varchar(255) NOT NULL,
   `amount_cents` int NOT NULL,
   `currency` varchar(3) NOT NULL DEFAULT 'CAD',
@@ -678,14 +478,13 @@ CREATE TABLE `payment_authorizations` (
   KEY `idx_status_auto_capture` (`status`,`auto_capture_at`),
   KEY `idx_status_expires` (`status`,`expires_at`),
   CONSTRAINT `payment_authorizations_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `payment_configurations`
 --
 
-DROP TABLE IF EXISTS `payment_configurations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_configurations` (
@@ -703,14 +502,13 @@ CREATE TABLE `payment_configurations` (
   KEY `idx_config_key` (`config_key`),
   KEY `idx_category` (`category`),
   KEY `idx_is_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `payment_events_log`
 --
 
-DROP TABLE IF EXISTS `payment_events_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_events_log` (
@@ -740,14 +538,13 @@ CREATE TABLE `payment_events_log` (
   CONSTRAINT `payment_events_log_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `payment_events_log_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE,
   CONSTRAINT `payment_events_log_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `review_reminders`
 --
 
-DROP TABLE IF EXISTS `review_reminders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `review_reminders` (
@@ -770,7 +567,6 @@ CREATE TABLE `review_reminders` (
 -- Table structure for table `reviews`
 --
 
-DROP TABLE IF EXISTS `reviews`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `reviews` (
@@ -803,7 +599,6 @@ CREATE TABLE `reviews` (
 -- Table structure for table `scheduled_jobs`
 --
 
-DROP TABLE IF EXISTS `scheduled_jobs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `scheduled_jobs` (
@@ -832,30 +627,29 @@ CREATE TABLE `scheduled_jobs` (
   KEY `idx_job_cleanup` (`status`,`created_at`),
   CONSTRAINT `scheduled_jobs_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `scheduled_jobs_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `transactions`
 --
 
-DROP TABLE IF EXISTS `transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `transactions` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `uuid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `booking_id` int NOT NULL,
-  `type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `payment_authorization_id` bigint unsigned DEFAULT NULL,
-  `stripe_payment_intent_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `stripe_payment_method_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `stripe_payment_intent_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `stripe_payment_method_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `amount` decimal(8,2) NOT NULL,
   `commission` decimal(8,2) NOT NULL,
   `receiver_amount` decimal(8,2) NOT NULL,
-  `currency` varchar(3) COLLATE utf8mb4_unicode_ci DEFAULT 'CAD',
-  `status` enum('pending','processing','succeeded','failed','cancelled','refunded','authorized','confirmed','captured','expired') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  `payment_method` enum('stripe','paypal','bank_transfer') COLLATE utf8mb4_unicode_ci DEFAULT 'stripe',
+  `currency` varchar(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'CAD',
+  `status` enum('pending','processing','succeeded','failed','cancelled','refunded','authorized','confirmed','captured','expired') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `payment_method` enum('stripe','paypal','bank_transfer') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'stripe',
   `processed_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `authorized_at` timestamp NULL DEFAULT NULL,
@@ -863,12 +657,12 @@ CREATE TABLE `transactions` (
   `captured_at` timestamp NULL DEFAULT NULL,
   `expires_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `transfer_status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
-  `stripe_transfer_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `stripe_transfer_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `transferred_at` timestamp NULL DEFAULT NULL,
   `rejected_at` timestamp NULL DEFAULT NULL,
   `rejected_by` int DEFAULT NULL,
-  `refund_type` enum('full_refund','partial_refund','standard_refund','no_refund') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `refund_type` enum('full_refund','partial_refund','standard_refund','no_refund') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `compensation_amount` decimal(10,2) DEFAULT '0.00',
   `original_transaction_id` int DEFAULT NULL COMMENT 'Référence à la transaction originale',
   `auto_processed` tinyint(1) DEFAULT '0' COMMENT 'Traité automatiquement',
@@ -883,42 +677,13 @@ CREATE TABLE `transactions` (
   KEY `idx_transactions_type_status` (`type`,`status`),
   CONSTRAINT `fk_transaction_payment_authorization` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Transactions financières et paiements Stripe';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `trip_alternatives`
---
-
-DROP TABLE IF EXISTS `trip_alternatives`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `trip_alternatives` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cancelled_trip_id` int NOT NULL,
-  `suggested_trip_id` int NOT NULL,
-  `affected_user_id` int NOT NULL,
-  `suggestion_type` enum('automatic','manual','ai_recommended') DEFAULT 'automatic',
-  `relevance_score` decimal(3,2) DEFAULT '0.00' COMMENT 'Score de pertinence (0-1)',
-  `is_accepted` tinyint(1) DEFAULT NULL COMMENT 'NULL = non répondu, TRUE = accepté, FALSE = refusé',
-  `suggested_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `responded_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `suggested_trip_id` (`suggested_trip_id`),
-  KEY `affected_user_id` (`affected_user_id`),
-  KEY `idx_suggestions` (`cancelled_trip_id`,`affected_user_id`),
-  KEY `idx_responses` (`is_accepted`,`responded_at`),
-  CONSTRAINT `trip_alternatives_ibfk_1` FOREIGN KEY (`cancelled_trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `trip_alternatives_ibfk_2` FOREIGN KEY (`suggested_trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `trip_alternatives_ibfk_3` FOREIGN KEY (`affected_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Transactions financières et paiements Stripe';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `trip_favorites`
 --
 
-DROP TABLE IF EXISTS `trip_favorites`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_favorites` (
@@ -939,22 +704,21 @@ CREATE TABLE `trip_favorites` (
 -- Table structure for table `trip_images`
 --
 
-DROP TABLE IF EXISTS `trip_images`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_images` (
   `id` int NOT NULL AUTO_INCREMENT,
   `trip_id` int NOT NULL,
-  `image_path` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `thumbnail` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `alt_text` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `image_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `thumbnail` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `alt_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_primary` tinyint(1) DEFAULT '0',
   `width` int DEFAULT NULL,
   `height` int DEFAULT NULL,
-  `image_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `image_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int DEFAULT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `order` int DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -966,14 +730,13 @@ CREATE TABLE `trip_images` (
   KEY `idx_trip_images_primary` (`is_primary`),
   KEY `idx_trip_images_order` (`order`),
   CONSTRAINT `trip_images_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `trip_reports`
 --
 
-DROP TABLE IF EXISTS `trip_reports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_reports` (
@@ -999,27 +762,9 @@ CREATE TABLE `trip_reports` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Temporary view structure for view `trip_status_summary`
---
-
-DROP TABLE IF EXISTS `trip_status_summary`;
-/*!50001 DROP VIEW IF EXISTS `trip_status_summary`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `trip_status_summary` AS SELECT 
- 1 AS `user_id`,
- 1 AS `status`,
- 1 AS `count`,
- 1 AS `total_views`,
- 1 AS `total_bookings`,
- 1 AS `avg_price`*/;
-SET character_set_client = @saved_cs_client;
-
---
 -- Table structure for table `trips`
 --
 
-DROP TABLE IF EXISTS `trips`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trips` (
@@ -1128,24 +873,23 @@ CREATE TABLE `trips` (
   CONSTRAINT `fk_trips_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `trips_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `trips_ibfk_2` FOREIGN KEY (`original_trip_id`) REFERENCES `trips` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `user_fcm_tokens`
 --
 
-DROP TABLE IF EXISTS `user_fcm_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_fcm_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Identifiant unique du token FCM',
   `user_id` int NOT NULL COMMENT 'ID de l''utilisateur propriétaire du token',
-  `fcm_token` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Token FCM généré par Firebase',
-  `platform` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'mobile' COMMENT 'Plateforme (mobile, web, etc.)',
+  `fcm_token` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Token FCM généré par Firebase',
+  `platform` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'mobile' COMMENT 'Plateforme (mobile, web, etc.)',
   `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'Indique si le token est actif',
   `device_info` json DEFAULT NULL COMMENT 'Informations sur l''appareil (modèle, version OS, etc.)',
-  `app_version` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Version de l''application mobile',
+  `app_version` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Version de l''application mobile',
   `last_used_at` timestamp NULL DEFAULT NULL COMMENT 'Dernière utilisation du token',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Date de création',
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Date de dernière modification',
@@ -1162,14 +906,13 @@ CREATE TABLE `user_fcm_tokens` (
   KEY `idx_user_fcm_active` (`user_id`,`is_active`),
   KEY `idx_platform_active` (`platform`,`is_active`),
   CONSTRAINT `fk_user_fcm_tokens_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `user_notification_preferences`
 --
 
-DROP TABLE IF EXISTS `user_notification_preferences`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_notification_preferences` (
@@ -1198,36 +941,13 @@ CREATE TABLE `user_notification_preferences` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`),
   CONSTRAINT `user_notification_preferences_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary view structure for view `user_rating_summary`
---
-
-DROP TABLE IF EXISTS `user_rating_summary`;
-/*!50001 DROP VIEW IF EXISTS `user_rating_summary`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `user_rating_summary` AS SELECT 
- 1 AS `user_id`,
- 1 AS `first_name`,
- 1 AS `last_name`,
- 1 AS `average_rating`,
- 1 AS `total_reviews`,
- 1 AS `as_traveler_rating`,
- 1 AS `as_traveler_count`,
- 1 AS `as_sender_rating`,
- 1 AS `as_sender_count`,
- 1 AS `last_calculated_at`,
- 1 AS `rating_status`*/;
-SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `user_ratings`
 --
 
-DROP TABLE IF EXISTS `user_ratings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_ratings` (
@@ -1252,7 +972,6 @@ CREATE TABLE `user_ratings` (
 -- Table structure for table `user_reliability_history`
 --
 
-DROP TABLE IF EXISTS `user_reliability_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_reliability_history` (
@@ -1271,44 +990,20 @@ CREATE TABLE `user_reliability_history` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Temporary view structure for view `user_reliability_stats`
---
-
-DROP TABLE IF EXISTS `user_reliability_stats`;
-/*!50001 DROP VIEW IF EXISTS `user_reliability_stats`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `user_reliability_stats` AS SELECT 
- 1 AS `user_id`,
- 1 AS `first_name`,
- 1 AS `last_name`,
- 1 AS `email`,
- 1 AS `user_type`,
- 1 AS `reliability_score`,
- 1 AS `total_trips`,
- 1 AS `completed_trips`,
- 1 AS `cancelled_trips`,
- 1 AS `completion_rate`,
- 1 AS `recent_cancellations`,
- 1 AS `member_since`*/;
-SET character_set_client = @saved_cs_client;
-
---
 -- Table structure for table `user_stripe_accounts`
 --
 
-DROP TABLE IF EXISTS `user_stripe_accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_stripe_accounts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
-  `stripe_account_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` enum('pending','onboarding','active','restricted','rejected') COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `stripe_account_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('pending','onboarding','active','restricted','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
   `details_submitted` tinyint(1) DEFAULT '0',
   `charges_enabled` tinyint(1) DEFAULT '0',
   `payouts_enabled` tinyint(1) DEFAULT '0',
-  `onboarding_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `onboarding_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `requirements` json DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1318,21 +1013,20 @@ CREATE TABLE `user_stripe_accounts` (
   KEY `idx_stripe_account` (`stripe_account_id`),
   KEY `idx_account_status` (`status`),
   CONSTRAINT `user_stripe_accounts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Comptes Stripe Connect pour les utilisateurs transporteurs';
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Comptes Stripe Connect pour les utilisateurs transporteurs';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `user_tokens`
 --
 
-DROP TABLE IF EXISTS `user_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_tokens` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
-  `token` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('refresh','access','password_reset') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('refresh','access','password_reset') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expires_at` timestamp NOT NULL,
   `is_revoked` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1343,81 +1037,63 @@ CREATE TABLE `user_tokens` (
   KEY `idx_type` (`type`),
   KEY `idx_expires_at` (`expires_at`),
   CONSTRAINT `user_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary view structure for view `user_unread_notifications`
---
-
-DROP TABLE IF EXISTS `user_unread_notifications`;
-/*!50001 DROP VIEW IF EXISTS `user_unread_notifications`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `user_unread_notifications` AS SELECT 
- 1 AS `user_id`,
- 1 AS `unread_count`,
- 1 AS `critical_count`,
- 1 AS `high_count`,
- 1 AS `latest_notification`*/;
-SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `users`
 --
 
-DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `uuid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `first_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `last_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `gender` enum('male','female','other') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `gender` enum('male','female','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `date_of_birth` date DEFAULT NULL,
-  `nationality` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `bio` text COLLATE utf8mb4_unicode_ci,
-  `website` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `profession` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `company` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `address_line1` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `address_line2` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `state_province` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `postal_code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `country` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `preferred_language` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT 'fr',
-  `timezone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'Europe/Paris',
-  `emergency_contact_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `emergency_contact_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `emergency_contact_relation` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `login_method` enum('email','phone','social') COLLATE utf8mb4_unicode_ci DEFAULT 'email',
+  `nationality` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bio` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `website` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `profession` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `company` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address_line1` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address_line2` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `city` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `state_province` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `postal_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `country` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `preferred_language` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'fr',
+  `timezone` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Europe/Paris',
+  `emergency_contact_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `emergency_contact_phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `emergency_contact_relation` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `login_method` enum('email','phone','social') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'email',
   `two_factor_enabled` tinyint(1) DEFAULT '0',
   `newsletter_subscribed` tinyint(1) DEFAULT '1',
   `marketing_emails` tinyint(1) DEFAULT '0',
-  `profile_visibility` enum('public','private','friends_only') COLLATE utf8mb4_unicode_ci DEFAULT 'public',
+  `profile_visibility` enum('public','private','friends_only') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'public',
   `is_verified` tinyint(1) DEFAULT '0',
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `stripe_setup_completed` tinyint(1) DEFAULT '0',
   `stripe_onboarding_completed_at` timestamp NULL DEFAULT NULL,
   `phone_verified_at` timestamp NULL DEFAULT NULL,
-  `profile_picture` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('active','inactive','suspended') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
-  `role` enum('user','admin','moderator') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
+  `profile_picture` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('active','inactive','suspended') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
+  `role` enum('user','admin','moderator') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
   `last_login_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `social_provider` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'google, facebook, apple',
-  `social_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'ID from social provider',
+  `social_provider` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'google, facebook, apple',
+  `social_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'ID from social provider',
   `provider_data` json DEFAULT NULL COMMENT 'Additional data from provider',
   `deleted_at` timestamp NULL DEFAULT NULL,
   `publication_restricted_until` datetime DEFAULT NULL COMMENT 'Restriction de publication jusqu''à',
   `reliability_score` int DEFAULT '100' COMMENT 'Score de fiabilité (0-100)',
-  `user_type` enum('new','confirmed','expert') COLLATE utf8mb4_unicode_ci DEFAULT 'new' COMMENT 'Type d''utilisateur basé sur l''expérience',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
   UNIQUE KEY `email` (`email`),
@@ -1435,46 +1111,22 @@ CREATE TABLE `users` (
   KEY `idx_users_city` (`city`),
   KEY `idx_users_profile_visibility` (`profile_visibility`),
   KEY `idx_users_stripe_setup` (`stripe_setup_completed`),
-  KEY `idx_users_reliability` (`reliability_score`,`user_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table des utilisateurs avec système de rôles';
+  KEY `idx_users_reliability` (`reliability_score`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table des utilisateurs avec système de rôles';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary view structure for view `users_with_stripe_status`
---
-
-DROP TABLE IF EXISTS `users_with_stripe_status`;
-/*!50001 DROP VIEW IF EXISTS `users_with_stripe_status`*/;
-SET @saved_cs_client     = @@character_set_client;
-/*!50503 SET character_set_client = utf8mb4 */;
-/*!50001 CREATE VIEW `users_with_stripe_status` AS SELECT 
- 1 AS `id`,
- 1 AS `email`,
- 1 AS `first_name`,
- 1 AS `last_name`,
- 1 AS `stripe_setup_completed`,
- 1 AS `stripe_onboarding_completed_at`,
- 1 AS `stripe_account_id`,
- 1 AS `stripe_status`,
- 1 AS `charges_enabled`,
- 1 AS `payouts_enabled`,
- 1 AS `details_submitted`,
- 1 AS `transaction_readiness`*/;
-SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `verification_codes`
 --
 
-DROP TABLE IF EXISTS `verification_codes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `verification_codes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
   `booking_id` int DEFAULT NULL,
-  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('phone_verification','email_verification','password_reset','pickup_code','delivery_code') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `code` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('phone_verification','email_verification','password_reset','pickup_code','delivery_code') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `expires_at` timestamp NOT NULL,
   `is_used` tinyint(1) DEFAULT '0',
   `attempts` int DEFAULT '0',
@@ -1487,152 +1139,8 @@ CREATE TABLE `verification_codes` (
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_booking_id` (`booking_id`),
   CONSTRAINT `verification_codes_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Final view structure for view `active_trips_overview`
---
-
-/*!50001 DROP VIEW IF EXISTS `active_trips_overview`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `active_trips_overview` AS select `t`.`id` AS `id`,`t`.`uuid` AS `uuid`,`t`.`user_id` AS `user_id`,`t`.`departure_city` AS `departure_city`,`t`.`departure_country` AS `departure_country`,`t`.`departure_airport_code` AS `departure_airport_code`,`t`.`departure_date` AS `departure_date`,`t`.`arrival_city` AS `arrival_city`,`t`.`arrival_country` AS `arrival_country`,`t`.`arrival_airport_code` AS `arrival_airport_code`,`t`.`arrival_date` AS `arrival_date`,`t`.`available_weight_kg` AS `available_weight_kg`,`t`.`price_per_kg` AS `price_per_kg`,`t`.`currency` AS `currency`,`t`.`flight_number` AS `flight_number`,`t`.`airline` AS `airline`,`t`.`ticket_verified` AS `ticket_verified`,`t`.`ticket_verification_date` AS `ticket_verification_date`,`t`.`status` AS `status`,`t`.`view_count` AS `view_count`,`t`.`booking_count` AS `booking_count`,`t`.`description` AS `description`,`t`.`special_notes` AS `special_notes`,`t`.`created_at` AS `created_at`,`t`.`updated_at` AS `updated_at`,`t`.`published_at` AS `published_at`,`t`.`paused_at` AS `paused_at`,`t`.`cancelled_at` AS `cancelled_at`,`t`.`archived_at` AS `archived_at`,`t`.`expired_at` AS `expired_at`,`t`.`rejected_at` AS `rejected_at`,`t`.`completed_at` AS `completed_at`,`t`.`rejection_reason` AS `rejection_reason`,`t`.`rejection_details` AS `rejection_details`,`t`.`cancellation_reason` AS `cancellation_reason`,`t`.`cancellation_details` AS `cancellation_details`,`t`.`pause_reason` AS `pause_reason`,`t`.`auto_approved` AS `auto_approved`,`t`.`moderated_by` AS `moderated_by`,`t`.`moderation_notes` AS `moderation_notes`,`t`.`trust_score_at_creation` AS `trust_score_at_creation`,`t`.`requires_manual_review` AS `requires_manual_review`,`t`.`review_priority` AS `review_priority`,`t`.`share_count` AS `share_count`,`t`.`favorite_count` AS `favorite_count`,`t`.`report_count` AS `report_count`,`t`.`duplicate_count` AS `duplicate_count`,`t`.`edit_count` AS `edit_count`,`t`.`total_booked_weight` AS `total_booked_weight`,`t`.`remaining_weight` AS `remaining_weight`,`t`.`is_urgent` AS `is_urgent`,`t`.`is_featured` AS `is_featured`,`t`.`is_verified` AS `is_verified`,`t`.`auto_expire` AS `auto_expire`,`t`.`allow_partial_booking` AS `allow_partial_booking`,`t`.`instant_booking` AS `instant_booking`,`t`.`visibility` AS `visibility`,`t`.`min_user_rating` AS `min_user_rating`,`t`.`min_user_trips` AS `min_user_trips`,`t`.`blocked_users` AS `blocked_users`,`t`.`slug` AS `slug`,`t`.`meta_title` AS `meta_title`,`t`.`meta_description` AS `meta_description`,`t`.`share_token` AS `share_token`,`t`.`version` AS `version`,`t`.`last_major_edit` AS `last_major_edit`,`t`.`original_trip_id` AS `original_trip_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`profile_picture` AS `profile_picture`,timestampdiff(HOUR,now(),`t`.`departure_date`) AS `hours_until_departure`,((`t`.`total_booked_weight` / `t`.`available_weight_kg`) * 100) AS `booking_percentage` from (`trips` `t` join `users` `u` on((`t`.`user_id` = `u`.`id`))) where ((`t`.`status` = 'active') and (`t`.`departure_date` > now())) order by `t`.`departure_date` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `booking_summary`
---
-
-/*!50001 DROP VIEW IF EXISTS `booking_summary`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `booking_summary` AS select `b`.`id` AS `id`,`b`.`uuid` AS `uuid`,`b`.`status` AS `status`,`b`.`package_description` AS `package_description`,`b`.`weight_kg` AS `weight_kg`,`b`.`total_price` AS `final_price`,`b`.`commission_amount` AS `commission_amount`,`t_sender`.`email` AS `sender_email`,`t_receiver`.`email` AS `receiver_email`,`tr`.`departure_city` AS `departure_city`,`tr`.`arrival_city` AS `arrival_city`,`b`.`created_at` AS `created_at` from (((`bookings` `b` left join `users` `t_sender` on((`b`.`sender_id` = `t_sender`.`id`))) left join `users` `t_receiver` on((`b`.`receiver_id` = `t_receiver`.`id`))) left join `trips` `tr` on((`b`.`trip_id` = `tr`.`id`))) */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `notification_stats_by_channel`
---
-
-/*!50001 DROP VIEW IF EXISTS `notification_stats_by_channel`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `notification_stats_by_channel` AS select `notification_logs`.`channel` AS `channel`,cast(`notification_logs`.`sent_at` as date) AS `date`,count(0) AS `total_sent`,count((case when (`notification_logs`.`status` = 'delivered') then 1 end)) AS `delivered`,count((case when (`notification_logs`.`status` = 'opened') then 1 end)) AS `opened`,count((case when (`notification_logs`.`status` = 'failed') then 1 end)) AS `failed`,round(((count((case when (`notification_logs`.`status` = 'delivered') then 1 end)) * 100.0) / count(0)),2) AS `delivery_rate`,round(((count((case when (`notification_logs`.`status` = 'opened') then 1 end)) * 100.0) / count((case when (`notification_logs`.`status` = 'delivered') then 1 end))),2) AS `open_rate` from `notification_logs` where (`notification_logs`.`sent_at` >= (now() - interval 30 day)) group by `notification_logs`.`channel`,cast(`notification_logs`.`sent_at` as date) order by `date` desc,`notification_logs`.`channel` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `trip_status_summary`
---
-
-/*!50001 DROP VIEW IF EXISTS `trip_status_summary`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `trip_status_summary` AS select `trips`.`user_id` AS `user_id`,`trips`.`status` AS `status`,count(0) AS `count`,sum(`trips`.`view_count`) AS `total_views`,sum(`trips`.`booking_count`) AS `total_bookings`,avg(`trips`.`price_per_kg`) AS `avg_price` from `trips` where (`trips`.`archived_at` is null) group by `trips`.`user_id`,`trips`.`status` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `user_rating_summary`
---
-
-/*!50001 DROP VIEW IF EXISTS `user_rating_summary`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `user_rating_summary` AS select `ur`.`user_id` AS `user_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`ur`.`average_rating` AS `average_rating`,`ur`.`total_reviews` AS `total_reviews`,`ur`.`as_traveler_rating` AS `as_traveler_rating`,`ur`.`as_traveler_count` AS `as_traveler_count`,`ur`.`as_sender_rating` AS `as_sender_rating`,`ur`.`as_sender_count` AS `as_sender_count`,`ur`.`last_calculated_at` AS `last_calculated_at`,(case when ((`ur`.`average_rating` >= 4.5) and (`ur`.`total_reviews` >= 5)) then 'super_traveler' when ((`ur`.`average_rating` < 2.5) and (`ur`.`total_reviews` >= 3)) then 'suspended' when ((`ur`.`average_rating` < 3.0) and (`ur`.`total_reviews` >= 3)) then 'warning' else 'normal' end) AS `rating_status` from (`user_ratings` `ur` join `users` `u` on((`ur`.`user_id` = `u`.`id`))) */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `user_reliability_stats`
---
-
-/*!50001 DROP VIEW IF EXISTS `user_reliability_stats`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `user_reliability_stats` AS select `u`.`id` AS `user_id`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`email` AS `email`,`u`.`user_type` AS `user_type`,coalesce(`ur`.`reliability_score`,100) AS `reliability_score`,count(`t`.`id`) AS `total_trips`,count((case when (`t`.`status` = 'completed') then 1 end)) AS `completed_trips`,count((case when (`t`.`status` = 'cancelled') then 1 end)) AS `cancelled_trips`,round((case when (count(`t`.`id`) > 0) then ((count((case when (`t`.`status` = 'completed') then 1 end)) / count(`t`.`id`)) * 100) else 100 end),2) AS `completion_rate`,(select count(0) from `cancellation_attempts` `ca` where ((`ca`.`user_id` = `u`.`id`) and (`ca`.`is_allowed` = true) and (`ca`.`created_at` >= (now() - interval 3 month)))) AS `recent_cancellations`,`u`.`created_at` AS `member_since` from ((`users` `u` left join `user_ratings` `ur` on((`u`.`id` = `ur`.`user_id`))) left join `trips` `t` on((`u`.`id` = `t`.`user_id`))) group by `u`.`id`,`u`.`first_name`,`u`.`last_name`,`u`.`email`,`u`.`user_type`,`ur`.`reliability_score`,`u`.`created_at` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `user_unread_notifications`
---
-
-/*!50001 DROP VIEW IF EXISTS `user_unread_notifications`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `user_unread_notifications` AS select `notifications`.`user_id` AS `user_id`,count(0) AS `unread_count`,count((case when (`notifications`.`priority` = 'critical') then 1 end)) AS `critical_count`,count((case when (`notifications`.`priority` = 'high') then 1 end)) AS `high_count`,max(`notifications`.`created_at`) AS `latest_notification` from `notifications` where ((`notifications`.`is_read` = false) and (`notifications`.`deleted_at` is null) and ((`notifications`.`expires_at` is null) or (`notifications`.`expires_at` > now()))) group by `notifications`.`user_id` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `users_with_stripe_status`
---
-
-/*!50001 DROP VIEW IF EXISTS `users_with_stripe_status`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 */
-/*!50001 VIEW `users_with_stripe_status` AS select `u`.`id` AS `id`,`u`.`email` AS `email`,`u`.`first_name` AS `first_name`,`u`.`last_name` AS `last_name`,`u`.`stripe_setup_completed` AS `stripe_setup_completed`,`u`.`stripe_onboarding_completed_at` AS `stripe_onboarding_completed_at`,`usa`.`stripe_account_id` AS `stripe_account_id`,`usa`.`status` AS `stripe_status`,`usa`.`charges_enabled` AS `charges_enabled`,`usa`.`payouts_enabled` AS `payouts_enabled`,`usa`.`details_submitted` AS `details_submitted`,(case when ((`usa`.`charges_enabled` = true) and (`usa`.`payouts_enabled` = true)) then 'ready_for_transactions' when (`usa`.`details_submitted` = true) then 'pending_verification' when (`usa`.`stripe_account_id` is not null) then 'onboarding_incomplete' else 'no_account' end) AS `transaction_readiness` from (`users` `u` left join `user_stripe_accounts` `usa` on((`u`.`id` = `usa`.`user_id`))) */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -1643,4 +1151,10 @@ CREATE TABLE `verification_codes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-04 11:40:19
+-- Dump completed on 2025-11-11  0:51:10
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================================================
+-- End of KiloShare Database Schema
+-- =====================================================

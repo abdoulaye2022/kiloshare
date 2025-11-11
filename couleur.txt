@@ -1,5 +1,0 @@
-Couleur primaire : #8E44AD (Violet)
-Couleur secondaire : #3498DB (Bleu)
-Couleur d'accentuation : #E67E22 (Orange)
-Couleur de fond : #FFFFFF (Blanc)
-Couleur de texte : #34495E (Gris foncé)
