@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/trip_image_service.dart';
+import '../models/trip_image_model.dart';
 
 class TripImagePicker extends StatefulWidget {
   final List<File> initialImages;
@@ -134,7 +134,7 @@ class _TripImagePickerState extends State<TripImagePicker> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(
-              image.imageUrl,
+              image.url,
               width: 120,
               height: 120,
               fit: BoxFit.cover,
@@ -184,7 +184,7 @@ class _TripImagePickerState extends State<TripImagePicker> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                image.formattedFileSize,
+                _formatFileSize(image.fileSize),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -405,5 +405,17 @@ class _TripImagePickerState extends State<TripImagePicker> {
         backgroundColor: Colors.red,
       ),
     );
+  }
+
+  String _formatFileSize(int? bytes) {
+    if (bytes == null || bytes == 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB'];
+    int i = 0;
+    double size = bytes.toDouble();
+    while (size >= 1024 && i < suffixes.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    return '${size.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
   }
 }

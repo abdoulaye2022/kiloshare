@@ -58,7 +58,10 @@ dependencies:
   
   # Launcher pour les liens externes
   url_launcher: ^6.2.5
-  
+
+  # Deep linking
+  app_links: ^6.3.2
+
   # Stripe pour les paiements
   flutter_stripe: ^11.1.0
   

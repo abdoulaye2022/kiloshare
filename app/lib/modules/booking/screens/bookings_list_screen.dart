@@ -16,12 +16,13 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   final BookingService _bookingService = BookingService.instance;
   final AuthService _authService = AuthService.instance;
   final StripeService _stripeService = StripeService.instance;
-  
+
   late TabController _tabController;
   List<BookingModel> _sentBookings = [];
   List<BookingModel> _receivedBookings = [];
   bool _isLoading = true;
   String? _error;
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -74,7 +75,10 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
 
     try {
       // Charger les réservations envoyées
-      final sentResult = await _bookingService.getUserBookings(role: 'sender');
+      final sentResult = await _bookingService.getUserBookings(
+        role: 'sender',
+        includeArchived: _showArchived,
+      );
       if (sentResult['success'] == true) {
         _sentBookings = (sentResult['bookings'] as List)
             .map((json) => BookingModel.fromJson(json))
@@ -82,7 +86,10 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
       }
 
       // Charger les réservations reçues
-      final receivedResult = await _bookingService.getUserBookings(role: 'receiver');
+      final receivedResult = await _bookingService.getUserBookings(
+        role: 'receiver',
+        includeArchived: _showArchived,
+      );
       if (receivedResult['success'] == true) {
         _receivedBookings = (receivedResult['bookings'] as List)
             .map((json) => BookingModel.fromJson(json))
@@ -129,6 +136,32 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
           ],
         ),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'toggle_archived') {
+                setState(() {
+                  _showArchived = !_showArchived;
+                });
+                _loadBookings();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'toggle_archived',
+                child: Row(
+                  children: [
+                    Icon(
+                      _showArchived ? Icons.visibility_off : Icons.visibility,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(_showArchived ? 'Masquer archives' : 'Afficher archives'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadBookings,
@@ -263,11 +296,42 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          booking.routeDescription,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                booking.routeDescription,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (_isArchivedForCurrentUser(booking, userRole)) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.archive, size: 12, color: Colors.grey.shade700),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Archivé',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         if (booking.tripDepartureDate != null)
@@ -401,6 +465,31 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
                     ),
                   ],
                 ),
+              ],
+
+              // Bouton d'archivage/désarchivage pour les réservations terminées/annulées/rejetées
+              if (_canArchiveBooking(booking)) ...[
+                const SizedBox(height: 12),
+                if (_isArchivedForCurrentUser(booking, userRole))
+                  OutlinedButton.icon(
+                    onPressed: () => _unarchiveBooking(booking),
+                    icon: const Icon(Icons.unarchive, size: 18),
+                    label: const Text('Désarchiver'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue.shade700,
+                      side: BorderSide(color: Colors.blue.shade300),
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: () => _archiveBooking(booking),
+                    icon: const Icon(Icons.archive, size: 18),
+                    label: const Text('Archiver'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                  ),
               ],
             ],
           ),
@@ -780,8 +869,145 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
       'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
       'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
     ];
-    
+
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  bool _canArchiveBooking(BookingModel booking) {
+    // Peut archiver seulement si terminée, annulée ou rejetée
+    return booking.status == BookingStatus.completed ||
+           booking.status == BookingStatus.cancelled ||
+           booking.status == BookingStatus.rejected;
+  }
+
+  bool _isArchivedForCurrentUser(BookingModel booking, String userRole) {
+    // Vérifier si la réservation est archivée pour l'utilisateur actuel
+    if (userRole == 'sender') {
+      return booking.archivedBySender;
+    } else if (userRole == 'receiver') {
+      return booking.archivedByReceiver;
+    }
+    return false;
+  }
+
+  Future<void> _archiveBooking(BookingModel booking) async {
+    if (!mounted) return;
+
+    // Confirmation
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Archiver la réservation'),
+        content: const Text(
+          'Cette réservation ne sera plus visible dans votre liste par défaut.\n\n'
+          'Vous pouvez afficher les archives à tout moment via le menu.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Archiver'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    // Afficher loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await _bookingService.archiveBooking(booking.id.toString());
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer loader
+
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Réservation archivée'),
+              backgroundColor: Colors.grey,
+            ),
+          );
+          _loadBookings(); // Recharger la liste
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Erreur lors de l\'archivage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _unarchiveBooking(BookingModel booking) async {
+    if (!mounted) return;
+
+    // Afficher loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await _bookingService.unarchiveBooking(booking.id.toString());
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer loader
+
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Réservation désarchivée'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+          _loadBookings(); // Recharger la liste
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Erreur lors de la désarchivage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

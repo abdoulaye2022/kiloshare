@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../services/booking_service.dart';
 import '../../trips/models/trip_model.dart';
 import '../../../utils/toast_utils.dart';
+import '../../../services/stripe_service.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final Trip trip;
@@ -19,6 +20,7 @@ class CreateBookingScreen extends StatefulWidget {
 class _CreateBookingScreenState extends State<CreateBookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bookingService = BookingService.instance;
+  final _stripeService = StripeService.instance;
 
   // Controllers pour les champs
   final _packageDescriptionController = TextEditingController();
@@ -377,8 +379,68 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
       'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
     ];
-    
+
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  /// Traiter le paiement immédiatement après la création de la réservation
+  Future<bool> _processPayment({
+    required String clientSecret,
+    required double amount,
+    required int bookingId,
+  }) async {
+    try {
+      // Étape 1: Initialiser Stripe PaymentSheet
+      final initResult = await _stripeService.initializePaymentSheet(
+        clientSecret: clientSecret,
+        amount: amount,
+        currency: 'CAD',
+        customerEmail: null, // Pourrait être récupéré du profil utilisateur
+      );
+
+      if (initResult['success'] != true) {
+        if (mounted) {
+          ToastUtils.showError(
+            context,
+            initResult['error'] ?? 'Erreur d\'initialisation du paiement',
+          );
+        }
+        return false;
+      }
+
+      // Étape 2: Présenter la feuille de paiement à l'utilisateur
+      final paymentResult = await _stripeService.presentPaymentSheet(
+        clientSecret: clientSecret,
+        paymentIntentId: '', // Pas nécessaire pour l'instant
+      );
+
+      if (paymentResult['success'] == true) {
+        if (mounted) {
+          ToastUtils.showSuccess(
+            context,
+            'Paiement autorisé avec succès! En attente de confirmation du transporteur.',
+          );
+        }
+        return true;
+      } else {
+        // Paiement annulé ou échoué
+        if (mounted) {
+          ToastUtils.showError(
+            context,
+            paymentResult['error'] ?? 'Paiement annulé',
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError(
+          context,
+          'Erreur lors du traitement du paiement: $e',
+        );
+      }
+      return false;
+    }
   }
 
   Future<void> _submitBookingRequest() async {
@@ -423,14 +485,45 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       );
 
       if (result['success'] == true) {
-        // Succès - retourner à l'écran précédent avec résultat
+        // Réservation créée avec succès
+        final bookingData = result['booking'];
+        final paymentData = result['payment'];
+
         if (mounted) {
           ToastUtils.showSuccess(
             context,
             result['message'] ?? 'Demande de réservation envoyée avec succès!',
           );
-          
-          Navigator.of(context).pop(true); // Indique le succès
+        }
+
+        // Vérifier si un paiement est requis
+        if (paymentData != null &&
+            paymentData['client_secret'] != null &&
+            paymentData['requires_payment_method'] == true) {
+
+          // Traiter le paiement immédiatement
+          final paymentSuccess = await _processPayment(
+            clientSecret: paymentData['client_secret'],
+            amount: double.tryParse(paymentData['amount']?.toString() ?? '0') ?? 0.0,
+            bookingId: bookingData['id'],
+          );
+
+          if (paymentSuccess && mounted) {
+            // Paiement réussi - retourner à l'écran précédent
+            Navigator.of(context).pop(true);
+          } else if (!paymentSuccess && mounted) {
+            // Paiement échoué/annulé - informer l'utilisateur
+            ToastUtils.showWarning(
+              context,
+              'Réservation créée mais paiement non effectué. Veuillez compléter le paiement depuis les détails de la réservation.',
+            );
+            Navigator.of(context).pop(true);
+          }
+        } else {
+          // Pas de paiement requis (transporteur sans Stripe)
+          if (mounted) {
+            Navigator.of(context).pop(true);
+          }
         }
       } else {
         // Erreur

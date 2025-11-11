@@ -144,7 +144,7 @@ class AuthController
 
             // Marquer l'email comme vérifié
             $emailVerification->markAsVerified();
-            
+
             // Mettre à jour l'utilisateur
             $user = User::find($emailVerification->user_id);
             if ($user) {
@@ -152,6 +152,18 @@ class AuthController
                     'email_verified_at' => Carbon::now(),
                     'is_verified' => true
                 ]);
+
+                // Envoyer l'email de bienvenue
+                try {
+                    $emailService = new EmailService();
+                    $emailService->sendWelcomeEmail(
+                        $user->email,
+                        $user->first_name ?? $user->full_name
+                    );
+                } catch (\Exception $e) {
+                    // Log l'erreur mais ne pas échouer la vérification
+                    error_log("Failed to send welcome email: " . $e->getMessage());
+                }
             }
 
             return Response::success([], 'Email verified successfully');

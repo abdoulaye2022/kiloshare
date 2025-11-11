@@ -116,6 +116,7 @@ class _MyTripsScreenState extends State<MyTripsScreen>
                     _buildFilterChip('Actifs', 'active'),
                     _buildFilterChip('En pause', 'paused'),
                     _buildFilterChip('En attente', 'pending'),
+                    _buildFilterChip('En cours', 'in_progress'),
                     _buildFilterChip('Terminés', 'completed'),
                     _buildFilterChip('Annulés', 'cancelled'),
                     const SizedBox(width: 8),

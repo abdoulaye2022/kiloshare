@@ -13,6 +13,9 @@ use KiloShare\Utils\Validator;
 use KiloShare\Services\CancellationService;
 use KiloShare\Services\SmartNotificationService;
 use KiloShare\Services\PaymentAuthorizationService;
+use KiloShare\Services\DeliveryCodeService;
+use KiloShare\Services\NotificationService;
+use KiloShare\Services\EmailService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -21,11 +24,17 @@ class BookingController
 {
     private SmartNotificationService $notificationService;
     private PaymentAuthorizationService $paymentAuthService;
+    private DeliveryCodeService $deliveryCodeService;
 
     public function __construct()
     {
         $this->notificationService = new SmartNotificationService();
         $this->paymentAuthService = new PaymentAuthorizationService();
+        $this->deliveryCodeService = new DeliveryCodeService(
+            new NotificationService(),
+            new SmartNotificationService(),
+            new EmailService()
+        );
     }
 
     public function createBookingRequest(ServerRequestInterface $request): ResponseInterface
@@ -177,21 +186,41 @@ class BookingController
             $limit = (int) ($queryParams['limit'] ?? 20);
             $status = $queryParams['status'] ?? null;
             $role = $queryParams['role'] ?? null; // 'sender' ou 'receiver'
-            
+            $includeArchived = filter_var($queryParams['include_archived'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
             // Construction de la requête selon le rôle
             $query = Booking::query()->with(['trip.user', 'sender', 'receiver']);
-            
+
             if ($role === 'sender') {
                 // L'utilisateur est celui qui envoie le colis (créateur de la réservation)
                 $query->where('sender_id', $user->id);
+
+                // Filtrer les archives sauf si explicitement demandé
+                if (!$includeArchived) {
+                    $query->where('archived_by_sender', false);
+                }
             } elseif ($role === 'receiver') {
                 // L'utilisateur est celui qui reçoit le colis (propriétaire du voyage)
                 $query->where('receiver_id', $user->id);
+
+                // Filtrer les archives sauf si explicitement demandé
+                if (!$includeArchived) {
+                    $query->where('archived_by_receiver', false);
+                }
             } else {
                 // Par défaut, récupérer toutes les réservations de l'utilisateur
-                $query->where(function($q) use ($user) {
-                    $q->where('sender_id', $user->id)
-                      ->orWhere('receiver_id', $user->id);
+                $query->where(function($q) use ($user, $includeArchived) {
+                    $q->where(function($sq) use ($user, $includeArchived) {
+                        $sq->where('sender_id', $user->id);
+                        if (!$includeArchived) {
+                            $sq->where('archived_by_sender', false);
+                        }
+                    })->orWhere(function($sq) use ($user, $includeArchived) {
+                        $sq->where('receiver_id', $user->id);
+                        if (!$includeArchived) {
+                            $sq->where('archived_by_receiver', false);
+                        }
+                    });
                 });
             }
 
@@ -223,11 +252,12 @@ class BookingController
                         'status' => $booking->status,
                         'weight_kg' => $booking->weight_kg,
                         'total_price' => $booking->total_price,
-                        'total_price' => $booking->total_price,
                         'package_description' => $booking->package_description,
                         'pickup_address' => $booking->pickup_address,
                         'delivery_address' => $booking->delivery_address,
                         'special_instructions' => $booking->special_instructions,
+                        'archived_by_sender' => $booking->archived_by_sender,
+                        'archived_by_receiver' => $booking->archived_by_receiver,
                         'created_at' => $booking->created_at,
                         'sender' => [
                             'id' => $booking->sender->id,
@@ -296,13 +326,14 @@ class BookingController
                     'status' => $booking->status,
                     'weight_kg' => $booking->weight_kg,
                     'total_price' => $booking->total_price,
-                    'total_price' => $booking->total_price,
                     'package_description' => $booking->package_description,
                     'pickup_address' => $booking->pickup_address,
                     'delivery_address' => $booking->delivery_address,
                     'special_instructions' => $booking->special_instructions,
                     'pickup_date' => $booking->pickup_date,
                     'delivery_date' => $booking->delivery_date,
+                    'archived_by_sender' => $booking->archived_by_sender,
+                    'archived_by_receiver' => $booking->archived_by_receiver,
                     'created_at' => $booking->created_at,
                     'updated_at' => $booking->updated_at,
                     'sender' => [
@@ -402,32 +433,26 @@ class BookingController
             // Accepter la réservation
             $booking->accept();
 
-            // NOUVEAU WORKFLOW: Capturer automatiquement le paiement
+            // Recharger la réservation avec les relations nécessaires
+            $booking->load(['sender', 'receiver', 'trip']);
+
+            // IMPORTANT: Le paiement reste AUTORISÉ (bloqué) jusqu'à la livraison
+            // La capture se fera automatiquement lors de la validation du code de livraison
+            // Cela protège l'expéditeur: l'argent ne va au transporteur QUE si le colis est livré
+
+            // Générer automatiquement le code de livraison
             try {
-                // Capturer le paiement immédiatement (workflow Airbnb/Uber)
-                $this->paymentAuthService->capturePayment(
-                    $authorization,
-                    PaymentAuthorization::CAPTURE_REASON_BOOKING_ACCEPTED
-                );
-
-                // Recharger le booking pour avoir le statut mis à jour (devrait être PAID)
-                $booking->refresh();
-
-            } catch (\Exception $captureError) {
-                // Si la capture échoue, annuler l'acceptation
-                $booking->update(['status' => Booking::STATUS_PAYMENT_AUTHORIZED]);
-
-                return Response::error(
-                    'Erreur lors de la capture du paiement: ' . $captureError->getMessage(),
-                    ['error_code' => 'payment_capture_failed'],
-                    500
-                );
+                $deliveryCode = $this->deliveryCodeService->generateDeliveryCode($booking);
+                error_log("Delivery code generated automatically for booking {$booking->id}: {$deliveryCode->code}");
+            } catch (\Exception $e) {
+                error_log("Failed to generate delivery code for booking {$booking->id}: " . $e->getMessage());
+                // Ne pas bloquer l'acceptation si la génération du code échoue
             }
 
-            // Envoyer notification au sender que la réservation est confirmée et payée
+            // Envoyer notification au sender que la réservation est acceptée
             $this->notificationService->send(
                 $booking->sender_id,
-                'booking_accepted_and_paid',
+                'booking_accepted',
                 [
                     'trip_title' => $booking->trip->title ?? 'Votre voyage',
                     'total_amount' => $booking->total_price,
@@ -443,7 +468,7 @@ class BookingController
                     'payment_authorization_id' => $booking->payment_authorization_id,
                     'updated_at' => $booking->updated_at,
                 ]
-            ], 'Réservation acceptée et paiement capturé avec succès.');
+            ], 'Réservation acceptée avec succès. Le paiement sera transféré automatiquement après la livraison.');
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to accept booking: ' . $e->getMessage());
@@ -474,42 +499,130 @@ class BookingController
         }
 
         try {
-            $booking = Booking::with('trip')->find($id);
+            error_log("🔍 Début rejectBooking - ID: $id");
+            $booking = Booking::with(['trip.user', 'sender', 'receiver'])->find($id);
+            error_log("🔍 Booking chargé: " . ($booking ? "OK" : "NULL"));
 
             if (!$booking) {
                 return Response::notFound('Booking not found');
             }
 
+            error_log("🔍 Booking status: " . $booking->status);
+            error_log("🔍 Trip user_id: " . $booking->trip->user_id . " vs User ID: " . $user->id);
+
             if ($booking->trip->user_id !== $user->id) {
                 return Response::forbidden('You can only reject bookings for your trips');
             }
 
-            if ($booking->status !== Booking::STATUS_PENDING) {
-                return Response::error('Only pending bookings can be rejected');
+            if (!in_array($booking->status, [
+                Booking::STATUS_PENDING,
+                Booking::STATUS_PAYMENT_AUTHORIZED,
+                Booking::STATUS_PAYMENT_CANCELLED,
+                Booking::STATUS_PAYMENT_FAILED
+            ])) {
+                error_log("❌ Statut invalide pour rejet: " . $booking->status);
+                return Response::error('Only pending, authorized, cancelled or failed payment bookings can be rejected');
             }
 
-            $booking->status = Booking::STATUS_CANCELLED;
+            error_log("✅ Validation OK, procédure de rejet...");
+
+            // IMPORTANT: Si un paiement a été autorisé, l'annuler pour rembourser Fati
+            if ($booking->payment_authorization_id) {
+                try {
+                    $authorization = \KiloShare\Models\PaymentAuthorization::find($booking->payment_authorization_id);
+                    if ($authorization && $authorization->canBeCancelled()) {
+                        $this->paymentAuthService->cancelAuthorization(
+                            $authorization,
+                            $user,
+                            isset($data['reason']) ? $data['reason'] : 'rejected_by_transporter'
+                        );
+                        error_log("✅ Paiement annulé et Fati remboursée automatiquement");
+                    }
+                } catch (\Exception $e) {
+                    error_log("❌ Erreur annulation paiement lors du rejet: " . $e->getMessage());
+                    // Continuer avec le rejet même si l'annulation du paiement échoue
+                }
+            }
+
+            error_log("🔍 Mise à jour du statut...");
+            $booking->status = Booking::STATUS_REJECTED;
             if (isset($data['reason']) && !empty(trim($data['reason']))) {
                 $booking->rejection_reason = trim($data['reason']);
             }
-            $booking->save();
+
+            try {
+                $booking->save();
+                error_log("✅ Booking sauvegardé avec statut rejected");
+            } catch (\Exception $e) {
+                error_log("❌ ERREUR SAVE: " . $e->getMessage());
+                error_log("❌ TRACE: " . $e->getTraceAsString());
+                throw $e;
+            }
 
             // Envoyer notification au sender (celui qui a fait la demande)
-            $this->notificationService->send(
-                $booking->sender_id,
-                'booking_rejected',
-                [
-                    'traveler_name' => $user->first_name . ' ' . $user->last_name,
-                    'trip_title' => $booking->trip->title ?? 'Le voyage'
-                ]
-            );
+            error_log("🔍 Envoi notification...");
+            try {
+                $this->notificationService->send(
+                    $booking->sender_id,
+                    'booking_rejected',
+                    [
+                        'traveler_name' => $user->first_name . ' ' . $user->last_name,
+                        'trip_title' => $booking->trip->title ?? 'Le voyage',
+                        'refunded' => !empty($booking->payment_authorization_id)
+                    ]
+                );
+                error_log("✅ Notification envoyée");
+            } catch (\Exception $e) {
+                error_log("❌ Erreur envoi notification rejet: " . $e->getMessage());
+                // Continuer même si la notification échoue
+            }
 
+            error_log("🔍 Préparation de la réponse...");
             return Response::success([
                 'booking' => [
                     'id' => $booking->id,
+                    'uuid' => $booking->uuid,
+                    'sender_id' => $booking->sender_id,
+                    'receiver_id' => $booking->receiver_id,
                     'status' => $booking->status,
+                    'weight_kg' => $booking->weight_kg,
+                    'total_price' => $booking->total_price,
+                    'package_description' => $booking->package_description,
+                    'pickup_address' => $booking->pickup_address,
+                    'delivery_address' => $booking->delivery_address,
+                    'special_instructions' => $booking->special_instructions,
                     'rejection_reason' => $booking->rejection_reason,
+                    'archived_by_sender' => $booking->archived_by_sender,
+                    'archived_by_receiver' => $booking->archived_by_receiver,
+                    'created_at' => $booking->created_at,
                     'updated_at' => $booking->updated_at,
+                    'sender' => [
+                        'id' => $booking->sender->id,
+                        'first_name' => $booking->sender->first_name,
+                        'last_name' => $booking->sender->last_name,
+                        'email' => $booking->sender->email,
+                        'profile_picture' => $booking->sender->profile_picture,
+                    ],
+                    'receiver' => [
+                        'id' => $booking->receiver->id,
+                        'first_name' => $booking->receiver->first_name,
+                        'last_name' => $booking->receiver->last_name,
+                        'email' => $booking->receiver->email,
+                        'profile_picture' => $booking->receiver->profile_picture,
+                    ],
+                    'trip' => [
+                        'id' => $booking->trip->id,
+                        'title' => $booking->trip->title,
+                        'departure_city' => $booking->trip->departure_city,
+                        'arrival_city' => $booking->trip->arrival_city,
+                        'departure_date' => $booking->trip->departure_date,
+                        'user' => [
+                            'id' => $booking->trip->user->id,
+                            'first_name' => $booking->trip->user->first_name,
+                            'last_name' => $booking->trip->user->last_name,
+                            'profile_picture' => $booking->trip->user->profile_picture,
+                        ],
+                    ],
                 ]
             ], 'Booking rejected successfully');
 
@@ -652,6 +765,8 @@ class BookingController
             }
 
             error_log("Statut actuel: {$booking->status}");
+            // Permettre l'annulation tant que le paiement n'est PAS capturé (pas encore livré)
+            // ACCEPTÉ est OK car le paiement est encore bloqué jusqu'à la livraison
             if (!in_array($booking->status, [
                 Booking::STATUS_PENDING,
                 Booking::STATUS_ACCEPTED,
@@ -660,7 +775,7 @@ class BookingController
                 Booking::STATUS_PAYMENT_CANCELLED  // Permettre l'annulation même si le paiement est déjà annulé
             ])) {
                 error_log("Erreur: Statut ne permet pas l'annulation");
-                return Response::error('Cette réservation ne peut plus être annulée');
+                return Response::error('Cette réservation ne peut plus être annulée car le paiement a déjà été transféré ou la livraison est en cours.');
             }
 
             // Si il y a une autorisation de paiement, l'annuler
@@ -1035,6 +1150,103 @@ class BookingController
 
         } catch (\Exception $e) {
             return Response::serverError('Erreur lors de la récupération du statut: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Archiver une réservation (spécifique à l'utilisateur)
+     * POST /bookings/{id}/archive
+     */
+    public function archiveBooking(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::find($id);
+
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que l'utilisateur est impliqué dans la réservation
+            if ($booking->sender_id !== $user->id && $booking->receiver_id !== $user->id) {
+                return Response::forbidden('Vous n\'êtes pas autorisé à archiver cette réservation');
+            }
+
+            // Vérifier que la réservation peut être archivée
+            if (!$booking->canBeArchived()) {
+                return Response::error(
+                    'Cette réservation ne peut pas être archivée. Seules les réservations terminées, annulées ou rejetées peuvent être archivées.',
+                    ['current_status' => $booking->status],
+                    400
+                );
+            }
+
+            // Archiver pour l'utilisateur approprié
+            if ($user->id === $booking->sender_id) {
+                $booking->archiveForSender();
+                $message = 'Réservation archivée avec succès dans votre historique d\'expéditeur';
+            } else {
+                $booking->archiveForReceiver();
+                $message = 'Réservation archivée avec succès dans votre historique de transporteur';
+            }
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'archived_by_sender' => $booking->archived_by_sender,
+                    'archived_by_receiver' => $booking->archived_by_receiver,
+                ]
+            ], $message);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de l\'archivage: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Désarchiver une réservation (spécifique à l'utilisateur)
+     * POST /bookings/{id}/unarchive
+     */
+    public function unarchiveBooking(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $id = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::find($id);
+
+            if (!$booking) {
+                return Response::notFound('Réservation non trouvée');
+            }
+
+            // Vérifier que l'utilisateur est impliqué dans la réservation
+            if ($booking->sender_id !== $user->id && $booking->receiver_id !== $user->id) {
+                return Response::forbidden('Vous n\'êtes pas autorisé à désarchiver cette réservation');
+            }
+
+            // Désarchiver pour l'utilisateur approprié
+            if ($user->id === $booking->sender_id) {
+                $booking->unarchiveForSender();
+                $message = 'Réservation désarchivée avec succès';
+            } else {
+                $booking->unarchiveForReceiver();
+                $message = 'Réservation désarchivée avec succès';
+            }
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'archived_by_sender' => $booking->archived_by_sender,
+                    'archived_by_receiver' => $booking->archived_by_receiver,
+                ]
+            ], $message);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Erreur lors de la désarchivage: ' . $e->getMessage());
         }
     }
 }

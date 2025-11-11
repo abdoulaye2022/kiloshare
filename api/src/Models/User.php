@@ -194,6 +194,11 @@ class User extends Model
         return $this->hasMany(TripReport::class, 'reporter_id');
     }
 
+    public function stripeAccount(): HasOne
+    {
+        return $this->hasOne(UserStripeAccount::class);
+    }
+
     // Accesseurs
     public function getFullNameAttribute(): string
     {
@@ -297,5 +302,35 @@ class User extends Model
     public function scopeWithPhone($query, string $phone)
     {
         return $query->where('phone', $phone);
+    }
+
+    /**
+     * Vérifier si l'utilisateur a un compte Stripe actif
+     */
+    public function hasActiveStripeAccount(): bool
+    {
+        $stripeAccount = $this->stripeAccount;
+
+        if (!$stripeAccount) {
+            return false;
+        }
+
+        return $stripeAccount->isActive();
+    }
+
+    /**
+     * Obtenir le compte Stripe de l'utilisateur
+     */
+    public function getStripeAccount()
+    {
+        return $this->stripeAccount;
+    }
+
+    /**
+     * Vérifier si l'utilisateur peut publier des voyages
+     */
+    public function canPublishTrips(): bool
+    {
+        return $this->hasActiveStripeAccount();
     }
 }

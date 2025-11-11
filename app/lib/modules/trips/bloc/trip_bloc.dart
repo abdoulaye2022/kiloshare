@@ -266,15 +266,25 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   Future<void> _onCompleteTrip(CompleteTrip event, Emitter<TripState> emit) async {
     try {
-      final updatedTrip = await _tripService.completeTrip(event.tripId);
-      emit(TripActionSuccess(
-        message: 'Voyage terminé avec succès',
-        action: TripAction.complete,
-        updatedTrip: updatedTrip,
-      ));
+      final result = await _tripService.completeTrip(event.tripId);
 
-      _syncTripAfterStatusChange(emit, updatedTrip);
-      add(const RefreshTrips());
+      if (result['success'] == true) {
+        final tripData = result['trip'] as Map<String, dynamic>?;
+        final updatedTrip = tripData != null ? Trip.fromJson(tripData) : null;
+
+        emit(TripActionSuccess(
+          message: result['message'] ?? 'Voyage terminé avec succès',
+          action: TripAction.complete,
+          updatedTrip: updatedTrip,
+        ));
+
+        if (updatedTrip != null) {
+          _syncTripAfterStatusChange(emit, updatedTrip);
+        }
+        add(const RefreshTrips());
+      } else {
+        emit(TripError(result['error'] ?? 'Impossible de compléter le voyage', error: result));
+      }
     } catch (error) {
       emit(TripError('Failed to complete trip: ${error.toString()}', error: error));
     }
@@ -605,7 +615,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final currentState = state;
 
     // Ajouter aux brouillons si c'est un brouillon
-    if (newTrip.status == 'draft' && currentState is DraftsLoaded) {
+    if (newTrip.status == TripStatus.draft && currentState is DraftsLoaded) {
       final updatedDrafts = [newTrip, ...currentState.drafts];
       emit(currentState.copyWith(drafts: updatedDrafts));
     }
@@ -617,7 +627,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     }
 
     // Ajouter aux voyages publics si le voyage est publié
-    if (['published', 'active'].contains(newTrip.status) && currentState is PublicTripsLoaded) {
+    if ([TripStatus.active].contains(newTrip.status) && currentState is PublicTripsLoaded) {
       final updatedPublicTrips = [newTrip, ...currentState.trips];
       emit(currentState.copyWith(trips: updatedPublicTrips));
     }
@@ -632,7 +642,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final currentState = state;
 
     // Si c'est devenu un brouillon, le retirer des listes publiques
-    if (updatedTrip.status == 'draft') {
+    if (updatedTrip.status == TripStatus.draft) {
       if (currentState is PublicTripsLoaded) {
         final filteredTrips = currentState.trips.where((trip) => trip.id != updatedTrip.id).toList();
         emit(currentState.copyWith(trips: filteredTrips));
@@ -650,7 +660,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     }
 
     // Si c'est devenu public, le retirer des brouillons
-    if (['published', 'active'].contains(updatedTrip.status)) {
+    if ([TripStatus.active].contains(updatedTrip.status)) {
       if (currentState is DraftsLoaded) {
         final filteredDrafts = currentState.drafts.where((trip) => trip.id != updatedTrip.id).toList();
         emit(currentState.copyWith(drafts: filteredDrafts));

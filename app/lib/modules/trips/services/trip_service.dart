@@ -4,6 +4,7 @@ import '../../../config/app_config.dart';
 import '../models/trip_model.dart';
 import '../../../data/locations_data.dart';
 import '../../auth/services/auth_service.dart';
+import '../../booking/models/booking_model.dart';
 
 class TripService {
   final Dio _dio;
@@ -650,8 +651,8 @@ class TripService {
     }
   }
 
-  /// Complete trip
-  Future<Trip> completeTrip(String tripId) async {
+  /// Complete trip (vérifier que tous les codes de livraison sont validés)
+  Future<Map<String, dynamic>> completeTrip(String tripId) async {
     try {
       final response = await _dio.post('/trips/$tripId/complete',
         options: Options(
@@ -660,12 +661,26 @@ class TripService {
       );
 
       if (response.data['success'] == true) {
-        return getTripById(tripId);
+        return {
+          'success': true,
+          'trip': response.data['data']['trip'],
+          'deliveries': response.data['data']['deliveries'],
+          'message': response.data['message'] ?? 'Voyage complété'
+        };
       } else {
-        throw TripException(response.data['message'] ?? 'Failed to complete trip');
+        return {
+          'success': false,
+          'error': response.data['message'] ?? 'Impossible de compléter le voyage',
+          'missing_deliveries': response.data['data']?['missing_deliveries'],
+          'missing_count': response.data['data']?['missing_count']
+        };
       }
     } on DioException catch (e) {
-      throw _handleDioException(e);
+      return {
+        'success': false,
+        'error': e.response?.data['message'] ?? 'Erreur de connexion',
+        'missing_deliveries': e.response?.data['data']?['missing_deliveries']
+      };
     }
   }
 
@@ -900,7 +915,10 @@ class TripService {
     if (e.response != null && e.response!.data != null) {
       final data = e.response!.data;
       if (data is Map<String, dynamic> && data['message'] != null) {
-        return TripException(data['message']);
+        // Extract error data if available (for Stripe errors, etc.)
+        // API returns error details in 'errors' field (not 'data')
+        final errorData = (data['errors'] ?? data['data']) as Map<String, dynamic>?;
+        return TripException(data['message'], errorData);
       }
     }
 
@@ -1179,11 +1197,83 @@ class TripService {
       throw _handleDioException(e);
     }
   }
+
+  /// Démarrer un voyage (marquer comme "en cours")
+  /// POST /trips/{id}/start
+  Future<Map<String, dynamic>> startTrip(String tripId) async {
+    try {
+      final token = await _getTokenWithRetry();
+
+      final response = await _dio.post(
+        '/trips/$tripId/start',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.data['success'] == true) {
+        return {
+          'success': true,
+          'trip': response.data['data']['trip'],
+          'message': response.data['message'] ?? 'Voyage démarré'
+        };
+      } else {
+        return {
+          'success': false,
+          'error': response.data['message'] ?? 'Erreur lors du démarrage'
+        };
+      }
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'error': e.response?.data['message'] ?? 'Erreur de connexion'
+      };
+    }
+  }
+
+  /// Récupérer les réservations d'un voyage
+  /// GET /trips/{id}/bookings
+  Future<List<BookingModel>> getTripBookings(String tripId) async {
+    try {
+      final token = await _getTokenWithRetry();
+
+      final response = await _dio.get(
+        '/trips/$tripId/bookings',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.data['success'] == true) {
+        final bookingsData = response.data['data']['bookings'] as List<dynamic>;
+        return bookingsData
+            .map((data) => BookingModel.fromJson(data as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw TripException(response.data['message'] ?? 'Erreur lors du chargement des réservations');
+      }
+    } on DioException catch (e) {
+      throw TripException(e.response?.data['message'] ?? 'Erreur de connexion');
+    }
+  }
+
 }
 
 class TripException implements Exception {
   final String message;
-  const TripException(this.message);
+  final Map<String, dynamic>? errorData;
+
+  const TripException(this.message, [this.errorData]);
+
+  /// Check if this error is related to Stripe account requirement
+  bool get isStripeAccountRequired =>
+    errorData?['code'] == 'stripe_account_required';
+
+  /// Get Stripe setup URL if available
+  String? get stripeSetupUrl => errorData?['stripe_setup_url'];
+
+  /// Get action required
+  String? get actionRequired => errorData?['action_required'];
 
   @override
   String toString() => 'TripException: $message';

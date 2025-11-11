@@ -12,6 +12,7 @@ use KiloShare\Models\UserStripeAccount;
 use KiloShare\Models\DeliveryCode;
 use KiloShare\Models\PaymentAuthorization;
 use KiloShare\Utils\Response;
+use KiloShare\Services\SmartNotificationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Carbon\Carbon;
@@ -524,10 +525,45 @@ class AdminController
                 return Response::badRequest('Trip is not pending approval');
             }
 
+            // Vérifier que le propriétaire du voyage a un compte Stripe actif
+            $tripOwner = $trip->user;
+            if (!$tripOwner->canPublishTrips()) {
+                return Response::error(
+                    'Le propriétaire de ce voyage doit configurer son compte Stripe avant que le voyage puisse être approuvé.',
+                    [
+                        'code' => 'stripe_account_required',
+                        'trip_owner_id' => $tripOwner->id,
+                        'trip_owner_email' => $tripOwner->email,
+                    ],
+                    403
+                );
+            }
+
             $trip->status = Trip::STATUS_ACTIVE;
             $trip->approved_at = Carbon::now();
             $trip->approved_by = $user->id;
             $trip->save();
+
+            // 🔔 Envoyer une notification FCM au propriétaire du voyage
+            try {
+                $notificationService = new SmartNotificationService();
+                $notificationService->send(
+                    $tripOwner->id,
+                    'trip_approved',
+                    [
+                        'trip_id' => $trip->id,
+                        'trip_title' => $trip->departure_city . ' → ' . $trip->arrival_city,
+                        'departure_date' => $trip->departure_date->format('d/m/Y'),
+                        'message' => 'Votre voyage a été approuvé et est maintenant visible sur la plateforme !',
+                    ],
+                    [
+                        'channels' => ['push', 'in_app'],
+                        'priority' => 'high'
+                    ]
+                );
+            } catch (\Exception $e) {
+                error_log("Failed to send trip approval notification: " . $e->getMessage());
+            }
 
             return Response::success([
                 'trip_id' => $trip->id,
@@ -573,6 +609,28 @@ class AdminController
             $trip->rejected_at = Carbon::now();
             $trip->rejected_by = $user->id;
             $trip->save();
+
+            // 🔔 Envoyer une notification FCM au propriétaire du voyage
+            try {
+                $tripOwner = $trip->user;
+                $notificationService = new SmartNotificationService();
+                $notificationService->send(
+                    $tripOwner->id,
+                    'trip_rejected',
+                    [
+                        'trip_id' => $trip->id,
+                        'trip_title' => $trip->departure_city . ' → ' . $trip->arrival_city,
+                        'reason' => $reason,
+                        'message' => 'Votre voyage a été rejeté par l\'équipe de modération.',
+                    ],
+                    [
+                        'channels' => ['push', 'in_app', 'email'],
+                        'priority' => 'high'
+                    ]
+                );
+            } catch (\Exception $e) {
+                error_log("Failed to send trip rejection notification: " . $e->getMessage());
+            }
 
             return Response::success([
                 'trip_id' => $trip->id,

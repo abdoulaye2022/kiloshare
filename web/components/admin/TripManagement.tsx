@@ -162,9 +162,6 @@ export default function TripManagement() {
         return;
       }
 
-      console.log('🔍 TripManagement - Calling endpoint:', endpoint);
-      console.log('🔍 TripManagement - With body:', body);
-
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -173,8 +170,6 @@ export default function TripManagement() {
         },
         body: JSON.stringify(body),
       });
-
-      console.log('🔍 TripManagement - Response status:', response.status);
 
       if (response.ok) {
         fetchTrips();

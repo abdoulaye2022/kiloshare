@@ -167,22 +167,38 @@ class ConversationModel
     public function getConversationContext(int $conversationId): ?array
     {
         $sql = "
-            SELECT c.*, 
-                   b.status as booking_status, b.payment_status, b.pickup_code, b.delivery_code,
-                   t.departure_city as trip_title, t.departure_date, t.departure_city as departure_location, t.arrival_city as arrival_location,
-                   u1.first_name as driver_first_name, u1.last_name as driver_last_name,
-                   u2.first_name as passenger_first_name, u2.last_name as passenger_last_name
+            SELECT c.id,
+                   c.booking_id,
+                   c.trip_id,
+                   c.type,
+                   c.status,
+                   c.created_at,
+                   c.updated_at,
+                   c.last_message_at,
+                   c.archived_at,
+                   b.status as booking_status,
+                   b.payment_status,
+                   b.payment_confirmed_at,
+                   COALESCE(t.title, t.departure_city) as trip_title,
+                   t.departure_date,
+                   t.departure_city as departure_location,
+                   t.arrival_city as arrival_location,
+                   t.user_id as trip_owner_id,
+                   u1.first_name as driver_first_name,
+                   u1.last_name as driver_last_name,
+                   u2.first_name as passenger_first_name,
+                   u2.last_name as passenger_last_name
             FROM conversations c
             LEFT JOIN bookings b ON c.booking_id = b.id
             LEFT JOIN trips t ON (c.trip_id = t.id OR b.trip_id = t.id)
-            LEFT JOIN users u1 ON b.receiver_id = u1.id
+            LEFT JOIN users u1 ON COALESCE(b.receiver_id, t.user_id) = u1.id
             LEFT JOIN users u2 ON b.sender_id = u2.id
             WHERE c.id = ?
         ";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$conversationId]);
-        
+
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }

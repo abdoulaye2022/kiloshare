@@ -361,28 +361,64 @@ class SmartNotificationService
     {
         $fallbacks = [
             'fr' => [
-                'new_booking_request' => [
-                    'push' => ['title' => 'Nouvelle demande', 'body' => 'Vous avez reçu une nouvelle demande de réservation'],
+                // Notifications de voyages
+                'trip_approved' => [
+                    'push' => ['title' => '✅ Voyage approuvé', 'body' => 'Votre voyage a été approuvé par les modérateurs'],
+                    'email' => ['title' => 'Voyage approuvé', 'subject' => '✅ Votre voyage a été approuvé', 'content' => 'Félicitations ! Votre voyage a été approuvé et est maintenant visible sur la plateforme.'],
                 ],
-                'booking_accepted' => [
-                    'push' => ['title' => 'Demande acceptée', 'body' => 'Votre demande a été acceptée'],
-                ],
-                'booking_rejected' => [
-                    'push' => ['title' => 'Demande refusée', 'body' => 'Votre demande a été refusée'],
-                ],
-                'payment_received' => [
-                    'push' => ['title' => 'Paiement reçu', 'body' => 'Paiement reçu avec succès'],
-                ],
-                'payment_confirmed' => [
-                    'push' => ['title' => 'Paiement confirmé', 'body' => 'Votre paiement a été confirmé'],
-                ],
-                'booking_cancelled' => [
-                    'push' => ['title' => 'Réservation annulée', 'body' => 'Une réservation a été annulée'],
+                'trip_rejected' => [
+                    'push' => ['title' => '❌ Voyage refusé', 'body' => 'Votre voyage a été refusé par les modérateurs'],
+                    'email' => ['title' => 'Voyage refusé', 'subject' => '❌ Votre voyage a été refusé', 'content' => 'Malheureusement, votre voyage a été refusé. Consultez la raison dans l\'application.'],
                 ],
                 'journey_started' => [
                     'push' => ['title' => '✈️ Voyage commencé !', 'body' => 'Votre transporteur a commencé le voyage'],
                     'email' => ['title' => 'Voyage commencé', 'subject' => '✈️ Votre voyage KiloShare a commencé !', 'content' => 'Votre transporteur a commencé le voyage. Vous serez notifié de la livraison.'],
                 ],
+
+                // Notifications de réservations
+                'new_booking_request' => [
+                    'push' => ['title' => '📦 Nouvelle demande', 'body' => 'Vous avez reçu une nouvelle demande de réservation'],
+                    'email' => ['title' => 'Nouvelle demande', 'subject' => '📦 Nouvelle demande de réservation', 'content' => 'Quelqu\'un souhaite réserver de l\'espace dans votre voyage.'],
+                ],
+                'booking_request_received' => [
+                    'push' => ['title' => '📦 Demande envoyée', 'body' => 'Votre demande de réservation a été envoyée'],
+                ],
+                'booking_accepted' => [
+                    'push' => ['title' => '✅ Demande acceptée', 'body' => 'Votre demande de réservation a été acceptée'],
+                    'email' => ['title' => 'Demande acceptée', 'subject' => '✅ Votre réservation a été acceptée', 'content' => 'Bonne nouvelle ! Le transporteur a accepté votre demande.'],
+                ],
+                'booking_rejected' => [
+                    'push' => ['title' => '❌ Demande refusée', 'body' => 'Votre demande de réservation a été refusée'],
+                    'email' => ['title' => 'Demande refusée', 'subject' => '❌ Votre réservation a été refusée', 'content' => 'Le transporteur a refusé votre demande de réservation.'],
+                ],
+                'booking_cancelled' => [
+                    'push' => ['title' => '❌ Réservation annulée', 'body' => 'Une réservation a été annulée'],
+                ],
+
+                // Notifications de messages
+                'new_message' => [
+                    'push' => ['title' => '💬 Nouveau message', 'body' => 'Vous avez reçu un nouveau message'],
+                ],
+
+                // Notifications de paiement
+                'payment_received' => [
+                    'push' => ['title' => '💰 Paiement reçu', 'body' => 'Paiement reçu avec succès'],
+                ],
+                'payment_confirmed' => [
+                    'push' => ['title' => '✅ Paiement confirmé', 'body' => 'Votre paiement a été confirmé'],
+                    'email' => ['title' => 'Paiement confirmé', 'subject' => '✅ Votre paiement a été confirmé', 'content' => 'Votre paiement a été confirmé avec succès.'],
+                ],
+                'payment_authorized' => [
+                    'push' => ['title' => '🔒 Paiement autorisé', 'body' => 'Votre paiement a été pré-autorisé'],
+                ],
+                'payment_captured' => [
+                    'push' => ['title' => '💳 Paiement effectué', 'body' => 'Le paiement a été effectué avec succès'],
+                ],
+                'payment_cancelled' => [
+                    'push' => ['title' => '❌ Paiement annulé', 'body' => 'Votre paiement a été annulé et remboursé'],
+                ],
+
+                // Notifications de livraison
                 'delivery_code_generated' => [
                     'push' => ['title' => '🔐 Code de livraison', 'body' => 'Votre code de livraison a été généré'],
                     'email' => ['title' => 'Code de livraison', 'subject' => '🔐 Code de livraison pour votre colis', 'content' => 'Votre code de livraison est disponible. Gardez-le précieusement !'],

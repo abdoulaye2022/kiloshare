@@ -20,14 +20,22 @@ class PushNotificationChannel implements NotificationChannelInterface
     public function send(User $user, array $rendered, array $data = []): array
     {
         try {
-            $fcmToken = $this->getRecipient($user);
-            if (!$fcmToken) {
+            // Récupérer tous les tokens FCM actifs de l'utilisateur depuis la table user_fcm_tokens
+            $fcmTokens = \KiloShare\Models\UserFCMToken::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->pluck('fcm_token')
+                ->toArray();
+
+            if (empty($fcmTokens)) {
+                error_log("No FCM tokens found for user {$user->id}");
                 return ['success' => false, 'error' => 'No FCM token available'];
             }
 
+            error_log("Found " . count($fcmTokens) . " FCM token(s) for user {$user->id}");
+
             $notification = [
                 'title' => $rendered['title'] ?? '',
-                'body' => $rendered['message'] ?? '',
+                'body' => $rendered['message'] ?? $rendered['body'] ?? $rendered['content'] ?? '',
             ];
 
             $pushData = array_merge($data, [
@@ -35,34 +43,58 @@ class PushNotificationChannel implements NotificationChannelInterface
                 'sound' => $data['sound'] ?? 'default',
             ]);
 
-            $result = $this->firebaseService->sendNotification($fcmToken, $notification, $pushData);
+            // Envoyer à tous les tokens actifs de l'utilisateur
+            $successCount = 0;
+            $lastError = null;
 
-            if ($result['success']) {
+            foreach ($fcmTokens as $fcmToken) {
+                error_log("Sending FCM to token: " . substr($fcmToken, 0, 20) . "...");
+                $result = $this->firebaseService->sendNotification($fcmToken, $notification, $pushData);
+
+                if ($result['success']) {
+                    $successCount++;
+                    error_log("FCM sent successfully to token: " . substr($fcmToken, 0, 20) . "...");
+                } else {
+                    $lastError = $result['error'] ?? 'Push notification failed';
+                    error_log("FCM failed for token: " . substr($fcmToken, 0, 20) . "... Error: " . $lastError);
+                }
+            }
+
+            if ($successCount > 0) {
                 return [
                     'success' => true,
                     'provider' => 'firebase',
-                    'provider_message_id' => $result['message_id'] ?? null,
+                    'tokens_sent' => $successCount,
+                    'total_tokens' => count($fcmTokens),
                 ];
             } else {
                 return [
                     'success' => false,
-                    'error' => $result['error'] ?? 'Push notification failed',
+                    'error' => $lastError ?? 'All push notifications failed',
                 ];
             }
 
         } catch (Exception $e) {
+            error_log("PushNotificationChannel exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
     public function getRecipient(User $user): ?string
     {
-        return $user->fcm_token;
+        // Pour compatibilité avec l'interface - retourne le premier token
+        $tokens = \KiloShare\Models\UserFCMToken::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->pluck('fcm_token')
+            ->toArray();
+
+        return !empty($tokens) ? $tokens[0] : null;
     }
 
     public function isAvailable(User $user): bool
     {
-        return !empty($user->fcm_token);
+        $token = $this->getRecipient($user);
+        return !empty($token);
     }
 
     public function getName(): string

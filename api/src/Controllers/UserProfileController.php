@@ -387,11 +387,54 @@ class UserProfileController
         $userId = $request->getAttribute('id');
 
         try {
-            $user = User::with(['receivedReviews.reviewer'])
-                       ->find($userId);
+            $user = User::find($userId);
 
             if (!$user) {
                 return Response::notFound('User not found');
+            }
+
+            // Use raw PDO queries to avoid table name issues
+            $db = \KiloShare\Utils\Database::getConnection()->getPdo();
+
+            // Get trips count
+            $stmt = $db->prepare("SELECT COUNT(*) as count FROM trips WHERE user_id = ? AND status = 'published' AND deleted_at IS NULL");
+            $stmt->execute([$userId]);
+            $tripsCount = (int)$stmt->fetchColumn();
+
+            // Get reviews stats
+            $stmt = $db->prepare("SELECT COUNT(*) as count, AVG(rating) as avg_rating FROM reviews WHERE reviewed_id = ?");
+            $stmt->execute([$userId]);
+            $reviewsStats = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            $avgRating = $reviewsStats ? (float)$reviewsStats['avg_rating'] : 0;
+            $reviewsCount = $reviewsStats ? (int)$reviewsStats['count'] : 0;
+
+            // Get recent reviews with reviewer info
+            $stmt = $db->prepare("
+                SELECT r.id, r.rating, r.comment, r.created_at,
+                       u.first_name as reviewer_first_name, u.profile_picture as reviewer_picture
+                FROM reviews r
+                LEFT JOIN users u ON r.reviewer_id = u.id
+                WHERE r.reviewed_id = ?
+                  AND r.is_visible = 1
+                ORDER BY r.created_at DESC
+                LIMIT 5
+            ");
+            $stmt->execute([$userId]);
+            $reviews = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $reviewsArray = [];
+            foreach ($reviews as $review) {
+                $reviewsArray[] = [
+                    'id' => $review['id'],
+                    'rating' => (int)$review['rating'],
+                    'comment' => $review['comment'],
+                    'created_at' => $review['created_at'],
+                    'reviewer' => [
+                        'first_name' => $review['reviewer_first_name'] ?? 'Utilisateur',
+                        'profile_picture' => $review['reviewer_picture'],
+                    ],
+                ];
             }
 
             return Response::success([
@@ -401,34 +444,19 @@ class UserProfileController
                     'first_name' => $user->first_name,
                     'profile_picture' => $user->profile_picture,
                     'is_verified' => $user->is_verified,
-                    'created_at' => $user->created_at,
+                    'created_at' => $user->created_at->toISOString(),
                     'stats' => [
-                        'trips_count' => $user->trips()->published()->count(),
-                        'average_rating' => $user->receivedReviews()->avg('rating') ?: 0,
-                        'reviews_count' => $user->receivedReviews()->count(),
+                        'trips_count' => $tripsCount,
+                        'average_rating' => round($avgRating, 1),
+                        'reviews_count' => $reviewsCount,
                     ],
-                    'recent_reviews' => $user->receivedReviews()
-                        ->public()
-                        ->latest()
-                        ->take(5)
-                        ->get()
-                        ->map(function ($review) {
-                            return [
-                                'id' => $review->id,
-                                'rating' => $review->rating,
-                                'title' => $review->title,
-                                'comment' => $review->comment,
-                                'created_at' => $review->created_at,
-                                'reviewer' => [
-                                    'first_name' => $review->reviewer->first_name,
-                                    'profile_picture' => $review->reviewer->profile_picture,
-                                ],
-                            ];
-                        }),
+                    'recent_reviews' => $reviewsArray,
                 ]
             ]);
 
         } catch (\Exception $e) {
+            error_log('getUserPublicProfile error: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
             return Response::serverError('Failed to fetch user profile: ' . $e->getMessage());
         }
     }

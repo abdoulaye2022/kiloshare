@@ -7,6 +7,8 @@ import '../services/favorites_service.dart';
 import '../../../widgets/ellipsis_button.dart';
 import '../../auth/services/auth_service.dart';
 import '../../booking/screens/create_booking_screen.dart';
+import '../../booking/models/booking_model.dart';
+import '../../delivery/screens/transporter_delivery_code_screen.dart';
 
 class TripDetailsFinal extends StatefulWidget {
   final String tripId;
@@ -818,7 +820,7 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Bon voyage ! N\'oubliez pas de confirmer la livraison.',
+                    'Bon voyage ! N\'oubliez pas de confirmer les livraisons.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
                   ),
@@ -829,9 +831,22 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
+                onPressed: () => _manageDeliveryCodes(),
+                icon: const Icon(Icons.qr_code_2),
+                label: const Text('Gérer les codes de livraison'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
                 onPressed: () => _completeDelivery(),
                 icon: const Icon(Icons.check_circle),
-                label: const Text('Marquer comme livré'),
+                label: const Text('Terminer le voyage'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
@@ -1131,27 +1146,31 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   void _publishTrip() async {
     try {
       // Publishing trip
-      
+
       if (_trip == null) {
         _showMessage('Erreur: voyage non trouvé', Colors.red);
         return;
       }
-      
+
       final tripService = TripService();
       final publishedTrip = await tripService.publishTrip(_trip!.id.toString());
-      
+
       // Trip published successfully
-      
+
       // Update local trip data
       setState(() {
         _trip = publishedTrip;
       });
-      
+
       _showMessage('Annonce publiée avec succès !', Colors.green);
-      
+
     } catch (e) {
-      // Failed to publish trip
-      _showMessage('Erreur lors de la publication: $e', Colors.red);
+      // Check if it's a Stripe account requirement error
+      if (e is TripException && e.isStripeAccountRequired) {
+        _showStripeRequiredDialog(e);
+      } else {
+        _showMessage('Erreur lors de la publication: $e', Colors.red);
+      }
     }
   }
 
@@ -1414,24 +1433,98 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   
   void _submitForReview() async {
     if (_trip == null) return;
-    
+
     try {
       final tripService = TripService();
       await tripService.submitForReview(_trip!.id.toString());
-      
+
       _showMessage('Voyage soumis pour révision avec succès !', Colors.green);
-      
+
       // Refresh trip data
       setState(() {
         _hasLoaded = false;
       });
       _loadDataOnce();
-      
+
     } catch (e) {
-      _showMessage('Erreur lors de la soumission: $e', Colors.red);
+      // Check if it's a Stripe account requirement error
+      if (e is TripException && e.isStripeAccountRequired) {
+        _showStripeRequiredDialog(e);
+      } else {
+        _showMessage('Erreur lors de la soumission: $e', Colors.red);
+      }
     }
   }
-  
+
+  void _showStripeRequiredDialog(TripException error) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          icon: const Icon(
+            Icons.payment,
+            color: Colors.orange,
+            size: 48,
+          ),
+          title: const Text(
+            'Configuration Stripe requise',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                error.message,
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Stripe vous permet de recevoir des paiements de manière sécurisée.',
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Plus tard'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to Wallet screen for Stripe setup
+                context.push('/profile/wallet');
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Configurer Stripe'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _markAsBooked() async {
     if (_trip == null) return;
     
@@ -1494,24 +1587,31 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   
   void _startJourney() async {
     if (_trip == null || _isStartingJourney) return;
-    
+
     setState(() {
       _isStartingJourney = true;
     });
-    
+
     try {
       final tripService = TripService();
-      await tripService.startJourney(_trip!.id.toString());
-      
-      _showMessage('Voyage commencé ! Bon voyage !', Colors.blue);
-      
-      // Refresh trip data
-      setState(() {
-        _hasLoaded = false;
-        _isStartingJourney = false;
-      });
-      _loadDataOnce();
-      
+      final result = await tripService.startTrip(_trip!.id.toString());
+
+      if (result['success'] == true) {
+        _showMessage('Voyage commencé ! Bon voyage !', Colors.blue);
+
+        // Refresh trip data
+        setState(() {
+          _hasLoaded = false;
+          _isStartingJourney = false;
+        });
+        _loadDataOnce();
+      } else {
+        setState(() {
+          _isStartingJourney = false;
+        });
+        _showMessage(result['error'] ?? 'Erreur lors du démarrage', Colors.red);
+      }
+
     } catch (e) {
       setState(() {
         _isStartingJourney = false;
@@ -1522,13 +1622,13 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
   
   void _completeDelivery() async {
     if (_trip == null) return;
-    
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Terminer la livraison'),
-        content: const Text('Confirmez-vous que la livraison a été effectuée avec succès ?'),
+        title: const Text('Terminer le voyage'),
+        content: const Text('Confirmez-vous que toutes les livraisons ont été effectuées avec succès ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1542,26 +1642,159 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
         ],
       ),
     );
-    
+
     if (confirmed != true) return;
-    
+
     try {
       final tripService = TripService();
-      await tripService.completeDelivery(_trip!.id.toString());
-      
-      _showMessage('Livraison terminée avec succès ! 🎉', Colors.green);
-      
-      // Refresh trip data
-      setState(() {
-        _hasLoaded = false;
-      });
-      _loadDataOnce();
-      
+      final result = await tripService.completeTrip(_trip!.id.toString());
+
+      if (result['success'] == true) {
+        _showMessage('Voyage terminé avec succès ! 🎉', Colors.green);
+
+        // Refresh trip data
+        setState(() {
+          _hasLoaded = false;
+        });
+        _loadDataOnce();
+      } else {
+        // Check if there are missing deliveries
+        if (result['missing_deliveries'] != null) {
+          final missingCount = result['missing_count'] ?? 0;
+          final missingDeliveries = result['missing_deliveries'] as List<dynamic>;
+
+          // Show dialog with missing deliveries
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Livraisons manquantes'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vous ne pouvez pas terminer le voyage car $missingCount livraison(s) n\'ont pas été confirmées:',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    ...missingDeliveries.map((delivery) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.warning, color: Colors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Réservation #${delivery['booking_id']}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  if (delivery['sender_name'] != null)
+                                    Text('Client: ${delivery['sender_name']}'),
+                                  if (delivery['package_description'] != null)
+                                    Text('Colis: ${delivery['package_description']}'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Veuillez générer les codes de livraison et demander aux clients de les valider.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          _showMessage(result['error'] ?? 'Erreur lors de la finalisation', Colors.red);
+        }
+      }
+
     } catch (e) {
       _showMessage('Erreur lors de la finalisation: $e', Colors.red);
     }
   }
-  
+
+  void _manageDeliveryCodes() async {
+    if (_trip == null) return;
+
+    // Check if trip has bookings
+    if (_trip!.bookingCount == 0) {
+      _showMessage('Aucune réservation pour ce voyage', Colors.orange);
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Load trip bookings
+      final tripService = TripService();
+      final bookings = await tripService.getTripBookings(_trip!.id.toString());
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Filter confirmed bookings only (accepted, paid, in transit, delivered, completed)
+      final confirmedBookings = bookings
+          .where((booking) =>
+            booking.status == BookingStatus.accepted ||
+            booking.status == BookingStatus.paymentPending ||
+            booking.status == BookingStatus.paymentAuthorized ||
+            booking.status == BookingStatus.paymentConfirmed ||
+            booking.status == BookingStatus.paid ||
+            booking.status == BookingStatus.inTransit ||
+            booking.status == BookingStatus.delivered ||
+            booking.status == BookingStatus.completed
+          )
+          .toList();
+
+      if (confirmedBookings.isEmpty) {
+        _showMessage('Aucune réservation confirmée pour ce voyage', Colors.orange);
+        return;
+      }
+
+      // Navigate to delivery codes screen
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransporterDeliveryCodeScreen(
+              bookings: confirmedBookings,
+            ),
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+      _showMessage('Erreur lors du chargement des réservations: $e', Colors.red);
+    }
+  }
+
   void _backToDraft() async {
     if (_trip == null) return;
     

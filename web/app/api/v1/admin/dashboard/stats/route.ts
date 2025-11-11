@@ -35,7 +35,6 @@ function getAuthToken(request: NextRequest): string | null {
 export async function GET(request: NextRequest) {
   try {
     const token = getAuthToken(request);
-    console.log('🔍 Dashboard stats request - Token:', token ? 'Present' : 'Missing');
 
     if (!token) {
       return NextResponse.json(
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest) {
     try {
       // Essayer l'API backend
       const backendUrl = `${BACKEND_URL}/api/v1/admin/dashboard/stats`;
-      console.log('🔍 Fetching from backend:', backendUrl);
 
       const response = await fetch(backendUrl, {
         method: 'GET',
@@ -57,11 +55,8 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      console.log('🔍 Backend response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend returned data successfully');
 
         return NextResponse.json({
           success: true,
@@ -69,11 +64,11 @@ export async function GET(request: NextRequest) {
         });
       } else {
         const errorText = await response.text();
-        console.error('❌ Backend error:', response.status, errorText.substring(0, 200));
+        console.error('Backend error:', response.status, errorText.substring(0, 200));
       }
 
     } catch (fetchError) {
-      console.error('❌ Fetch error:', fetchError);
+      console.error('Fetch error:', fetchError);
     }
 
     // Si le backend n'est pas disponible, générer des stats basées sur les données réelles

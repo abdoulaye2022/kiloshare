@@ -34,6 +34,32 @@ class StripeController
     }
 
     /**
+     * Get return URL for Stripe redirects
+     * Note: Stripe only accepts HTTP/HTTPS URLs, not custom deep links
+     * The web page will handle redirecting to the mobile app if needed
+     */
+    private function getReturnUrl(string $path, array $queryParams = []): string
+    {
+        $baseUrl = $_ENV['FRONTEND_URL'];
+
+        // Ensure baseUrl doesn't end with /
+        $baseUrl = rtrim($baseUrl, '/');
+
+        // Ensure path starts with /
+        if (!str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+
+        $url = $baseUrl . $path;
+
+        if (!empty($queryParams)) {
+            $url .= '?' . http_build_query($queryParams);
+        }
+
+        return $url;
+    }
+
+    /**
      * Create a Stripe Connect account for the user
      */
     public function createConnectedAccount(ServerRequestInterface $request): ResponseInterface
@@ -48,8 +74,8 @@ class StripeController
                 if ($existingAccount->status !== 'active') {
                     $accountLink = AccountLink::create([
                         'account' => $existingAccount->stripe_account_id,
-                        'refresh_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?refresh=true',
-                        'return_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?success=true',
+                        'refresh_url' => $this->getReturnUrl('/profile/wallet', ['refresh' => 'true']),
+                        'return_url' => $this->getReturnUrl('/profile/wallet', ['success' => 'true']),
                         'type' => 'account_onboarding',
                     ]);
 
@@ -97,8 +123,8 @@ class StripeController
             // Create account link for onboarding
             $accountLink = AccountLink::create([
                 'account' => $account->id,
-                'refresh_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?refresh=true',
-                'return_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?success=true',
+                'refresh_url' => $this->getReturnUrl('/profile/wallet', ['refresh' => 'true']),
+                'return_url' => $this->getReturnUrl('/profile/wallet', ['success' => 'true']),
                 'type' => 'account_onboarding',
             ]);
 
@@ -219,8 +245,8 @@ class StripeController
                 try {
                     $accountLink = AccountLink::create([
                         'account' => $account->id,
-                        'refresh_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?refresh=true',
-                        'return_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?success=true',
+                        'refresh_url' => $this->getReturnUrl('/profile/wallet', ['refresh' => 'true']),
+                        'return_url' => $this->getReturnUrl('/profile/wallet', ['success' => 'true']),
                         'type' => 'account_onboarding',
                     ]);
                     
@@ -284,23 +310,38 @@ class StripeController
         $user = $request->getAttribute('user');
 
         try {
+            error_log("🔍 refreshOnboardingLink - User ID: " . $user->id);
+
             $userStripeAccount = UserStripeAccount::where('user_id', $user->id)->first();
 
             if (!$userStripeAccount) {
+                error_log("❌ No Stripe account found for user " . $user->id);
                 return Response::notFound('Aucun compte Stripe trouvé');
             }
+
+            error_log("🔍 Stripe account found: " . $userStripeAccount->stripe_account_id);
+            error_log("🔍 Account status: " . $userStripeAccount->status);
 
             if ($userStripeAccount->status === 'active') {
                 return Response::error('Le compte Stripe est déjà actif', [], 400);
             }
 
+            // Generate URLs
+            $refreshUrl = $this->getReturnUrl('/profile/wallet', ['refresh' => 'true']);
+            $returnUrl = $this->getReturnUrl('/profile/wallet', ['success' => 'true']);
+
+            error_log("🔍 Refresh URL: " . $refreshUrl);
+            error_log("🔍 Return URL: " . $returnUrl);
+
             // Create new account link
             $accountLink = AccountLink::create([
                 'account' => $userStripeAccount->stripe_account_id,
-                'refresh_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?refresh=true',
-                'return_url' => $_ENV['FRONTEND_URL'] . '/profile/wallet?success=true',
+                'refresh_url' => $refreshUrl,
+                'return_url' => $returnUrl,
                 'type' => 'account_onboarding',
             ]);
+
+            error_log("✅ Account link created: " . $accountLink->url);
 
             // Update the onboarding URL
             $userStripeAccount->onboarding_url = $accountLink->url;
@@ -313,6 +354,8 @@ class StripeController
             ]);
 
         } catch (Exception $e) {
+            error_log("❌ ERREUR refreshOnboardingLink: " . $e->getMessage());
+            error_log("❌ TRACE: " . $e->getTraceAsString());
             return Response::serverError('Erreur lors du rafraîchissement du lien: ' . $e->getMessage());
         }
     }
@@ -505,8 +548,7 @@ class StripeController
             // ÉTAPE 8: Envoyer les notifications
             $this->sendPaymentNotifications($booking);
 
-            // ÉTAPE 9: Mettre à jour les tables de résumé
-            $this->updateSummaryTables($booking, $trip);
+            // ÉTAPE 9: Aucune mise à jour nécessaire (les vues SQL ont été supprimées)
 
             error_log("StripeController.confirmPayment - Payment workflow completed successfully for booking: " . $bookingId);
 
@@ -598,45 +640,6 @@ class StripeController
         return $codes;
     }
 
-    /**
-     * Met à jour les tables de résumé pour maintenir la cohérence
-     */
-    private function updateSummaryTables(Booking $booking, Trip $trip): void
-    {
-        try {
-            // Mettre à jour trip_status_summary
-            \Illuminate\Support\Facades\DB::statement("
-                INSERT INTO trip_status_summary (status, count, last_updated) 
-                VALUES (?, 1, NOW()) 
-                ON DUPLICATE KEY UPDATE 
-                count = count + 1, 
-                last_updated = NOW()
-            ", [$trip->status]);
-
-            // Mettre à jour booking_summary
-            \Illuminate\Support\Facades\DB::statement("
-                INSERT INTO booking_summary (status, count, last_updated) 
-                VALUES (?, 1, NOW()) 
-                ON DUPLICATE KEY UPDATE 
-                count = count + 1, 
-                last_updated = NOW()
-            ", [$booking->status]);
-
-            // Mettre à jour active_trips_overview
-            \Illuminate\Support\Facades\DB::statement("
-                UPDATE active_trips_overview 
-                SET booked_trips = (
-                    SELECT COUNT(*) FROM trips WHERE status = 'booked'
-                ), 
-                last_updated = NOW()
-            ");
-
-            error_log("Summary tables updated successfully for booking {$booking->id}");
-            
-        } catch (Exception $e) {
-            error_log("Error updating summary tables: " . $e->getMessage());
-        }
-    }
 
     /**
      * Valider le code pickup et marquer le début du voyage

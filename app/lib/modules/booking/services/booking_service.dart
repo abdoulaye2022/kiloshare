@@ -81,6 +81,7 @@ class BookingService {
         return {
           'success': true,
           'booking': responseData['data']?['booking'],
+          'payment': responseData['data']?['payment'], // Inclure les infos de paiement
           'message': responseData['message'],
         };
       } else {
@@ -131,20 +132,30 @@ class BookingService {
   }
 
   /// Récupérer les réservations de l'utilisateur
-  Future<Map<String, dynamic>> getUserBookings({String? role}) async {
+  Future<Map<String, dynamic>> getUserBookings({String? role, bool includeArchived = false}) async {
     try {
       final headers = await _getAuthHeaders();
-      
+
       if (headers == null) {
         return {
           'success': false,
           'error': 'Utilisateur non connecté',
         };
       }
-      
+
       String url = '$_baseUrl/bookings';
+      List<String> queryParams = [];
+
       if (role != null) {
-        url += '?role=$role';
+        queryParams.add('role=$role');
+      }
+
+      if (includeArchived) {
+        queryParams.add('include_archived=true');
+      }
+
+      if (queryParams.isNotEmpty) {
+        url += '?${queryParams.join('&')}';
       }
 
 
@@ -467,7 +478,11 @@ class BookingService {
     }
   }
 
-  /// Confirmer le paiement (nouveau système de capture différée)
+  /// OBSOLÈTE: Confirmer le paiement (nouveau système de capture différée)
+  /// Cette méthode n'est plus utilisée. Le paiement est maintenant effectué IMMÉDIATEMENT
+  /// après la création de la réservation via Stripe SDK, plus besoin de confirmation manuelle.
+  @Deprecated('Payment confirmation has been replaced by immediate payment after booking creation')
+  /*
   Future<Map<String, dynamic>> confirmPayment(String bookingId) async {
     try {
       final headers = await _getAuthHeaders();
@@ -505,6 +520,7 @@ class BookingService {
       };
     }
   }
+  */
 
   /// Capturer le paiement manuellement (transporteur)
   @Deprecated('Manual payment capture has been replaced by automatic capture upon delivery code validation')
@@ -551,6 +567,82 @@ class BookingService {
       }
     } catch (e) {
       print('Erreur BookingService.getPaymentStatus: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Archiver une réservation
+  Future<Map<String, dynamic>> archiveBooking(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/archive'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Réservation archivée avec succès',
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de l\'archivage',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.archiveBooking: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
+
+  /// Désarchiver une réservation
+  Future<Map<String, dynamic>> unarchiveBooking(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${_baseUrl}/bookings/$bookingId/unarchive'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Réservation désarchivée avec succès',
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la désarchivage',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.unarchiveBooking: $e');
       return {
         'success': false,
         'error': 'Erreur de connexion: $e',

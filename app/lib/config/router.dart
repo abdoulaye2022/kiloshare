@@ -25,11 +25,41 @@ import '../modules/booking/screens/bookings_list_screen.dart';
 import '../modules/booking/screens/booking_details_screen.dart';
 import '../modules/messaging/screens/conversation_screen.dart';
 import '../modules/profile/screens/wallet_screen.dart';
+import '../modules/profile/screens/public_user_profile_screen.dart';
 
 GoRouter createRouter() {
   return GoRouter(
     initialLocation: '/home',
     debugLogDiagnostics: true,
+    // Handle deep links by converting kiloshare:// scheme to paths
+    redirect: (context, state) {
+      final uri = state.uri;
+
+      // If the URI has kiloshare scheme, reconstruct the proper path
+      if (uri.scheme == 'kiloshare') {
+        debugPrint('🔗 Router redirect - Converting kiloshare:// to path');
+        debugPrint('🔗 Original URI: $uri');
+        debugPrint('🔗 Host: ${uri.host}, Path: ${uri.path}');
+
+        // Combine host and path: kiloshare://profile/wallet -> /profile/wallet
+        String path = '';
+        if (uri.host.isNotEmpty) {
+          path = '/${uri.host}${uri.path}';
+        } else {
+          path = uri.path;
+        }
+
+        // Ensure path starts with /
+        if (!path.startsWith('/')) {
+          path = '/$path';
+        }
+
+        debugPrint('🔗 Redirecting to: $path');
+        return path;
+      }
+
+      return null; // No redirect needed
+    },
     routes: [
       // Root redirect to home
       GoRoute(
@@ -125,7 +155,19 @@ GoRouter createRouter() {
         name: 'wallet',
         builder: (context, state) => const WalletScreen(),
       ),
-      
+      GoRoute(
+        path: '/users/:userId/profile',
+        name: 'public-user-profile',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final userName = state.uri.queryParameters['userName'];
+          return PublicUserProfileScreen(
+            userId: userId,
+            userName: userName,
+          );
+        },
+      ),
+
       // Trip routes
       GoRoute(
         path: '/trips/create',
@@ -191,31 +233,49 @@ GoRouter createRouter() {
       ),
     ],
     
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Page not found',
-              style: Theme.of(context).textTheme.headlineSmall,
+    errorBuilder: (context, state) {
+      // Log detailed error information
+      debugPrint('❌ Router Error - Location: ${state.uri}');
+      debugPrint('❌ Router Error - Error: ${state.error}');
+      debugPrint('❌ Router Error - MatchedLocation: ${state.matchedLocation}');
+
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Page not found',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Path: ${state.uri}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  state.error.toString(),
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.go('/home'),
+                  child: const Text('Go to Home'),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              state.error.toString(),
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('Go to Login'),
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }

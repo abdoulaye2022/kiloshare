@@ -68,8 +68,6 @@ export default function UserManagement() {
       if (response.ok) {
         const data = await response.json();
         const users = data.data?.users || [];
-        console.log('🔍 Users received:', users);
-        console.log('🔍 Users with Stripe accounts:', users.filter((u: User) => u.stripe_account_id));
         setUsers(users);
       } else {
         console.error('Failed to fetch users', response.status);

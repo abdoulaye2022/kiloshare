@@ -37,6 +37,10 @@ class Booking extends Model
         'cancellation_type',
         'cancellation_reason',
         'rejection_reason',
+        'archived_by_sender',
+        'archived_by_sender_at',
+        'archived_by_receiver',
+        'archived_by_receiver_at',
     ];
 
     protected $casts = [
@@ -50,6 +54,10 @@ class Booking extends Model
         'payment_authorized_at' => 'datetime',
         'payment_confirmed_at' => 'datetime',
         'payment_captured_at' => 'datetime',
+        'archived_by_sender' => 'boolean',
+        'archived_by_receiver' => 'boolean',
+        'archived_by_sender_at' => 'datetime',
+        'archived_by_receiver_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -158,7 +166,8 @@ class Booking extends Model
     // Méthodes utilitaires
     public function canBeAcceptedBy(User $user): bool
     {
-        return $this->status === self::STATUS_PENDING 
+        // Le transporteur peut accepter si status PENDING ou PAYMENT_AUTHORIZED
+        return ($this->status === self::STATUS_PENDING || $this->status === self::STATUS_PAYMENT_AUTHORIZED)
             && $this->trip->user_id === $user->id;
     }
 
@@ -461,5 +470,90 @@ class Booking extends Model
     public function scopeForTrip($query, int $tripId)
     {
         return $query->where('trip_id', $tripId);
+    }
+
+    // ============== MÉTHODES D'ARCHIVAGE ==============
+
+    /**
+     * Archiver la réservation pour l'expéditeur
+     */
+    public function archiveForSender(): bool
+    {
+        $this->archived_by_sender = true;
+        $this->archived_by_sender_at = Carbon::now();
+        return $this->save();
+    }
+
+    /**
+     * Désarchiver la réservation pour l'expéditeur
+     */
+    public function unarchiveForSender(): bool
+    {
+        $this->archived_by_sender = false;
+        $this->archived_by_sender_at = null;
+        return $this->save();
+    }
+
+    /**
+     * Archiver la réservation pour le transporteur
+     */
+    public function archiveForReceiver(): bool
+    {
+        $this->archived_by_receiver = true;
+        $this->archived_by_receiver_at = Carbon::now();
+        return $this->save();
+    }
+
+    /**
+     * Désarchiver la réservation pour le transporteur
+     */
+    public function unarchiveForReceiver(): bool
+    {
+        $this->archived_by_receiver = false;
+        $this->archived_by_receiver_at = null;
+        return $this->save();
+    }
+
+    /**
+     * Vérifier si une réservation peut être archivée
+     * Seulement les réservations terminées, annulées ou rejetées
+     */
+    public function canBeArchived(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_COMPLETED,
+            self::STATUS_CANCELLED,
+            self::STATUS_REJECTED,
+        ]);
+    }
+
+    /**
+     * Vérifier si archivée pour l'expéditeur
+     */
+    public function isArchivedForSender(): bool
+    {
+        return (bool) $this->archived_by_sender;
+    }
+
+    /**
+     * Vérifier si archivée pour le transporteur
+     */
+    public function isArchivedForReceiver(): bool
+    {
+        return (bool) $this->archived_by_receiver;
+    }
+
+    /**
+     * Vérifier si archivée pour un utilisateur donné
+     */
+    public function isArchivedForUser(User $user): bool
+    {
+        if ($user->id === $this->sender_id) {
+            return $this->isArchivedForSender();
+        }
+        if ($user->id === $this->receiver_id) {
+            return $this->isArchivedForReceiver();
+        }
+        return false;
     }
 }

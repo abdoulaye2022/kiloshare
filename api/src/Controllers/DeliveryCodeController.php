@@ -12,8 +12,9 @@ use KiloShare\Services\DeliveryCodeService;
 use KiloShare\Services\GoogleCloudStorageService;
 use Respect\Validation\Validator;
 use Exception;
+use KiloShare\Utils\Response;
 
-class DeliveryCodeController extends BaseController
+class DeliveryCodeController
 {
     private DeliveryCodeService $deliveryCodeService;
     private GoogleCloudStorageService $gcsService;
@@ -40,23 +41,23 @@ class DeliveryCodeController extends BaseController
             $booking = Booking::with(['sender', 'receiver', 'trip'])->find($bookingId);
 
             if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
+                return Response::notFound('Réservation non trouvée');
             }
 
             // Vérifier les permissions (propriétaire du voyage uniquement)
             if ($booking->receiver_id !== $currentUser->id) {
-                return $this->respondForbidden('Seul le transporteur peut générer un code de livraison');
+                return Response::forbidden('Seul le transporteur peut générer un code de livraison');
             }
 
             // Vérifier que la réservation est confirmée
             if ($booking->status !== Booking::STATUS_ACCEPTED) {
-                return $this->respondBadRequest('La réservation doit être confirmée pour générer un code');
+                return Response::error('La réservation doit être confirmée pour générer un code', [], 400);
             }
 
             // Générer le code
             $deliveryCode = $this->deliveryCodeService->generateDeliveryCode($booking);
 
-            return $this->respondSuccess([
+            return Response::success([
                 'delivery_code' => [
                     'id' => $deliveryCode->id,
                     'booking_id' => $deliveryCode->booking_id,
@@ -66,11 +67,10 @@ class DeliveryCodeController extends BaseController
                     'max_attempts' => $deliveryCode->max_attempts,
                     'attempts_count' => $deliveryCode->attempts_count,
                 ],
-                'message' => 'Code de livraison généré et envoyé à l\'expéditeur'
-            ]);
+            ], 'Code de livraison généré et envoyé à l\'expéditeur');
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 
@@ -85,22 +85,11 @@ class DeliveryCodeController extends BaseController
             $currentUser = $request->getAttribute('user');
             $data = json_decode($request->getBody()->getContents(), true);
 
-            // Validation des données
-            $validator = new Validator();
-            $rules = [
-                'code' => $validator->notEmpty()->stringType()->length(6, 6),
-                'latitude' => $validator->optional($validator->numericVal()),
-                'longitude' => $validator->optional($validator->numericVal()),
-                'photos' => $validator->optional($validator->arrayType()),
-            ];
-
-            $this->validateInput($data, $rules);
-
             // Récupérer la réservation
             $booking = Booking::with(['sender', 'receiver', 'trip'])->find($bookingId);
 
             if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
+                return Response::notFound('Réservation non trouvée');
             }
 
             // Traitement des photos si fournies
@@ -156,20 +145,30 @@ class DeliveryCodeController extends BaseController
             );
 
             if ($result['success']) {
-                return $this->respondSuccess([
+                $freshBooking = $booking->fresh();
+
+                // Gérer delivery_confirmed_at qui peut être string ou DateTime
+                $deliveryConfirmedAt = $freshBooking->delivery_confirmed_at;
+                if (is_string($deliveryConfirmedAt)) {
+                    $deliveryConfirmedAt = $deliveryConfirmedAt;
+                } elseif ($deliveryConfirmedAt instanceof \DateTime) {
+                    $deliveryConfirmedAt = $deliveryConfirmedAt->format('c');
+                }
+
+                return Response::success([
                     'message' => $result['message'],
-                    'booking_status' => $booking->fresh()->status,
-                    'delivery_confirmed_at' => $booking->fresh()->delivery_confirmed_at?->toISOString(),
+                    'booking_status' => $freshBooking->status,
+                    'delivery_confirmed_at' => $deliveryConfirmedAt,
                     'photos_uploaded' => count($photos),
                 ]);
             } else {
-                return $this->respondBadRequest($result['error'], [
+                return Response::error($result['error'], [
                     'attempts_remaining' => $result['attempts_remaining'] ?? 0,
-                ]);
+                ], 400);
             }
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 
@@ -184,19 +183,11 @@ class DeliveryCodeController extends BaseController
             $currentUser = $request->getAttribute('user');
             $data = json_decode($request->getBody()->getContents(), true);
 
-            // Validation optionnelle de la raison
-            if (isset($data['reason'])) {
-                $validator = new Validator();
-                $this->validateInput($data, [
-                    'reason' => $validator->optional($validator->stringType()->length(1, 255)),
-                ]);
-            }
-
             // Récupérer la réservation
             $booking = Booking::with(['sender', 'receiver', 'trip'])->find($bookingId);
 
             if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
+                return Response::notFound('Réservation non trouvée');
             }
 
             // Régénérer le code
@@ -206,7 +197,7 @@ class DeliveryCodeController extends BaseController
                 $data['reason'] ?? 'Code perdu - régénération demandée'
             );
 
-            return $this->respondSuccess([
+            return Response::success([
                 'delivery_code' => [
                     'id' => $newDeliveryCode->id,
                     'booking_id' => $newDeliveryCode->booking_id,
@@ -220,7 +211,7 @@ class DeliveryCodeController extends BaseController
             ]);
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 
@@ -238,19 +229,19 @@ class DeliveryCodeController extends BaseController
             $booking = Booking::with(['sender', 'receiver', 'trip'])->find($bookingId);
 
             if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
+                return Response::notFound('Réservation non trouvée');
             }
 
             // Vérifier les permissions
             if ($booking->sender_id !== $currentUser->id && $booking->receiver_id !== $currentUser->id) {
-                return $this->respondForbidden('Accès non autorisé');
+                return Response::forbidden('Accès non autorisé');
             }
 
             // Récupérer le code actif
             $deliveryCode = $this->deliveryCodeService->getActiveDeliveryCode($booking);
 
             if (!$deliveryCode) {
-                return $this->respondNotFound('Aucun code de livraison actif');
+                return Response::notFound('Aucun code de livraison actif');
             }
 
             // Préparer la réponse selon le rôle de l'utilisateur
@@ -291,71 +282,10 @@ class DeliveryCodeController extends BaseController
                 $response['message'] = 'Code de livraison requis pour cette réservation';
             }
 
-            return $this->respondSuccess($response);
+            return Response::success($response);
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
-        }
-    }
-
-    /**
-     * Récupère l'historique des tentatives pour un code de livraison
-     * GET /bookings/{id}/delivery-code/attempts
-     */
-    public function getDeliveryCodeAttempts(ServerRequestInterface $request): ResponseInterface
-    {
-        try {
-            $bookingId = $request->getAttribute('id');
-            $currentUser = $request->getAttribute('user');
-
-            // Récupérer la réservation
-            $booking = Booking::find($bookingId);
-
-            if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
-            }
-
-            // Vérifier les permissions (propriétaires uniquement)
-            if ($booking->sender_id !== $currentUser->id && $booking->receiver_id !== $currentUser->id) {
-                return $this->respondForbidden('Accès non autorisé');
-            }
-
-            // Récupérer le code de livraison et ses tentatives
-            $deliveryCode = DeliveryCode::with(['attempts.user'])
-                ->where('booking_id', $booking->id)
-                ->where('status', DeliveryCode::STATUS_ACTIVE)
-                ->first();
-
-            if (!$deliveryCode) {
-                return $this->respondNotFound('Aucun code de livraison actif');
-            }
-
-            $attempts = $deliveryCode->attempts()
-                ->orderBy('attempted_at', 'desc')
-                ->get()
-                ->map(function ($attempt) {
-                    return [
-                        'id' => $attempt->id,
-                        'user' => [
-                            'id' => $attempt->user->id,
-                            'name' => $attempt->user->first_name . ' ' . $attempt->user->last_name,
-                        ],
-                        'success' => $attempt->success,
-                        'error_message' => $attempt->error_message,
-                        'has_location' => $attempt->hasLocation(),
-                        'attempted_at' => $attempt->attempted_at->toISOString(),
-                    ];
-                });
-
-            return $this->respondSuccess([
-                'attempts' => $attempts,
-                'total_attempts' => $attempts->count(),
-                'successful_attempts' => $attempts->where('success', true)->count(),
-                'remaining_attempts' => $deliveryCode->remaining_attempts,
-            ]);
-
-        } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 
@@ -373,18 +303,18 @@ class DeliveryCodeController extends BaseController
             $booking = Booking::with(['trip'])->find($bookingId);
 
             if (!$booking) {
-                return $this->respondNotFound('Réservation non trouvée');
+                return Response::notFound('Réservation non trouvée');
             }
 
             // Vérifier les permissions
             if ($booking->sender_id !== $currentUser->id && $booking->receiver_id !== $currentUser->id) {
-                return $this->respondForbidden('Accès non autorisé');
+                return Response::forbidden('Accès non autorisé');
             }
 
             $required = $this->deliveryCodeService->requiresDeliveryCode($booking);
             $activeCode = $this->deliveryCodeService->getActiveDeliveryCode($booking);
 
-            return $this->respondSuccess([
+            return Response::success([
                 'required' => $required,
                 'has_active_code' => $activeCode !== null,
                 'booking_status' => $booking->status,
@@ -396,7 +326,7 @@ class DeliveryCodeController extends BaseController
             ]);
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 
@@ -411,7 +341,7 @@ class DeliveryCodeController extends BaseController
 
             // Vérifier les permissions admin
             if (!$currentUser->isAdmin()) {
-                return $this->respondForbidden('Accès réservé aux administrateurs');
+                return Response::forbidden('Accès réservé aux administrateurs');
             }
 
             $queryParams = $request->getQueryParams();
@@ -419,14 +349,14 @@ class DeliveryCodeController extends BaseController
 
             $stats = $this->deliveryCodeService->getDeliveryCodeStats($days);
 
-            return $this->respondSuccess([
+            return Response::success([
                 'stats' => $stats,
                 'period_days' => $days,
                 'generated_at' => now()->toISOString(),
             ]);
 
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage());
+            return Response::serverError($e->getMessage());
         }
     }
 }

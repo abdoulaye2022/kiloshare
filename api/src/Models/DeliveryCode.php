@@ -19,9 +19,11 @@ class DeliveryCode extends Model
         'status',
         'attempts_count',
         'max_attempts',
+        'generated_by',
         'generated_at',
         'expires_at',
         'used_at',
+        'used_by',
         'delivery_latitude',
         'delivery_longitude',
         'delivery_photos',
@@ -74,27 +76,12 @@ class DeliveryCode extends Model
                 $deliveryCode->generated_at = Carbon::now();
             }
         });
-
-        static::created(function ($deliveryCode) {
-            // Enregistrer dans l'historique
-            $deliveryCode->recordHistory(self::ACTION_GENERATED);
-        });
     }
 
     // Relations
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
-    }
-
-    public function attempts(): HasMany
-    {
-        return $this->hasMany(DeliveryCodeAttempt::class);
-    }
-
-    public function history(): HasMany
-    {
-        return $this->hasMany(DeliveryCodeHistory::class, 'booking_id', 'booking_id');
     }
 
     // Méthodes utilitaires
@@ -152,13 +139,12 @@ class DeliveryCode extends Model
 
         if ($this->hasReachedMaxAttempts()) {
             $this->status = self::STATUS_EXPIRED;
-            $this->recordHistory(self::ACTION_EXPIRED, null, 'Nombre maximum de tentatives atteint');
         }
 
         $this->save();
     }
 
-    public function markAsUsed(float $latitude = null, float $longitude = null, array $photos = []): void
+    public function markAsUsed(?float $latitude = null, ?float $longitude = null, array $photos = []): void
     {
         $this->status = self::STATUS_USED;
         $this->used_at = Carbon::now();
@@ -174,17 +160,15 @@ class DeliveryCode extends Model
         }
 
         $this->save();
-        $this->recordHistory(self::ACTION_USED);
 
         // Marquer la réservation comme livrée
         $this->booking->delivery_confirmed_at = Carbon::now();
         $this->booking->save();
     }
 
-    public function regenerate(int $userId = null, string $reason = null): self
+    public function regenerate(?int $userId = null, ?string $reason = null): self
     {
         // Marquer l'ancien code comme régénéré
-        $oldCode = $this->code;
         $this->status = self::STATUS_REGENERATED;
         $this->save();
 
@@ -201,49 +185,14 @@ class DeliveryCode extends Model
         $newDeliveryCode->setExpiryBasedOnTrip();
         $newDeliveryCode->save();
 
-        // Enregistrer dans l'historique
-        DeliveryCodeHistory::create([
-            'booking_id' => $this->booking_id,
-            'old_code' => $oldCode,
-            'new_code' => $newDeliveryCode->code,
-            'action' => self::ACTION_REGENERATED,
-            'triggered_by_user_id' => $userId,
-            'reason' => $reason ?? 'Code régénéré sur demande',
-        ]);
-
         return $newDeliveryCode;
     }
 
-    public function recordHistory(string $action, int $userId = null, string $reason = null): void
+    public function validateAttempt(string $inputCode): array
     {
-        DeliveryCodeHistory::create([
-            'booking_id' => $this->booking_id,
-            'old_code' => null,
-            'new_code' => $this->code,
-            'action' => $action,
-            'triggered_by_user_id' => $userId,
-            'reason' => $reason,
-        ]);
-    }
-
-    public function validateAttempt(string $inputCode, int $userId, float $latitude = null, float $longitude = null): array
-    {
-        // Enregistrer la tentative
-        $attempt = DeliveryCodeAttempt::create([
-            'delivery_code_id' => $this->id,
-            'attempted_code' => $inputCode,
-            'user_id' => $userId,
-            'attempt_latitude' => $latitude,
-            'attempt_longitude' => $longitude,
-            'success' => false,
-        ]);
-
         // Vérifier si le code est encore valide
         if (!$this->isValid()) {
             $errorMessage = $this->isExpired() ? 'Code expiré' : 'Code invalide';
-            $attempt->update([
-                'error_message' => $errorMessage,
-            ]);
             return [
                 'success' => false,
                 'error' => $errorMessage,
@@ -254,9 +203,6 @@ class DeliveryCode extends Model
         // Vérifier le code
         if ($inputCode !== $this->code) {
             $this->incrementAttempts();
-            $attempt->update([
-                'error_message' => 'Code incorrect',
-            ]);
 
             return [
                 'success' => false,
@@ -266,12 +212,9 @@ class DeliveryCode extends Model
         }
 
         // Code correct
-        $attempt->update(['success' => true]);
-
         return [
             'success' => true,
             'message' => 'Code validé avec succès',
-            'attempt_id' => $attempt->id,
         ];
     }
 

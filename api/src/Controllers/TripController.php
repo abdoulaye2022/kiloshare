@@ -7,6 +7,7 @@ namespace KiloShare\Controllers;
 use KiloShare\Models\Trip;
 use KiloShare\Models\User;
 use KiloShare\Models\TripImage;
+use KiloShare\Models\Booking;
 use KiloShare\Utils\Response;
 use KiloShare\Utils\Validator;
 use KiloShare\Services\GoogleCloudStorageService;
@@ -30,7 +31,7 @@ class TripController
             $trips = Trip::active()
                 ->notExpired()
                 ->with(['user', 'images'])
-                ->orderByRelevance()
+                ->orderBy('created_at', 'desc')
                 ->skip($offset)
                 ->take($limit)
                 ->get();
@@ -264,20 +265,25 @@ class TripController
         }
         
         try {
-            // Debug restrictions data
-            
+            // Vérifier si l'utilisateur a un compte Stripe actif
+            $hasStripeAccount = $user->hasActiveStripeAccount();
+            $needsStripeSetup = !$hasStripeAccount;
+
             // Générer un titre automatique si non fourni
             $title = $data['title'] ?? "{$data['departure_city']} → {$data['arrival_city']}";
-            
+
             // Mapper transport type de Flutter vers DB
             $transportTypeMap = [
                 'flight' => 'plane',
-                'train' => 'train', 
+                'train' => 'train',
                 'bus' => 'bus',
                 'car' => 'car'
             ];
             $transportType = $transportTypeMap[$data['transport_type']] ?? 'plane';
-            
+
+            // Définir le statut : DRAFT si pas de Stripe, sinon DRAFT également (publication manuelle)
+            $tripStatus = Trip::STATUS_DRAFT;
+
             $trip = Trip::create([
                 'user_id' => $user->id,
                 'title' => $title,
@@ -294,7 +300,7 @@ class TripController
                 'currency' => $data['currency'],
                 'is_domestic' => $data['departure_country'] === $data['arrival_country'],
                 'special_notes' => $data['special_notes'] ?? '',
-                'status' => Trip::STATUS_DRAFT,
+                'status' => $tripStatus,
             ]);
 
             // Gérer les images si présentes (URLs GCS)
@@ -314,7 +320,8 @@ class TripController
                 error_log("TripController: No images to process. Images data: " . json_encode($data['images'] ?? null));
             }
 
-            return Response::created([
+            // Préparer la réponse avec warnings si nécessaire
+            $responseData = [
                 'trip' => [
                     'id' => $trip->id,
                     'uuid' => $trip->uuid,
@@ -326,7 +333,23 @@ class TripController
                     'created_at' => $trip->created_at,
                     'images' => $images,
                 ]
-            ], 'Trip created successfully');
+            ];
+
+            // Ajouter un warning si Stripe n'est pas configuré
+            if ($needsStripeSetup) {
+                $responseData['warning'] = [
+                    'code' => 'stripe_account_required',
+                    'message' => 'Votre voyage a été créé en brouillon. Configurez votre compte Stripe pour le publier et recevoir des paiements.',
+                    'action_required' => 'setup_stripe',
+                    'stripe_setup_url' => $this->getStripeOnboardingUrl($user)
+                ];
+            }
+
+            $message = $needsStripeSetup
+                ? 'Voyage créé en brouillon. Configuration Stripe requise pour publication.'
+                : 'Voyage créé avec succès';
+
+            return Response::created($responseData, $message);
 
         } catch (\Exception $e) {
             error_log("TRIP CREATION ERROR: " . $e->getMessage());
@@ -546,6 +569,19 @@ class TripController
 
             if ($trip->status !== Trip::STATUS_DRAFT) {
                 return Response::error('Only draft trips can be published');
+            }
+
+            // Vérifier que l'utilisateur a un compte Stripe actif avant de publier
+            if (!$user->canPublishTrips()) {
+                return Response::error(
+                    'Vous devez configurer votre compte Stripe avant de publier un voyage. Cela permet de recevoir des paiements de manière sécurisée.',
+                    [
+                        'code' => 'stripe_account_required',
+                        'action_required' => 'setup_stripe',
+                        'stripe_setup_url' => $this->getStripeOnboardingUrl($user)
+                    ],
+                    403
+                );
             }
 
             $trip->publish();
@@ -1487,15 +1523,28 @@ class TripController
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
-        
+
         try {
             $trip = Trip::where('user_id', $user->id)->find($id);
             if (!$trip) {
                 return Response::notFound('Trip not found');
             }
-            
+
+            // Vérifier que l'utilisateur a un compte Stripe actif avant de soumettre pour approbation
+            if (!$user->canPublishTrips()) {
+                return Response::error(
+                    'Vous devez configurer votre compte Stripe avant de soumettre un voyage pour publication. Cela permet de recevoir des paiements de manière sécurisée.',
+                    [
+                        'code' => 'stripe_account_required',
+                        'action_required' => 'setup_stripe',
+                        'stripe_setup_url' => $this->getStripeOnboardingUrl($user)
+                    ],
+                    403
+                );
+            }
+
             $trip->submitForReview();
-            
+
             return Response::success([
                 'trip' => [
                     'id' => $trip->id,
@@ -1512,20 +1561,34 @@ class TripController
     {
         $user = $request->getAttribute('user');
         $id = $request->getAttribute('id');
-        
+
         // Only admins can approve trips
         if ($user->role !== 'admin') {
             return Response::forbidden('Only administrators can approve trips');
         }
-        
+
         try {
             $trip = Trip::find($id);
             if (!$trip) {
                 return Response::notFound('Trip not found');
             }
-            
+
+            // Vérifier que le propriétaire du voyage a un compte Stripe actif
+            $tripOwner = $trip->user;
+            if (!$tripOwner->canPublishTrips()) {
+                return Response::error(
+                    'Le propriétaire de ce voyage doit configurer son compte Stripe avant que le voyage puisse être approuvé.',
+                    [
+                        'code' => 'stripe_account_required',
+                        'trip_owner_id' => $tripOwner->id,
+                        'trip_owner_email' => $tripOwner->email,
+                    ],
+                    403
+                );
+            }
+
             $trip->approve();
-            
+
             return Response::success([
                 'trip' => [
                     'id' => $trip->id,
@@ -1896,6 +1959,256 @@ class TripController
         } catch (\Exception $e) {
             error_log("TripController::duplicateTrip Error: " . $e->getMessage());
             return Response::error('Failed to duplicate trip', [], 500);
+        }
+    }
+
+    /**
+     * Obtenir l'URL d'onboarding Stripe pour l'utilisateur
+     */
+    private function getStripeOnboardingUrl(User $user): ?string
+    {
+        // Vérifier si l'utilisateur a déjà un compte Stripe en cours
+        $stripeAccount = $user->getStripeAccount();
+
+        if ($stripeAccount && !empty($stripeAccount->onboarding_url)) {
+            return $stripeAccount->onboarding_url;
+        }
+
+        // Construire l'URL frontend pour la page Stripe setup
+        $frontendUrl = $_ENV['FRONTEND_URL_PROD'] ?? 'https://kiloshare.com';
+        if (($_ENV['APP_ENV'] ?? 'production') === 'development') {
+            $frontendUrl = $_ENV['FRONTEND_URL_DEV'] ?? 'http://localhost:3000';
+        }
+
+        return "{$frontendUrl}/settings/stripe-setup";
+    }
+
+    /**
+     * Marquer un voyage comme "en cours" (démarre le voyage)
+     * POST /trips/{id}/start
+     */
+    public function startTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $tripId = (int) $request->getAttribute('id');
+            $currentUser = $request->getAttribute('user');
+
+            $trip = Trip::with(['bookings'])->find($tripId);
+
+            if (!$trip) {
+                return Response::notFound('Voyage non trouvé');
+            }
+
+            // Vérifier que c'est le propriétaire du voyage
+            if ($trip->user_id !== $currentUser->id) {
+                return Response::forbidden('Seul le propriétaire peut démarrer le voyage');
+            }
+
+            // Vérifier que le voyage est publié
+            if (!in_array($trip->status, [Trip::STATUS_PUBLISHED, Trip::STATUS_ACTIVE, Trip::STATUS_BOOKED])) {
+                return Response::error('Le voyage doit être publié pour être démarré', [], 400);
+            }
+
+            // Vérifier qu'il y a au moins une réservation confirmée
+            $confirmedBookings = $trip->bookings()
+                ->whereIn('status', [
+                    Booking::STATUS_ACCEPTED,
+                    Booking::STATUS_PAYMENT_AUTHORIZED,
+                    Booking::STATUS_PAYMENT_CONFIRMED
+                ])
+                ->count();
+
+            if ($confirmedBookings === 0) {
+                return Response::error('Aucune réservation confirmée pour ce voyage', [], 400);
+            }
+
+            // Marquer le voyage comme "en cours"
+            $trip->status = Trip::STATUS_IN_PROGRESS;
+            $trip->save();
+
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'confirmed_bookings' => $confirmedBookings
+                ],
+                'message' => 'Voyage démarré avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            error_log("TripController::startTrip Error: " . $e->getMessage());
+            return Response::serverError('Erreur lors du démarrage du voyage: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Compléter un voyage (vérifier que tous les codes de livraison sont validés)
+     * POST /trips/{id}/complete
+     */
+    public function completeTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $tripId = (int) $request->getAttribute('id');
+            $currentUser = $request->getAttribute('user');
+
+            $trip = Trip::with(['bookings.deliveryCode'])->find($tripId);
+
+            if (!$trip) {
+                return Response::notFound('Voyage non trouvé');
+            }
+
+            // Vérifier que c'est le propriétaire du voyage
+            if ($trip->user_id !== $currentUser->id) {
+                return Response::forbidden('Seul le propriétaire peut compléter le voyage');
+            }
+
+            // Vérifier que le voyage est "en cours"
+            if ($trip->status !== Trip::STATUS_IN_PROGRESS) {
+                return Response::error('Le voyage doit être en cours pour être complété', [], 400);
+            }
+
+            // Récupérer toutes les réservations confirmées
+            $confirmedBookings = $trip->bookings()
+                ->whereIn('status', [
+                    Booking::STATUS_ACCEPTED,
+                    Booking::STATUS_PAYMENT_AUTHORIZED,
+                    Booking::STATUS_PAYMENT_CONFIRMED
+                ])
+                ->get();
+
+            if ($confirmedBookings->isEmpty()) {
+                return Response::error('Aucune réservation à livrer', [], 400);
+            }
+
+            // Vérifier que TOUS les codes de livraison ont été validés
+            $missingDeliveries = [];
+            foreach ($confirmedBookings as $booking) {
+                // Chercher un code de livraison validé pour cette réservation
+                $validatedCode = \KiloShare\Models\DeliveryCode::where('booking_id', $booking->id)
+                    ->where('status', \KiloShare\Models\DeliveryCode::STATUS_USED)
+                    ->first();
+
+                if (!$validatedCode) {
+                    $missingDeliveries[] = [
+                        'booking_id' => $booking->id,
+                        'package_description' => $booking->package_description,
+                        'sender_name' => $booking->sender ? $booking->sender->first_name . ' ' . $booking->sender->last_name : 'N/A'
+                    ];
+                }
+            }
+
+            // Si des livraisons manquent, refuser la complétion
+            if (!empty($missingDeliveries)) {
+                return Response::error(
+                    'Impossible de compléter le voyage: certaines livraisons n\'ont pas été confirmées',
+                    [
+                        'missing_deliveries' => $missingDeliveries,
+                        'missing_count' => count($missingDeliveries),
+                        'total_bookings' => $confirmedBookings->count()
+                    ],
+                    400
+                );
+            }
+
+            // Marquer toutes les réservations comme "livrées"
+            foreach ($confirmedBookings as $booking) {
+                if ($booking->status !== Booking::STATUS_COMPLETED) {
+                    $booking->status = Booking::STATUS_COMPLETED;
+                    $booking->save();
+                }
+            }
+
+            // Marquer le voyage comme "complété"
+            $trip->status = Trip::STATUS_COMPLETED;
+            $trip->save();
+
+            // TODO: Déclencher la capture des paiements ici si nécessaire
+            // Le paiement devrait être capturé automatiquement lors de la validation du code
+
+            return Response::success([
+                'trip' => [
+                    'id' => $trip->id,
+                    'status' => $trip->status,
+                    'completed_at' => $trip->updated_at->toISOString()
+                ],
+                'deliveries' => [
+                    'total' => $confirmedBookings->count(),
+                    'completed' => $confirmedBookings->count()
+                ],
+                'message' => 'Voyage complété avec succès! Tous les colis ont été livrés.'
+            ]);
+
+        } catch (\Exception $e) {
+            error_log("TripController::completeTrip Error: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return Response::serverError('Erreur lors de la complétion du voyage: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get all bookings for a specific trip
+     * GET /trips/{id}/bookings
+     */
+    public function getTripBookings(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $tripId = $request->getAttribute('id');
+            $userId = $request->getAttribute('user_id');
+
+            // Récupérer le voyage
+            $trip = Trip::find($tripId);
+            if (!$trip) {
+                return Response::notFound('Voyage non trouvé');
+            }
+
+            // Vérifier que l'utilisateur est le propriétaire du voyage
+            if ($trip->user_id != $userId) {
+                return Response::forbidden('Vous n\'êtes pas autorisé à voir ces réservations');
+            }
+
+            // Récupérer toutes les réservations du voyage avec les relations
+            $bookings = Booking::where('trip_id', $tripId)
+                ->with(['sender', 'receiver'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return Response::success([
+                'bookings' => $bookings->map(function ($booking) {
+                    return [
+                        'id' => $booking->id,
+                        'trip_id' => $booking->trip_id,
+                        'sender_id' => $booking->sender_id,
+                        'receiver_id' => $booking->receiver_id,
+                        'package_description' => $booking->package_description,
+                        'weight_kg' => $booking->weight_kg,
+                        'dimensions_cm' => $booking->dimensions_cm,
+                        'total_price' => $booking->total_price,
+                        'pickup_address' => $booking->pickup_address,
+                        'delivery_address' => $booking->delivery_address,
+                        'special_instructions' => $booking->special_instructions,
+                        'status' => $booking->status,
+                        'created_at' => $booking->created_at,
+                        'updated_at' => $booking->updated_at,
+                        'sender' => $booking->sender ? [
+                            'id' => $booking->sender->id,
+                            'first_name' => $booking->sender->first_name,
+                            'last_name' => $booking->sender->last_name,
+                            'email' => $booking->sender->email,
+                        ] : null,
+                        'receiver' => $booking->receiver ? [
+                            'id' => $booking->receiver->id,
+                            'first_name' => $booking->receiver->first_name,
+                            'last_name' => $booking->receiver->last_name,
+                            'email' => $booking->receiver->email,
+                        ] : null,
+                    ];
+                }),
+                'total' => $bookings->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            error_log("TripController::getTripBookings Error: " . $e->getMessage());
+            return Response::serverError('Erreur lors de la récupération des réservations');
         }
     }
 }

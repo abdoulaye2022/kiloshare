@@ -40,6 +40,14 @@
 				<string>com.googleusercontent.apps.325498754106-2pnias80tkj3c1uvc75c3vonhv1m1bli</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>kiloshare</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kiloshare</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>

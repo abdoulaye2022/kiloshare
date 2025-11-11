@@ -8,8 +8,6 @@ export async function POST(request: NextRequest) {
     const { id } = body;
     const authHeader = request.headers.get('authorization');
 
-    console.log('🔍 Approve trip request - ID:', id);
-
     if (!authHeader) {
       return NextResponse.json(
         { success: false, message: 'Authorization header required' },
@@ -26,7 +24,6 @@ export async function POST(request: NextRequest) {
 
     // Forward the request to the backend
     const backendUrl = `${BACKEND_URL}/api/v1/admin/trips/approve`;
-    console.log('🔍 Calling backend:', backendUrl, 'with body:', { id });
 
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -37,16 +34,13 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ id }),
     });
 
-    console.log('🔍 Backend response status:', response.status);
-
     const data = await response.json();
-    console.log('🔍 Backend response data:', data);
 
     // Return the backend response
     return NextResponse.json(data, { status: response.status });
 
   } catch (error) {
-    console.error('❌ Proxy error:', error);
+    console.error('Proxy error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 }

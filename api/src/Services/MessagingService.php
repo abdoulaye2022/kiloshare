@@ -84,8 +84,10 @@ class MessagingService
             // Get conversation context
             $context = $this->conversationModel->getConversationContext($conversationId);
             if (!$context) {
+                error_log("Conversation context not found for ID: $conversationId");
                 throw new Exception('Conversation not found');
             }
+            error_log("Conversation context retrieved: " . json_encode($context));
 
             // Send message
             $result = $this->messageModel->sendMessage(
@@ -104,32 +106,47 @@ class MessagingService
 
             // Get recipient for notifications
             $participants = $this->conversationModel->getParticipants($conversationId);
+            error_log("Participants count: " . count($participants));
             $recipient = null;
-            
+
             foreach ($participants as $participant) {
+                error_log("Checking participant: user_id={$participant['user_id']}, sender_id={$senderId}");
                 if ($participant['user_id'] !== $senderId) {
                     $recipient = $participant;
+                    error_log("Recipient found: user_id={$recipient['user_id']}");
                     break;
                 }
             }
 
-            // Send notification to recipient
+            // 🔔 Send notification to recipient (avec FCM push)
             if ($recipient) {
-                $this->notificationService->send(
-                    $recipient['user_id'],
-                    'new_message',
-                    [
-                        'sender_name' => $this->getUserName($senderId),
-                        'message_preview' => $this->getMessagePreview($content, $type),
-                        'conversation_id' => $conversationId,
-                        'booking_id' => $context['booking_id']
-                    ],
-                    [
-                        'scope' => 'conversation',
-                        'scope_id' => $conversationId,
-                        'channels' => ['push', 'in_app']
-                    ]
-                );
+                error_log("Attempting to send FCM notification to user {$recipient['user_id']}");
+                try {
+                    $result = $this->notificationService->send(
+                        $recipient['user_id'],
+                        'new_message',
+                        [
+                            'sender_name' => $this->getUserName($senderId),
+                            'message_preview' => $this->getMessagePreview($content, $type),
+                            'conversation_id' => $conversationId,
+                            'booking_id' => $context['booking_id'],
+                            'trip_title' => $context['trip_title'] ?? 'Conversation',
+                            'message' => $this->getUserName($senderId) . ' vous a envoyé un message'
+                        ],
+                        [
+                            'scope' => 'conversation',
+                            'scope_id' => $conversationId,
+                            'channels' => ['push', 'in_app'],
+                            'priority' => 'normal'
+                        ]
+                    );
+                    error_log("FCM notification result: " . json_encode($result));
+                } catch (\Exception $e) {
+                    error_log("FCM notification error: " . $e->getMessage());
+                    error_log("Stack trace: " . $e->getTraceAsString());
+                }
+            } else {
+                error_log("No recipient found for notification");
             }
 
             return [
@@ -392,14 +409,14 @@ class MessagingService
     private function canShareLocation(array $context): bool
     {
         // Location can be shared post-payment or on day of travel
-        return $context['payment_confirmed'] === 'completed' ||
+        return !empty($context['payment_confirmed_at']) ||
                ($context['departure_date'] && date('Y-m-d') === date('Y-m-d', strtotime($context['departure_date'])));
     }
 
     private function canSharePhotos(array $context): bool
     {
         // Photos only after payment confirmation
-        return $context['payment_confirmed'] === 'completed';
+        return !empty($context['payment_confirmed_at']);
     }
 
     private function storeQuickAction(int $messageId, string $actionType, array $actionData): void

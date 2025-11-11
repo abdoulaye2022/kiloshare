@@ -26,6 +26,10 @@ class BookingModel {
   final String? tripArrivalCity;
   final DateTime? tripDepartureDate;
 
+  // Archivage spécifique par utilisateur
+  final bool archivedBySender;
+  final bool archivedByReceiver;
+
   BookingModel({
     required this.id,
     required this.tripId,
@@ -49,6 +53,8 @@ class BookingModel {
     this.tripDepartureCity,
     this.tripArrivalCity,
     this.tripDepartureDate,
+    this.archivedBySender = false,
+    this.archivedByReceiver = false,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
@@ -79,6 +85,8 @@ class BookingModel {
       tripDepartureCity: trip?['departure_city'] as String?,
       tripArrivalCity: trip?['arrival_city'] as String?,
       tripDepartureDate: trip?['departure_date'] != null ? DateTime.parse(trip!['departure_date'] as String) : null,
+      archivedBySender: json['archived_by_sender'] == true || json['archived_by_sender'] == 1,
+      archivedByReceiver: json['archived_by_receiver'] == true || json['archived_by_receiver'] == 1,
     );
   }
 
@@ -124,6 +132,8 @@ class BookingModel {
     String? tripDepartureCity,
     String? tripArrivalCity,
     DateTime? tripDepartureDate,
+    bool? archivedBySender,
+    bool? archivedByReceiver,
   }) {
     return BookingModel(
       id: id ?? this.id,
@@ -148,6 +158,8 @@ class BookingModel {
       tripDepartureCity: tripDepartureCity ?? this.tripDepartureCity,
       tripArrivalCity: tripArrivalCity ?? this.tripArrivalCity,
       tripDepartureDate: tripDepartureDate ?? this.tripDepartureDate,
+      archivedBySender: archivedBySender ?? this.archivedBySender,
+      archivedByReceiver: archivedByReceiver ?? this.archivedByReceiver,
     );
   }
 
@@ -168,9 +180,11 @@ class BookingModel {
   bool get canConfirmPayment => status == BookingStatus.paymentAuthorized;
   @Deprecated('Manual payment capture has been disabled. Payment is now captured automatically upon delivery code validation')
   bool get canCapturePayment => false; // Always false - manual capture disabled
+  // Peut annuler tant que le paiement n'est pas capturé (pas encore transféré au transporteur)
+  // IMPORTANT: Même si accepté, le paiement est encore bloqué jusqu'à la livraison
   bool get canCancelBeforePayment =>
       status == BookingStatus.pending ||
-      status == BookingStatus.accepted ||
+      status == BookingStatus.accepted ||  // OK car paiement pas encore capturé
       status == BookingStatus.paymentAuthorized ||
       status == BookingStatus.paymentConfirmed;
 

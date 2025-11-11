@@ -194,9 +194,18 @@ class _TripActionsWidgetState extends State<TripActionsWidget> {
 
     if (!confirmed) return;
 
-    final updatedTrip = await _tripService.completeTrip(widget.trip.id);
-    widget.onTripUpdated?.call(updatedTrip);
-    _showSuccessSnackBar('Voyage marqué comme terminé');
+    final result = await _tripService.completeTrip(widget.trip.id);
+
+    if (result['success'] == true) {
+      final tripData = result['trip'] as Map<String, dynamic>?;
+      if (tripData != null) {
+        final updatedTrip = Trip.fromJson(tripData);
+        widget.onTripUpdated?.call(updatedTrip);
+      }
+      _showSuccessSnackBar(result['message'] ?? 'Voyage marqué comme terminé');
+    } else {
+      _showErrorSnackBar(result['error'] ?? 'Impossible de compléter le voyage');
+    }
   }
 
   Future<void> _shareTrip() async {

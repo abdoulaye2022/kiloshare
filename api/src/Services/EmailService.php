@@ -88,11 +88,23 @@ class EmailService
     }
 
     /**
+     * Obtenir l'URL frontend selon l'environnement
+     */
+    private function getFrontendUrl(): string
+    {
+        if ($this->isDev) {
+            return $_ENV['FRONTEND_URL_DEV'] ?? 'http://localhost:3000';
+        } else {
+            return $_ENV['FRONTEND_URL_PROD'] ?? 'https://kiloshare.com';
+        }
+    }
+
+    /**
      * Construire l'URL de vérification - Redirige vers la plateforme Next.js
      */
     private function buildVerificationUrl(string $code): string
     {
-        $frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:3000';
+        $frontendUrl = $this->getFrontendUrl();
         return "{$frontendUrl}/verify-email?code={$code}";
     }
 
@@ -112,18 +124,18 @@ class EmailService
         </head>
         <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;'>
-                <h1 style='color: #2563eb; margin-bottom: 30px;'>🚀 Bienvenue sur KiloShare !</h1>
-                
+                <h1 style='color: #2563eb; margin-bottom: 30px;'>Bienvenue sur KiloShare</h1>
+
                 <p style='font-size: 16px; margin-bottom: 20px;'>Bonjour <strong>{$userName}</strong>,</p>
-                
+
                 <p style='font-size: 16px; margin-bottom: 30px;'>
-                    Merci de vous être inscrit sur KiloShare ! Pour activer votre compte et commencer à partager vos voyages, 
+                    Merci de vous être inscrit sur KiloShare ! Pour activer votre compte et commencer à partager vos voyages,
                     veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
                 </p>
-                
-                <a href='{$verificationUrl}' 
+
+                <a href='{$verificationUrl}'
                    style='display: inline-block; background-color: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 20px 0;'>
-                    ✉️ Vérifier mon email
+                    Vérifier mon email
                 </a>
                 
                 <p style='font-size: 14px; color: #666; margin-top: 30px;'>
@@ -178,6 +190,11 @@ KiloShare Team
         try {
             // En dev, rediriger vers l'email de développement
             $recipientEmail = $this->isDev && !empty($this->devEmail) ? $this->devEmail : $toEmail;
+
+            // Convertir les URLs relatives en URLs absolues
+            if ($actionUrl && !str_starts_with($actionUrl, 'http')) {
+                $actionUrl = $this->getFrontendUrl() . $actionUrl;
+            }
 
             // Suppress deprecation warnings for Brevo models
             $oldErrorReporting = error_reporting(E_ALL & ~E_DEPRECATED);
@@ -236,7 +253,7 @@ KiloShare Team
         </head>
         <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background-color: #f8f9fa; padding: 30px; border-radius: 10px;'>
-                <h1 style='color: #2563eb; margin-bottom: 30px; text-align: center;'>🚀 KiloShare</h1>
+                <h1 style='color: #2563eb; margin-bottom: 30px; text-align: center;'>KiloShare</h1>
 
                 <p style='font-size: 16px; margin-bottom: 20px;'>Bonjour <strong>{$userName}</strong>,</p>
 
@@ -280,5 +297,180 @@ Bonjour {$userName},
 KiloShare Team
 © " . date('Y') . " KiloShare. Tous droits réservés.
         ";
+    }
+
+    /**
+     * Envoyer un email de bienvenue après vérification du compte
+     */
+    public function sendWelcomeEmail(string $toEmail, string $userName): bool
+    {
+        try {
+            // En dev, rediriger vers l'email de développement
+            $recipientEmail = $this->isDev && !empty($this->devEmail) ? $this->devEmail : $toEmail;
+
+            $dashboardUrl = $this->getFrontendUrl() . '/dashboard';
+
+            // Suppress deprecation warnings for Brevo models
+            $oldErrorReporting = error_reporting(E_ALL & ~E_DEPRECATED);
+
+            $sendSmtpEmail = new SendSmtpEmail([
+                'sender' => new SendSmtpEmailSender([
+                    'name' => $this->fromName,
+                    'email' => $this->fromEmail
+                ]),
+                'to' => [
+                    new SendSmtpEmailTo([
+                        'email' => $recipientEmail,
+                        'name' => $userName
+                    ])
+                ],
+                'subject' => 'Bienvenue sur KiloShare !',
+                'htmlContent' => $this->getWelcomeEmailTemplate($userName, $dashboardUrl, $toEmail),
+                'textContent' => $this->getWelcomeEmailTextTemplate($userName, $dashboardUrl)
+            ]);
+
+            $result = $this->emailApi->sendTransacEmail($sendSmtpEmail);
+
+            error_reporting($oldErrorReporting);
+
+            error_log("Welcome email sent successfully to {$recipientEmail} (original: {$toEmail}) - Message ID: " . $result->getMessageId());
+
+            return true;
+        } catch (\Exception $e) {
+            error_log("Failed to send welcome email to {$toEmail}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Template HTML pour l'email de bienvenue
+     */
+    private function getWelcomeEmailTemplate(string $userName, string $dashboardUrl, string $originalEmail): string
+    {
+        $devNote = $this->isDev ? "<p style='color: #ff6b6b; font-size: 12px; margin-top: 20px;'><strong>Note dev:</strong> Cet email était destiné à {$originalEmail}</p>" : '';
+
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <title>Bienvenue sur KiloShare !</title>
+        </head>
+        <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
+            <div style='background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;'>
+                <h1 style='color: #2563eb; margin-bottom: 30px;'>Bienvenue sur KiloShare !</h1>
+
+                <p style='font-size: 16px; margin-bottom: 20px;'>Bonjour <strong>{$userName}</strong>,</p>
+
+                <p style='font-size: 16px; margin-bottom: 30px;'>
+                    Félicitations ! Votre adresse email a été vérifiée avec succès. Vous faites maintenant partie de la communauté KiloShare.
+                </p>
+
+                <div style='background: white; padding: 20px; border-radius: 8px; margin: 30px 0; text-align: left;'>
+                    <h2 style='color: #2563eb; font-size: 18px; margin-bottom: 15px;'>Que pouvez-vous faire sur KiloShare ?</h2>
+
+                    <ul style='color: #333; line-height: 1.8; margin: 0; padding-left: 20px;'>
+                        <li><strong>Voyagez léger</strong> : Confiez vos colis à des voyageurs de confiance</li>
+                        <li><strong>Gagnez en voyageant</strong> : Transportez des colis lors de vos déplacements</li>
+                        <li><strong>Restez connecté</strong> : Communiquez facilement avec les autres membres</li>
+                        <li><strong>Sécurité garantie</strong> : Transactions sécurisées et système de notation</li>
+                    </ul>
+                </div>
+
+                <p style='font-size: 16px; margin-bottom: 30px;'>
+                    Prêt à commencer ? Connectez-vous à votre compte et explorez toutes les possibilités que KiloShare vous offre.
+                </p>
+
+                <a href='{$dashboardUrl}'
+                   style='display: inline-block; background-color: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 20px 0;'>
+                    Accéder à mon compte
+                </a>
+
+                <hr style='margin: 30px 0; border: none; border-top: 1px solid #ddd;'>
+
+                <p style='font-size: 14px; color: #666; margin-top: 20px;'>
+                    Besoin d'aide ? N'hésitez pas à consulter notre centre d'aide ou à nous contacter.
+                </p>
+
+                <p style='font-size: 12px; color: #888;'>
+                    Cet email a été envoyé par KiloShare<br>
+                    © " . date('Y') . " KiloShare. Tous droits réservés.
+                </p>
+
+                {$devNote}
+            </div>
+        </body>
+        </html>";
+    }
+
+    /**
+     * Template texte pour l'email de bienvenue
+     */
+    private function getWelcomeEmailTextTemplate(string $userName, string $dashboardUrl): string
+    {
+        return "
+Bienvenue sur KiloShare !
+
+Bonjour {$userName},
+
+Félicitations ! Votre adresse email a été vérifiée avec succès. Vous faites maintenant partie de la communauté KiloShare.
+
+Que pouvez-vous faire sur KiloShare ?
+
+- Voyagez léger : Confiez vos colis à des voyageurs de confiance
+- Gagnez en voyageant : Transportez des colis lors de vos déplacements
+- Restez connecté : Communiquez facilement avec les autres membres
+- Sécurité garantie : Transactions sécurisées et système de notation
+
+Prêt à commencer ? Connectez-vous à votre compte et explorez toutes les possibilités que KiloShare vous offre.
+
+Accédez à votre compte : {$dashboardUrl}
+
+Besoin d'aide ? N'hésitez pas à consulter notre centre d'aide ou à nous contacter.
+
+---
+KiloShare Team
+© " . date('Y') . " KiloShare. Tous droits réservés.
+        ";
+    }
+
+    /**
+     * Envoyer un email HTML personnalisé
+     */
+    public function sendHtmlEmail(string $toEmail, string $userName, string $subject, string $htmlContent): bool
+    {
+        try {
+            // En dev, rediriger vers l'email de développement
+            $recipientEmail = $this->isDev && !empty($this->devEmail) ? $this->devEmail : $toEmail;
+
+            // Suppress deprecation warnings for Brevo models
+            $oldErrorReporting = error_reporting(E_ALL & ~E_DEPRECATED);
+
+            $sendSmtpEmail = new SendSmtpEmail([
+                'sender' => new SendSmtpEmailSender([
+                    'name' => $this->fromName,
+                    'email' => $this->fromEmail
+                ]),
+                'to' => [
+                    new SendSmtpEmailTo([
+                        'email' => $recipientEmail,
+                        'name' => $userName
+                    ])
+                ],
+                'subject' => $subject,
+                'htmlContent' => $htmlContent
+            ]);
+
+            $result = $this->emailApi->sendTransacEmail($sendSmtpEmail);
+
+            error_reporting($oldErrorReporting);
+
+            error_log("HTML email sent successfully to {$recipientEmail} (original: {$toEmail}) - Message ID: " . $result->getMessageId());
+
+            return true;
+        } catch (\Exception $e) {
+            error_log("Failed to send HTML email to {$toEmail}: " . $e->getMessage());
+            return false;
+        }
     }
 }

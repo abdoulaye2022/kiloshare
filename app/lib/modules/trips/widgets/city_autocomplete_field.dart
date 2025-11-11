@@ -6,6 +6,7 @@ class CityAutocompleteField extends StatefulWidget {
   final String label;
   final IconData icon;
   final String? initialValue;
+  final String? initialCountry;
   final TransportType? transportType;
   final Function(String city, String country, String? code) onCitySelected;
 
@@ -14,6 +15,7 @@ class CityAutocompleteField extends StatefulWidget {
     required this.label,
     required this.icon,
     this.initialValue,
+    this.initialCountry,
     this.transportType,
     required this.onCitySelected,
   });
@@ -30,7 +32,25 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
+    String initialText = widget.initialValue ?? '';
+    if (initialText.isNotEmpty && widget.initialCountry != null) {
+      initialText = '$initialText, ${widget.initialCountry}';
+    }
+    _controller = TextEditingController(text: initialText);
+  }
+
+  @override
+  void didUpdateWidget(CityAutocompleteField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update controller text if initialValue or initialCountry changed
+    if (oldWidget.initialValue != widget.initialValue ||
+        oldWidget.initialCountry != widget.initialCountry) {
+      String newText = widget.initialValue ?? '';
+      if (newText.isNotEmpty && widget.initialCountry != null) {
+        newText = '$newText, ${widget.initialCountry}';
+      }
+      _controller.text = newText;
+    }
   }
 
   @override

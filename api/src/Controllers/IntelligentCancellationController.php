@@ -116,7 +116,6 @@ class IntelligentCancellationController
                 'recommendations' => $recommendations,
                 'user_info' => [
                     'id' => $user->id,
-                    'user_type' => $user->user_type ?? 'new',
                     'member_since' => $user->created_at
                 ]
             ], 'Reliability score retrieved');

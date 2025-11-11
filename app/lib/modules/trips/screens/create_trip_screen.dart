@@ -120,9 +120,10 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
       // Load existing images
       try {
-        // TODO: Load existing images from trip data if needed
-        // For now, we'll handle existing images differently
-        print('Loading existing images for edit mode...');
+        if (trip.images != null && trip.images!.isNotEmpty) {
+          _existingImages = trip.images!;
+          print('Loaded ${_existingImages.length} existing images for edit mode');
+        }
       } catch (e) {
         print('Warning: Failed to load trip images: $e');
       }
@@ -332,6 +333,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             label: 'Ville de départ',
             icon: Icons.flight_takeoff,
             initialValue: _tripData['departure_city'],
+            initialCountry: _tripData['departure_country'],
             transportType: _tripData['transport_type'] != null
                 ? TransportType.fromString(_tripData['transport_type'])
                 : null,
@@ -351,6 +353,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             label: 'Ville d\'arrivée',
             icon: Icons.flight_land,
             initialValue: _tripData['arrival_city'],
+            initialCountry: _tripData['arrival_country'],
             transportType: _tripData['transport_type'] != null
                 ? TransportType.fromString(_tripData['transport_type'])
                 : null,
@@ -901,7 +904,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           const SizedBox(height: 24),
           TripImagePicker(
             initialImages: _selectedImages,
-            // existingImages: _existingImages, // Disable until TripImage types are aligned
+            existingImages: _existingImages,
             onImagesChanged: (images) {
               setState(() {
                 _selectedImages = images;

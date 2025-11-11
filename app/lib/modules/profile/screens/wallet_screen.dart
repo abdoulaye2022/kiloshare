@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../services/stripe_service.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -34,12 +35,14 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
     super.didChangeAppLifecycleState(state);
     // Recharger les infos quand l'utilisateur revient dans l'app
     // Ceci est utile après avoir complété l'onboarding Stripe dans le navigateur
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && mounted) {
       _loadStripeAccountInfo();
     }
   }
 
   Future<void> _loadStripeAccountInfo() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -48,15 +51,19 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
     try {
       final result = await _stripeService.getAccountStatus();
       final accountInfo = result['success'] == true ? result : null;
-      setState(() {
-        _accountInfo = accountInfo;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _accountInfo = accountInfo;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = 'Erreur lors du chargement des informations Stripe: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Erreur lors du chargement des informations Stripe: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -68,6 +75,19 @@ class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Vérifier si on peut revenir en arrière
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              // Si on est arrivé via deep link, retourner à l'accueil
+              context.go('/home');
+            }
+          },
+          tooltip: 'Retour',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

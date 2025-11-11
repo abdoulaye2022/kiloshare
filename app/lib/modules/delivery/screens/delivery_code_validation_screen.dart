@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../themes/modern_theme.dart';
 import '../services/delivery_code_service.dart';
 import '../models/delivery_code_model.dart';
@@ -155,11 +156,19 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
     });
 
     try {
+      // TODO: Upload photos first if selected and get URLs
+      List<String>? photoUrls;
+      if (_selectedPhotos.isNotEmpty) {
+        // For now, skip photo upload - will be implemented later
+        photoUrls = [];
+      }
+
       final result = await _deliveryCodeService.validateDeliveryCode(
         bookingId: widget.booking.id.toString(),
         code: _enteredCode,
-        photos: _selectedPhotos.isNotEmpty ? _selectedPhotos : null,
-        requireLocation: true,
+        latitude: _currentPosition?.latitude,
+        longitude: _currentPosition?.longitude,
+        photoUrls: photoUrls,
       );
 
       if (mounted) {
@@ -202,20 +211,38 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
   }
 
   Future<void> _takePhoto() async {
-    final photo = await _deliveryCodeService.takePhoto();
-    if (photo != null && mounted) {
-      setState(() {
-        _selectedPhotos.add(photo);
-      });
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      if (photo != null && mounted) {
+        setState(() {
+          _selectedPhotos.add(File(photo.path));
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la prise de photo: $e')),
+        );
+      }
     }
   }
 
   Future<void> _pickPhotos() async {
-    final photos = await _deliveryCodeService.pickPhotosFromGallery(maxPhotos: 3 - _selectedPhotos.length);
-    if (photos.isNotEmpty && mounted) {
-      setState(() {
-        _selectedPhotos.addAll(photos);
-      });
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> photos = await picker.pickMultiImage(limit: 3 - _selectedPhotos.length);
+      if (photos.isNotEmpty && mounted) {
+        setState(() {
+          _selectedPhotos.addAll(photos.map((xFile) => File(xFile.path)));
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la sélection des photos: $e')),
+        );
+      }
     }
   }
 

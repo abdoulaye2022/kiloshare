@@ -24,6 +24,7 @@ class PaymentAuthorization extends Model
 
     // Raisons de capture
     const CAPTURE_REASON_MANUAL = 'manual';     // Capture manuelle
+    const CAPTURE_REASON_BOOKING_ACCEPTED = 'booking_accepted'; // Capture automatique lors de l'acceptation de la réservation
     const CAPTURE_REASON_AUTO_72H = 'auto_72h'; // Capture automatique 72h avant
     const CAPTURE_REASON_AUTO_PICKUP = 'auto_pickup'; // Capture automatique à la récupération
     const CAPTURE_REASON_DELIVERY_CONFIRMED = 'delivery_confirmed'; // Capture automatique après confirmation de livraison

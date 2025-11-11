@@ -104,6 +104,27 @@ class ProfileService {
     }
   }
 
+  /// Get public profile of any user by their ID
+  Future<Map<String, dynamic>?> getPublicUserProfile(String userId) async {
+    try {
+      final response = await _dio.get(
+        '/users/$userId/profile',
+        options: await _getAuthHeaders(),
+      );
+
+      if (response.data['success'] == true && response.data['data'] != null) {
+        return response.data['data'];
+      }
+
+      return null;
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
   Future<UserProfile> createUserProfile(Map<String, dynamic> profileData) async {
     try {
 

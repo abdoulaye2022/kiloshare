@@ -120,15 +120,16 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                     ),
                   ],
                 ],
-                if (_booking!.isAccepted && _isReceiver)
-                  const PopupMenuItem(
-                    value: 'payment-ready',
-                    child: ListTile(
-                      leading: Icon(Icons.payment),
-                      title: Text('Marquer prêt pour paiement'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
+                // Ne plus afficher "Marquer prêt pour paiement" car le paiement est fait immédiatement
+                // if (_booking!.isAccepted && _isReceiver)
+                //   const PopupMenuItem(
+                //     value: 'payment-ready',
+                //     child: ListTile(
+                //       leading: Icon(Icons.payment),
+                //       title: Text('Marquer prêt pour paiement'),
+                //       contentPadding: EdgeInsets.zero,
+                //     ),
+                //   ),
                 if (_booking!.isAccepted && _isSender)
                   const PopupMenuItem(
                     value: 'cancel',
@@ -633,17 +634,21 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Widget _buildActionButtons() {
-    // Boutons pour réservations en attente (voyageur)
+    // Boutons pour réservations en attente (voyageur/transporteur)
     if (_booking!.isPending && _isReceiver) {
       return _buildPendingReceiverActions();
     }
 
+    // Boutons pour réservations avec paiement autorisé (transporteur peut accepter/rejeter)
+    if (_booking!.isPaymentAuthorized && _isReceiver) {
+      return _buildPaymentAuthorizedReceiverActions();
+    }
+
     // Actions pour l'expéditeur selon le statut
     if (_isSender) {
-      if (_booking!.isAccepted) {
-        return _buildPaymentActions();
-      } else if (_booking!.isPaymentAuthorized) {
-        return _buildPaymentConfirmationActions();
+      // Si paiement autorisé, afficher info d'attente validation transporteur
+      if (_booking!.isPaymentAuthorized) {
+        return _buildWaitingForTransporterInfo();
       } else if (_booking!.isPaymentConfirmed) {
         return _buildPaymentConfirmedInfo();
       }
@@ -705,76 +710,29 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildPaymentActions() {
+  // Nouveau: Boutons pour transporteur quand paiement est autorisé
+  Widget _buildPaymentAuthorizedReceiverActions() {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
+            color: Colors.green.shade50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.shade200),
+            border: Border.all(color: Colors.green.shade200),
           ),
-          child: Column(
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.payment, color: Colors.blue.shade600, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Réservation acceptée !',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Procédez au paiement pour confirmer votre réservation',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
+              Icon(Icons.check_circle, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Paiement autorisé ! Vous pouvez accepter ou refuser cette réservation.',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Montant à payer',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        Text(
-                          '${_booking!.totalPrice?.toStringAsFixed(2) ?? _booking!.totalPrice.toStringAsFixed(2)} CAD',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Commission: 15%',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -783,17 +741,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _confirmPayment(),
+            onPressed: () => _acceptBooking(),
             icon: const Icon(Icons.check_circle),
-            label: const Text('Confirmer le paiement'),
+            label: const Text('Accepter la réservation'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: Colors.green,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ),
@@ -801,9 +755,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => _cancelBooking(),
+            onPressed: () => _rejectBooking(),
             icon: const Icon(Icons.cancel),
-            label: const Text('Annuler la réservation'),
+            label: const Text('Refuser la réservation'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
               side: BorderSide(color: Colors.red.shade300),
@@ -815,84 +769,77 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  /// Actions pour confirmer le paiement (expéditeur, après acceptation)
-  Widget _buildPaymentConfirmationActions() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange.shade200),
-          ),
-          child: Column(
+  // Nouveau: Info pour Fati quand elle attend validation du transporteur
+  Widget _buildWaitingForTransporterInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.schedule, color: Colors.orange.shade600, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Confirmation de paiement requise',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Vous avez 4 heures pour confirmer ce paiement, sinon il sera automatiquement annulé.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
+              Icon(Icons.hourglass_empty, color: Colors.blue.shade600, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Paiement autorisé',
+                      style: TextStyle(
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Votre paiement est autorisé. En attente de validation par le transporteur.',
+                      style: TextStyle(
+                        color: Colors.blue.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _confirmPayment(),
-            icon: const Icon(Icons.check_circle),
-            label: const Text('Confirmer le paiement'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.grey.shade600, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Votre argent est sécurisé. Il sera capturé seulement si le transporteur accepte.',
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _cancelBooking(),
-            icon: const Icon(Icons.cancel),
-            label: const Text('Annuler maintenant (gratuit)'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: BorderSide(color: Colors.red.shade300),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
+
+  // OBSOLÈTE: Les méthodes _buildPaymentActions et _buildPaymentConfirmationActions
+  // ont été supprimées car le workflow a changé. Le paiement est maintenant fait
+  // IMMÉDIATEMENT après la création de réservation, pas après l'acceptation.
 
   /// Informations pour paiement confirmé (expéditeur)
   Widget _buildPaymentConfirmedInfo() {
@@ -1154,12 +1101,18 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Future<void> _cancelBooking() async {
     // Déterminer le message selon le statut du paiement
     String dialogContent;
-    if (_booking!.isPaymentConfirmed) {
-      // Paiement confirmé mais pas encore capturé = argent pas encore débité
+    if (_booking!.status == BookingStatus.accepted) {
+      // Réservation acceptée mais paiement pas encore capturé (reste bloqué jusqu'à livraison)
+      dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation acceptée?\n\n'
+          '💳 Le paiement autorisé sera annulé et les fonds bloqués sur votre carte seront libérés immédiatement.\n\n'
+          '✅ Aucun montant ne sera débité de votre carte.\n\n'
+          '⚠️ Le transporteur a déjà accepté votre réservation. L\'annulation est gratuite mais pensez aux impacts pour le transporteur.';
+    } else if (_booking!.isPaymentConfirmed || _booking!.isPaymentAuthorized) {
+      // Paiement confirmé/autorisé mais pas encore capturé = argent pas encore débité
       dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
           '💳 L\'autorisation de paiement sera annulée et les fonds réservés sur votre carte seront libérés immédiatement.\n\n'
           '✅ Aucun montant ne sera débité de votre carte.\n\n'
-          'L\'annulation est gratuite jusqu\'à 72h avant le départ.';
+          'L\'annulation est gratuite à ce stade.';
     } else if (_booking!.status == BookingStatus.paid) {
       // Paiement capturé = argent débité, remboursement nécessaire
       dialogContent = 'Êtes-vous sûr de vouloir annuler cette réservation?\n\n'
@@ -1244,7 +1197,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Confirmer l\'annulation'),
+                      child: const Text('Confirmer'),
                     ),
                   ),
                 ],
@@ -1496,6 +1449,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   /// Confirmer le paiement avec Stripe PaymentSheet
+  // OBSOLÈTE: Cette fonction n'est plus utilisée
+  // Le paiement est maintenant effectué IMMÉDIATEMENT après la création de la réservation
+  // via le StripeService dans l'écran de création
+  /*
   Future<void> _confirmPayment() async {
     try {
       // Étape 1: Vérifier que nous avons une réservation
@@ -1559,6 +1516,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       _showErrorSnackBar('Erreur de connexion: $e');
     }
   }
+  */
 
 }
 

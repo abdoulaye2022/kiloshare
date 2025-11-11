@@ -247,7 +247,10 @@ return function (App $app) {
                 $tripGroup->post('/{id}/intelligent-cancel', [IntelligentCancellationController::class, 'executeIntelligentCancellation']);
                 $tripGroup->get('/{id}/alternatives', [IntelligentCancellationController::class, 'getTripAlternatives']);
 
+                // Routes de gestion du voyage
+                $tripGroup->post('/{id}/start', [TripController::class, 'startTrip']);
                 $tripGroup->post('/{id}/complete', [TripController::class, 'completeTrip']);
+                $tripGroup->get('/{id}/bookings', [TripController::class, 'getTripBookings']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'removeTripImage']);
 
@@ -325,6 +328,10 @@ return function (App $app) {
                 $bookingGroup->get('/{id}/cancellation-check', [BookingController::class, 'checkBookingCancellation']);
                 $bookingGroup->post('/{id}/cancel', [BookingController::class, 'cancelBooking']);
                 $bookingGroup->post('/{id}/no-show', [BookingController::class, 'markAsNoShow']);
+
+                // Routes d'archivage (spécifique par utilisateur)
+                $bookingGroup->post('/{id}/archive', [BookingController::class, 'archiveBooking']);
+                $bookingGroup->post('/{id}/unarchive', [BookingController::class, 'unarchiveBooking']);
 
                 // Routes pour le nouveau système de capture différée
                 $bookingGroup->get('/{id}/payment/details', [BookingController::class, 'getPaymentDetails']);

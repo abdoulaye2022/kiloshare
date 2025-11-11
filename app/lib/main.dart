@@ -6,6 +6,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:app_links/app_links.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:async';
 
 import 'firebase_options.dart';
 import 'config/app_config.dart';
@@ -61,8 +64,117 @@ void main() async {
   }
 }
 
-class KiloShareApp extends StatelessWidget {
+class KiloShareApp extends StatefulWidget {
   const KiloShareApp({super.key});
+
+  @override
+  State<KiloShareApp> createState() => _KiloShareAppState();
+}
+
+class _KiloShareAppState extends State<KiloShareApp> {
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+  late final GoRouter _router;
+  bool _initialLinkHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = createRouter();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Handle links when app is already running
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      debugPrint('🔗 Deep link received: $uri');
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      debugPrint('❌ Deep link error: $err');
+    });
+
+    // Check if app was launched via deep link (cold start)
+    try {
+      final uri = await _appLinks.getInitialLink();
+      if (uri != null && !_initialLinkHandled) {
+        debugPrint('🔗 Initial deep link: $uri');
+        _initialLinkHandled = true;
+        // Delay to ensure router and app are fully ready
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          debugPrint('🔗 Router ready, processing initial deep link');
+          _handleDeepLink(uri);
+        });
+      } else if (_initialLinkHandled) {
+        debugPrint('🔗 Initial link already handled, ignoring (hot reload detected)');
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to get initial link: $e');
+    }
+  }
+
+  void _handleDeepLink(Uri uri) {
+    debugPrint('🔗 Deep link received - Full URI: ${uri.toString()}');
+    debugPrint('🔗 URI Details:');
+    debugPrint('   - Scheme: ${uri.scheme}');
+    debugPrint('   - Host: ${uri.host}');
+    debugPrint('   - Path: ${uri.path}');
+    debugPrint('   - PathSegments: ${uri.pathSegments}');
+
+    String path = '';
+
+    // For custom scheme kiloshare://profile/wallet
+    // uri.host = "profile", uri.path = "/wallet"
+    if (uri.scheme == 'kiloshare') {
+      debugPrint('🔗 Processing kiloshare:// scheme');
+      // Combine host and path: profile + /wallet = /profile/wallet
+      if (uri.host.isNotEmpty) {
+        path = '/${uri.host}${uri.path}';
+        debugPrint('🔗 Combined host and path: $path');
+      } else {
+        path = uri.path;
+        debugPrint('🔗 Using path only: $path');
+      }
+    } else {
+      debugPrint('🔗 Processing ${uri.scheme}:// scheme');
+      // For https://kiloshare.com/profile/wallet
+      // uri.path already contains the full path
+      path = uri.path;
+    }
+
+    // Ensure path starts with /
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+
+    debugPrint('🔗 Final navigation path: $path');
+
+    // Navigate using the router instance with error handling
+    try {
+      debugPrint('🔗 Attempting navigation to: $path');
+      _router.go(path);
+      debugPrint('✅ Navigation successful to: $path');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Navigation failed to: $path');
+      debugPrint('❌ Error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+
+      // Fallback: try going to home if navigation fails
+      try {
+        debugPrint('🔄 Attempting fallback navigation to /home');
+        _router.go('/home');
+      } catch (fallbackError) {
+        debugPrint('❌ Fallback navigation also failed: $fallbackError');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,14 +191,14 @@ class KiloShareApp extends StatelessWidget {
                 'Accept': 'application/json',
               },
             ));
-            
+
             // Add logging interceptor
             dio.interceptors.add(LogInterceptor(
               requestBody: true,
               responseBody: true,
               logPrint: (obj) => debugPrint(obj.toString()),
             ));
-            
+
             return AuthBloc(
               authService: AuthService.instance,
               phoneAuthService: PhoneAuthService(dio),
@@ -99,8 +211,6 @@ class KiloShareApp extends StatelessWidget {
   }
 
   Widget _buildApp(BuildContext context) {
-    final router = createRouter();
-    
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       minTextAdapt: true,
@@ -112,7 +222,7 @@ class KiloShareApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
-          routerConfig: router,
+          routerConfig: _router,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
