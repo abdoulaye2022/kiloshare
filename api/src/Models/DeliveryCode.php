@@ -144,10 +144,14 @@ class DeliveryCode extends Model
         $this->save();
     }
 
-    public function markAsUsed(?float $latitude = null, ?float $longitude = null, array $photos = []): void
+    public function markAsUsed(?int $userId = null, ?float $latitude = null, ?float $longitude = null, array $photos = []): void
     {
         $this->status = self::STATUS_USED;
         $this->used_at = Carbon::now();
+
+        if ($userId !== null) {
+            $this->used_by = $userId;
+        }
 
         if ($latitude !== null) {
             $this->delivery_latitude = $latitude;

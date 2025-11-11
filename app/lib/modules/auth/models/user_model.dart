@@ -65,10 +65,6 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
-    // Debug: voir ce qui est reçu de l'API
-    print('🔍 User.fromJson - profile_picture: ${json['profile_picture']}');
-    print('🔍 User.fromJson - profile_picture_url: ${json['profile_picture_url']}');
-
     // Déterminer la valeur de profilePicture de manière intelligente
     String? profilePictureValue;
     final profilePic = json['profile_picture'] as String?;

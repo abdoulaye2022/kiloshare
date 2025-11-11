@@ -42,6 +42,13 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recharger les données quand l'écran revient
+    _loadDeliveryCodeInfo();
+  }
+
+  @override
   void dispose() {
     for (var controller in _codeControllers) {
       controller.dispose();
@@ -359,6 +366,18 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
         backgroundColor: ModernTheme.white,
         elevation: 0,
         iconTheme: IconThemeData(color: ModernTheme.gray700),
+        actions: [
+          // Bouton refresh pour recharger l'état
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _loadDeliveryCodeInfo();
+              });
+            },
+            tooltip: 'Actualiser',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(ModernTheme.spacing16),

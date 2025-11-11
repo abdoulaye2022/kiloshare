@@ -256,7 +256,7 @@ class DeliveryCodeService
             // Log du succès de validation
             error_log("DELIVERY: Successful code validation for booking {$booking->id} by user {$user->id}");
             // Marquer le code comme utilisé
-            $deliveryCode->markAsUsed($latitude, $longitude, $photos);
+            $deliveryCode->markAsUsed($user->id, $latitude, $longitude, $photos);
 
             // Marquer la réservation comme confirmée
             $booking->delivery_confirmed_at = Carbon::now();
