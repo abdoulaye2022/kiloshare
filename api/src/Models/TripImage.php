@@ -42,17 +42,57 @@ class TripImage extends Model
 
     protected $dates = ['deleted_at'];
 
-    protected $appends = ['image_url'];
+    protected $appends = ['image_url', 'thumbnail_url'];
 
     public function trip(): BelongsTo
     {
         return $this->belongsTo(Trip::class);
     }
 
-    // Accesseur pour compatibilité avec l'ancien nom de champ
-    public function getImageUrlAttribute(): string
+    // Accesseur pour générer l'URL complète selon l'environnement
+    public function getImageUrlAttribute(): ?string
     {
-        return $this->url;
+        if (empty($this->url)) {
+            return null;
+        }
+
+        // Si c'est déjà une URL complète (anciennes données), la retourner telle quelle
+        if (str_starts_with($this->url, 'http://') ||
+            str_starts_with($this->url, 'https://')) {
+            return $this->url;
+        }
+
+        // Sinon, générer l'URL via GoogleCloudStorageService
+        try {
+            $gcs = new \KiloShare\Services\GoogleCloudStorageService();
+            return $gcs->getPublicUrl($this->url);
+        } catch (\Exception $e) {
+            error_log("Error generating trip image URL: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    // Accesseur pour générer l'URL du thumbnail
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if (empty($this->thumbnail)) {
+            return null;
+        }
+
+        // Si c'est déjà une URL complète (anciennes données), la retourner telle quelle
+        if (str_starts_with($this->thumbnail, 'http://') ||
+            str_starts_with($this->thumbnail, 'https://')) {
+            return $this->thumbnail;
+        }
+
+        // Sinon, générer l'URL via GoogleCloudStorageService
+        try {
+            $gcs = new \KiloShare\Services\GoogleCloudStorageService();
+            return $gcs->getPublicUrl($this->thumbnail);
+        } catch (\Exception $e) {
+            error_log("Error generating thumbnail URL: " . $e->getMessage());
+            return null;
+        }
     }
 
     public function scopePrimary($query)

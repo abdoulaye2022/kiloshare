@@ -83,8 +83,9 @@ class GoogleCloudStorageService
 
             $object = $this->bucket->upload($imageData, [
                 'name' => $destination,
-                'metadata' => $options['metadata'] ?? [],
-                'predefinedAcl' => 'publicRead'
+                'metadata' => $options['metadata'] ?? []
+                // Pas de predefinedAcl car kiloshare-prod a Public Access Prevention activé
+                // Les permissions sont gérées au niveau du bucket avec IAM
             ]);
 
             return [
@@ -134,6 +135,13 @@ class GoogleCloudStorageService
      */
     public function getPublicUrl(string $path): string
     {
+        // En production avec kiloshare-prod, Public Access Prevention est activé
+        // On doit utiliser des signed URLs
+        if ($this->bucketName === 'kiloshare-prod') {
+            return $this->getSignedUrl($path, 60); // URL valide 60 minutes
+        }
+
+        // En développement, URL directe fonctionne
         return sprintf(
             'https://storage.googleapis.com/%s/%s',
             $this->bucketName,
@@ -243,7 +251,8 @@ class GoogleCloudStorageService
     }
 
     /**
-     * Generate a signed URL for private access (if needed in the future)
+     * Generate a signed URL for secure access
+     * Utilisé en production avec Public Access Prevention activé
      */
     public function getSignedUrl(string $path, int $expirationMinutes = 60): string
     {
@@ -251,9 +260,13 @@ class GoogleCloudStorageService
             $object = $this->bucket->object($path);
             $expiration = new \DateTime("+{$expirationMinutes} minutes");
 
-            return $object->signedUrl($expiration);
+            // Utiliser v4 pour plus de sécurité
+            return $object->signedUrl($expiration, [
+                'version' => 'v4'
+            ]);
         } catch (Exception $e) {
             error_log("GCS Signed URL Error: " . $e->getMessage());
+            error_log("Path: {$path}, Bucket: {$this->bucketName}");
             return '';
         }
     }

@@ -1006,11 +1006,12 @@ class TripController
                 }
 
                 // Créer l'enregistrement en base
+                // Stocker uniquement le CHEMIN, l'URL sera générée à la volée
                 $tripImage = TripImage::create([
                     'trip_id' => $trip->id,
                     'image_path' => $uploadResult['path'],
-                    'url' => $uploadResult['url'],
-                    'thumbnail' => $uploadResult['url'], // Pas de thumbnail automatique
+                    'url' => $uploadResult['path'], // Stocker le chemin (rétrocompatibilité avec le schema)
+                    'thumbnail' => $uploadResult['path'], // Idem pour thumbnail
                     'image_name' => $filename,
                     'is_primary' => ($currentImageCount + count($uploadedImages)) === 0,
                     'order' => $currentImageCount + count($uploadedImages) + 1,

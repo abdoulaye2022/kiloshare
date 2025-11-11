@@ -308,15 +308,13 @@ class UserProfileController
 
                 // Supprimer l'ancien avatar si il existe
                 if ($user->profile_picture) {
-                    // Extraire le chemin de l'ancienne URL
-                    $oldPath = $this->extractPathFromGcsUrl($user->profile_picture);
-                    if ($oldPath) {
-                        $storageService->deleteImage($oldPath);
-                    }
+                    // Le chemin est maintenant stocké directement (pas l'URL)
+                    $storageService->deleteImage($user->profile_picture);
                 }
 
-                // Mettre à jour l'URL de l'avatar dans la base de données
-                $user->profile_picture = $uploadResult['url'];
+                // Stocker le CHEMIN uniquement (pas l'URL complète)
+                // L'URL sera générée à la volée selon l'environnement (dev/prod)
+                $user->profile_picture = $uploadResult['path'];
                 $user->save();
 
                 // Supprimer le fichier temporaire

@@ -333,4 +333,35 @@ class User extends Model
     {
         return $this->hasActiveStripeAccount();
     }
+
+    /**
+     * Obtenir l'URL complète de la photo de profil
+     * Génère automatiquement l'URL selon l'environnement (dev/prod)
+     */
+    public function getProfilePictureUrlAttribute(): ?string
+    {
+        if (empty($this->profile_picture)) {
+            return null;
+        }
+
+        // Si c'est déjà une URL complète (anciennes données), la retourner telle quelle
+        if (str_starts_with($this->profile_picture, 'http://') ||
+            str_starts_with($this->profile_picture, 'https://')) {
+            return $this->profile_picture;
+        }
+
+        // Sinon, générer l'URL via GoogleCloudStorageService
+        try {
+            $gcs = new \KiloShare\Services\GoogleCloudStorageService();
+            return $gcs->getPublicUrl($this->profile_picture);
+        } catch (\Exception $e) {
+            error_log("Error generating profile picture URL: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Ajouter profile_picture_url automatiquement aux réponses JSON
+     */
+    protected $appends = ['profile_picture_url'];
 }
