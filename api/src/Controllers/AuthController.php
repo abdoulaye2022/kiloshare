@@ -98,16 +98,7 @@ class AuthController
             $this->registerFCMTokenIfProvided($data, $user->id);
 
             return Response::created([
-                'user' => [
-                    'id' => $user->id,
-                    'uuid' => $user->uuid,
-                    'email' => $user->email,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'is_verified' => $user->is_verified,
-                ],
+                'user' => $this->formatUserData($user),
                 'requires_email_verification' => true
             ], $message ?? 'User registered successfully. Please verify your email before logging in.');
 
@@ -222,16 +213,7 @@ class AuthController
                 return Response::json([
                     'success' => false,
                     'message' => 'Email verification required. A new verification email has been sent.',
-                    'user' => [
-                        'id' => $user->id,
-                        'uuid' => $user->uuid,
-                        'email' => $user->email,
-                        'first_name' => $user->first_name,
-                        'last_name' => $user->last_name,
-                        'phone' => $user->phone,
-                        'role' => $user->role,
-                        'is_verified' => $user->is_verified,
-                    ],
+                    'user' => $this->formatUserData($user),
                     'requires_email_verification' => true
                 ], 403);
             }
@@ -254,16 +236,7 @@ class AuthController
             $this->registerFCMTokenIfProvided($data, $user->id);
 
             return Response::success([
-                'user' => [
-                    'id' => $user->id,
-                    'uuid' => $user->uuid,
-                    'email' => $user->email,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'is_verified' => $user->is_verified,
-                ],
+                'user' => $this->formatUserData($user),
                 'tokens' => $tokens
             ], 'Login successful');
 
@@ -316,16 +289,7 @@ class AuthController
             ]);
 
             return Response::success([
-                'user' => [
-                    'id' => $user->id,
-                    'uuid' => $user->uuid,
-                    'email' => $user->email,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'is_verified' => $user->is_verified,
-                ],
+                'user' => $this->formatUserData($user),
                 'tokens' => $tokens
             ], 'Admin login successful');
 
@@ -337,20 +301,7 @@ class AuthController
     public function me(ServerRequestInterface $request): ResponseInterface
     {
         $user = $request->getAttribute('user');
-
-        return Response::success([
-            'id' => $user->id,
-            'uuid' => $user->uuid,
-            'email' => $user->email,
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
-            'phone' => $user->phone,
-            'role' => $user->role,
-            'is_verified' => $user->is_verified,
-            'email_verified_at' => $user->email_verified_at,
-            'phone_verified_at' => $user->phone_verified_at,
-            'created_at' => $user->created_at,
-        ]);
+        return Response::success($this->formatUserData($user));
     }
 
     public function refreshToken(ServerRequestInterface $request): ResponseInterface
@@ -511,16 +462,7 @@ class AuthController
             'iat' => $now,
             'exp' => $accessTokenExpiry,
             'sub' => $user->uuid,
-            'user' => [
-                'id' => $user->id,
-                'uuid' => $user->uuid,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'is_verified' => $user->is_verified,
-                'role' => $user->role,
-            ],
+            'user' => $this->formatUserData($user),
             'type' => 'access'
         ];
 
@@ -561,5 +503,28 @@ class AuthController
                 error_log("Erreur enregistrement FCM token lors de l'auth: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Formater les données utilisateur pour les réponses API
+     * Génère automatiquement l'URL de la photo de profil selon l'environnement
+     */
+    private function formatUserData(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'uuid' => $user->uuid,
+            'email' => $user->email,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'phone' => $user->phone,
+            'role' => $user->role,
+            'is_verified' => $user->is_verified,
+            'email_verified_at' => $user->email_verified_at,
+            'phone_verified_at' => $user->phone_verified_at,
+            'profile_picture' => $user->profile_picture, // Chemin uniquement
+            'profile_picture_url' => $user->profile_picture_url, // URL complète générée
+            'created_at' => $user->created_at,
+        ];
     }
 }

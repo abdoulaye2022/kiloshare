@@ -76,13 +76,13 @@ class User {
         : json['is_verified'] != null 
             ? (json['is_verified'] as int) == 1
             : false,
-    emailVerifiedAt: json['email_verified_at'] != null 
-        ? DateTime.parse(json['email_verified_at'] as String) 
+    emailVerifiedAt: json['email_verified_at'] != null
+        ? DateTime.parse(json['email_verified_at'] as String)
         : null,
-    phoneVerifiedAt: json['phone_verified_at'] != null 
-        ? DateTime.parse(json['phone_verified_at'] as String) 
+    phoneVerifiedAt: json['phone_verified_at'] != null
+        ? DateTime.parse(json['phone_verified_at'] as String)
         : null,
-    profilePicture: json['profile_picture'] as String?,
+    profilePicture: json['profile_picture_url'] as String? ?? json['profile_picture'] as String?,
     status: json['status'] as String? ?? 'active',
     lastLoginAt: json['last_login_at'] != null 
         ? DateTime.parse(json['last_login_at'] as String) 
