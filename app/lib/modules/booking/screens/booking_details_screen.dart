@@ -100,25 +100,24 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             PopupMenuButton<String>(
               onSelected: (value) => _handleMenuAction(value),
               itemBuilder: (context) => [
-                if (_booking!.isPending) ...[
-                  if (_isReceiver) ...[
-                    const PopupMenuItem(
-                      value: 'accept',
-                      child: ListTile(
-                        leading: Icon(Icons.check_circle, color: Colors.green),
-                        title: Text('Accepter'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                // Afficher les boutons accepter/refuser pour pending, payment_authorized et paid
+                if ((_booking!.isPending || _booking!.status == BookingStatus.paymentAuthorized || _booking!.status == BookingStatus.paid) && _isReceiver) ...[
+                  const PopupMenuItem(
+                    value: 'accept',
+                    child: ListTile(
+                      leading: Icon(Icons.check_circle, color: Colors.green),
+                      title: Text('Accepter'),
+                      contentPadding: EdgeInsets.zero,
                     ),
-                    const PopupMenuItem(
-                      value: 'reject',
-                      child: ListTile(
-                        leading: Icon(Icons.cancel, color: Colors.red),
-                        title: Text('Refuser'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'reject',
+                    child: ListTile(
+                      leading: Icon(Icons.cancel, color: Colors.red),
+                      title: Text('Refuser'),
+                      contentPadding: EdgeInsets.zero,
                     ),
-                  ],
+                  ),
                 ],
                 // Ne plus afficher "Marquer prêt pour paiement" car le paiement est fait immédiatement
                 // if (_booking!.isAccepted && _isReceiver)

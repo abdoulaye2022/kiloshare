@@ -15,12 +15,11 @@ class ConversationsListScreen extends StatefulWidget {
   }
 }
 
-class _ConversationsListScreenState extends State<ConversationsListScreen> with WidgetsBindingObserver {
+class _ConversationsListScreenState extends State<ConversationsListScreen> {
   final MessagingService _messagingService = MessagingService();
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
   String? _error;
-  bool _hasInitialized = false;
 
   // Instance statique pour permettre le refresh depuis d'autres écrans
   static _ConversationsListScreenState? _currentInstance;
@@ -29,15 +28,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
   void initState() {
     super.initState();
     _currentInstance = this;
-    WidgetsBinding.instance.addObserver(this);
     _loadConversations();
-    _hasInitialized = true;
   }
 
   @override
   void dispose() {
     _currentInstance = null;
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -45,24 +41,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
   static void refresh() {
     if (_currentInstance != null && _currentInstance!.mounted) {
       _currentInstance!._loadConversations(silent: true);
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    // Rafraîchir quand l'app revient au premier plan
-    if (state == AppLifecycleState.resumed && _hasInitialized) {
-      _loadConversations(silent: true);
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Rafraîchir quand on revient sur cette page (changement d'onglet)
-    if (_hasInitialized && ModalRoute.of(context)?.isCurrent == true) {
-      _loadConversations(silent: true);
     }
   }
 
@@ -74,6 +52,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> with 
           _error = null;
         });
       }
+
+      // Attendre un peu pour s'assurer que le token est disponible
+      await Future.delayed(const Duration(milliseconds: 100));
 
       final response = await _messagingService.getConversations();
       

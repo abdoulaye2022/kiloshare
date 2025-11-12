@@ -649,4 +649,42 @@ class BookingService {
       };
     }
   }
+
+  /// Réessayer le paiement d'une réservation
+  Future<Map<String, dynamic>> retryPayment(String bookingId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers == null) {
+        return {
+          'success': false,
+          'error': 'Authentification requise. Veuillez vous reconnecter.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/bookings/$bookingId/payment/retry'),
+        headers: headers,
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          ...responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': responseData['message'] ?? 'Erreur lors de la réessai du paiement',
+        };
+      }
+    } catch (e) {
+      print('Erreur BookingService.retryPayment: $e');
+      return {
+        'success': false,
+        'error': 'Erreur de connexion: $e',
+      };
+    }
+  }
 }

@@ -475,6 +475,11 @@ class TripController
                         'available_weight_kg' => $trip->available_weight_kg,
                         'bookings_count' => $trip->bookings->count(),
                         'created_at' => $trip->created_at,
+                        // Statistiques
+                        'view_count' => (int) ($trip->view_count ?? 0),
+                        'share_count' => (int) ($trip->share_count ?? 0),
+                        'favorite_count' => (int) ($trip->favorite_count ?? 0),
+                        'report_count' => (int) ($trip->report_count ?? 0),
                     ];
                 }),
                 'pagination' => [
@@ -487,6 +492,43 @@ class TripController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to fetch trips: ' . $e->getMessage());
+        }
+    }
+
+    public function shareTrip(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            $id = $request->getAttribute('id');
+            $user = $request->getAttribute('user');
+            $data = json_decode($request->getBody()->getContents(), true);
+            $platform = $data['platform'] ?? null; // whatsapp, telegram, copy_link, etc.
+
+            // Vérifier que le voyage existe
+            $trip = Trip::find($id);
+            if (!$trip) {
+                return Response::notFound('Trip not found');
+            }
+
+            // Enregistrer le partage
+            \Illuminate\Database\Capsule\Manager::table('trip_shares')->insert([
+                'trip_id' => $id,
+                'user_id' => $user->id ?? null,
+                'platform' => $platform,
+                'shared_at' => \Carbon\Carbon::now()
+            ]);
+
+            // Incrémenter le compteur de partages
+            $trip->increment('share_count');
+
+            error_log("TripController::shareTrip - Trip shared: {$id} via {$platform}");
+
+            return Response::success([
+                'share_count' => (int) $trip->fresh()->share_count
+            ], 'Trip share recorded successfully');
+
+        } catch (\Exception $e) {
+            error_log("TripController::shareTrip - Error: " . $e->getMessage());
+            return Response::serverError('Failed to record share: ' . $e->getMessage());
         }
     }
 
@@ -1229,22 +1271,31 @@ class TripController
 
     public function getPublicTripDetails(ServerRequestInterface $request): ResponseInterface
     {
-        $tripId = (int) $request->getAttribute('id');
-        
-        error_log("TripController::getPublicTripDetails - Requested trip ID: $tripId");
-        
+        $identifier = $request->getAttribute('id');
+
+        error_log("TripController::getPublicTripDetails - Requested trip identifier: $identifier");
+
         try {
-            // Vérifier d'abord que l'ID est valide
-            if ($tripId <= 0) {
-                error_log("TripController::getPublicTripDetails - Invalid trip ID: $tripId");
-                return Response::error('Invalid trip ID', [], 400);
+            // Essayer d'abord avec UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+            if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $identifier)) {
+                error_log("TripController::getPublicTripDetails - Using UUID: $identifier");
+                $trip = Trip::with(['user', 'images', 'bookings'])
+                           ->where('uuid', $identifier)
+                           ->first();
+            } else {
+                // Fallback sur l'ID numérique pour rétrocompatibilité
+                $tripId = (int) $identifier;
+                if ($tripId <= 0) {
+                    error_log("TripController::getPublicTripDetails - Invalid trip ID: $identifier");
+                    return Response::error('Invalid trip identifier', [], 400);
+                }
+                error_log("TripController::getPublicTripDetails - Using numeric ID: $tripId");
+                $trip = Trip::with(['user', 'images', 'bookings'])
+                           ->find($tripId);
             }
-            
-            $trip = Trip::with(['user', 'images', 'bookings'])
-                       ->find($tripId);
-                       
+
             if (!$trip) {
-                error_log("TripController::getPublicTripDetails - Trip not found for ID: $tripId");
+                error_log("TripController::getPublicTripDetails - Trip not found for identifier: $identifier");
                 return Response::notFound('Trip not found');
             }
 
@@ -1276,12 +1327,54 @@ class TripController
                 }
             }
 
-            // Incrémenter le compteur de vues
+            // Incrémenter le compteur de vues (uniquement si c'est une nouvelle vue)
             try {
-                $trip->increment('view_count');
-                error_log("TripController::getPublicTripDetails - View count incremented for trip: $tripId");
+                // Récupérer user_id si connecté
+                $user = $request->getAttribute('user');
+                $userId = $user ? $user->id : null;
+
+                // Générer un session_id si pas d'utilisateur (visiteur anonyme)
+                $sessionId = null;
+                $serverParams = $request->getServerParams();
+                if (!$userId) {
+                    // Utiliser l'IP + User-Agent comme identifiant de session
+                    $ipAddress = $serverParams['REMOTE_ADDR'] ?? '';
+                    $userAgent = $serverParams['HTTP_USER_AGENT'] ?? '';
+                    $sessionId = md5($ipAddress . $userAgent);
+                }
+
+                // Vérifier si cette vue existe déjà (dans les dernières 24h) en utilisant Eloquent
+                $existingView = \Illuminate\Database\Capsule\Manager::table('trip_views')
+                    ->where('trip_id', $tripId)
+                    ->where(function ($query) use ($userId, $sessionId) {
+                        if ($userId) {
+                            $query->where('user_id', $userId);
+                        } else {
+                            $query->whereNull('user_id')->where('session_id', $sessionId);
+                        }
+                    })
+                    ->where('viewed_at', '>', \Carbon\Carbon::now()->subHours(24))
+                    ->first();
+
+                if (!$existingView) {
+                    // Nouvelle vue unique
+                    \Illuminate\Database\Capsule\Manager::table('trip_views')->insert([
+                        'trip_id' => $tripId,
+                        'user_id' => $userId,
+                        'session_id' => $sessionId,
+                        'ip_address' => $serverParams['REMOTE_ADDR'] ?? null,
+                        'user_agent' => $serverParams['HTTP_USER_AGENT'] ?? null,
+                        'viewed_at' => \Carbon\Carbon::now()
+                    ]);
+
+                    // Mettre à jour le compteur seulement si c'est une nouvelle vue
+                    $trip->increment('view_count');
+                    error_log("TripController::getPublicTripDetails - New unique view counted for trip: $tripId");
+                } else {
+                    error_log("TripController::getPublicTripDetails - Duplicate view skipped for trip: $tripId");
+                }
             } catch (\Exception $viewError) {
-                error_log("TripController::getPublicTripDetails - View count increment error: " . $viewError->getMessage());
+                error_log("TripController::getPublicTripDetails - View count error: " . $viewError->getMessage());
             }
 
             error_log("TripController::getPublicTripDetails - Trip found: " . $trip->title);
@@ -1289,11 +1382,12 @@ class TripController
             // Préparer les images de manière sécurisée
             $imageUrls = [];
             try {
-                if ($trip->images && method_exists($trip->images, 'toArray')) {
-                    $imagesArray = $trip->images->toArray();
-                    foreach ($imagesArray as $image) {
-                        if (isset($image['url']) && !empty($image['url'])) {
-                            $imageUrls[] = (string) $image['url'];
+                if ($trip->images && count($trip->images) > 0) {
+                    // Utiliser l'accesseur image_url du modèle pour obtenir l'URL complète
+                    foreach ($trip->images as $image) {
+                        $imageUrl = $image->image_url; // Utilise l'accesseur qui génère l'URL complète
+                        if (!empty($imageUrl)) {
+                            $imageUrls[] = $imageUrl;
                         }
                     }
                 }
@@ -1413,7 +1507,12 @@ class TripController
                 'special_notes' => $trip->special_notes ?? null,
                 'is_domestic' => (bool) ($trip->is_domestic ?? false),
                 'total_reward' => (float) ($trip->total_reward ?? 0),
+                // Statistiques du voyage
                 'view_count' => (int) ($trip->view_count ?? 0),
+                'share_count' => (int) ($trip->share_count ?? 0),
+                'favorite_count' => (int) ($trip->favorite_count ?? 0),
+                'report_count' => (int) ($trip->report_count ?? 0),
+                'booking_count' => (int) ($trip->booking_count ?? 0),
                 // Structure utilisateur compatible Flutter
                 'user' => $userData,
                 // Backwards compatibility

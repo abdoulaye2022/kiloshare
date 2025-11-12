@@ -21,12 +21,21 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const _HomePage(),
-    const _MyTripsPage(),
-    const _BookingsPage(),
-    const ConversationsListScreen(),
-  ];
+  // Méthode pour obtenir la page actuelle (recréée à chaque fois)
+  Widget _getCurrentPage() {
+    switch (_currentIndex) {
+      case 0:
+        return const _HomePage();
+      case 1:
+        return const _MyTripsPage();
+      case 2:
+        return const _BookingsPage();
+      case 3:
+        return const ConversationsListScreen();
+      default:
+        return const _HomePage();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final isAuthenticated = state is AuthAuthenticated;
 
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _pages,
-          ),
+          body: _getCurrentPage(), // Utiliser la page actuelle au lieu d'IndexedStack
           bottomNavigationBar: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             currentIndex: _currentIndex,
@@ -131,6 +137,9 @@ class _HomePageState extends State<_HomePage> {
         _isLoading = true;
         _error = null;
       });
+
+      // Attendre un peu pour s'assurer que les services sont prêts
+      await Future.delayed(const Duration(milliseconds: 100));
 
       final trips = await _tripService.getPublicTrips(limit: 5);
 

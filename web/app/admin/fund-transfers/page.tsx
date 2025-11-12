@@ -29,16 +29,50 @@ interface BookingReadyForTransfer {
   }
 }
 
+interface CompletedTransfer {
+  booking_id: number
+  booking_uuid: string
+  trip_id: number
+  trip_route: string
+  transporter: {
+    id: number
+    name: string
+    email: string
+  }
+  sender: {
+    id: number
+    name: string
+    email: string
+  }
+  transfer_details: {
+    transferred_at: string
+    transfer_id: string
+    stripe_account_id: string
+  }
+  amounts: {
+    total: number
+    platform_fee: number
+    transferred: number
+    currency: string
+  }
+}
+
 export default function FundTransfersPage() {
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
   const [bookings, setBookings] = useState<BookingReadyForTransfer[]>([])
+  const [completedTransfers, setCompletedTransfers] = useState<CompletedTransfer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [processingId, setProcessingId] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
-    loadBookings()
-  }, [])
+    if (activeTab === 'pending') {
+      loadBookings()
+    } else {
+      loadCompletedTransfers()
+    }
+  }, [activeTab])
 
   const loadBookings = async () => {
     try {
@@ -51,6 +85,22 @@ export default function FundTransfersPage() {
       }
     } catch (err: any) {
       setError(err.message || 'Erreur lors du chargement des réservations')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCompletedTransfers = async () => {
+    try {
+      setLoading(true)
+      const response = await adminAPI.get('/api/v1/admin/transfers/completed')
+      const data = await response.json()
+
+      if (data.data?.transfers) {
+        setCompletedTransfers(data.data.transfers)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des transferts complétés')
     } finally {
       setLoading(false)
     }
@@ -138,7 +188,30 @@ export default function FundTransfersPage() {
         </div>
       )}
 
-      {bookings.length === 0 ? (
+      {/* Onglets */}
+      <ul className="nav nav-tabs mb-4">
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pending')}
+          >
+            <i className="bi bi-clock-history me-2"></i>
+            En attente ({bookings.length})
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'completed' ? 'active' : ''}`}
+            onClick={() => setActiveTab('completed')}
+          >
+            <i className="bi bi-check-circle me-2"></i>
+            Historique ({completedTransfers.length})
+          </button>
+        </li>
+      </ul>
+
+      {/* Contenu de l'onglet "En attente" */}
+      {activeTab === 'pending' && bookings.length === 0 ? (
         <div className="card">
           <div className="card-body text-center py-5">
             <i className="bi bi-inbox fs-1 text-muted mb-3 d-block"></i>
@@ -148,7 +221,7 @@ export default function FundTransfersPage() {
             </p>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'pending' ? (
         <>
           <div className="alert alert-info mb-4">
             <i className="bi bi-info-circle me-2"></i>
@@ -266,6 +339,83 @@ export default function FundTransfersPage() {
             ))}
           </div>
         </>
+      ) : (
+        /* Onglet "Historique" */
+        completedTransfers.length === 0 ? (
+          <div className="card">
+            <div className="card-body text-center py-5">
+              <i className="bi bi-archive fs-1 text-muted mb-3 d-block"></i>
+              <h5 className="card-title">Aucun transfert complété</h5>
+              <p className="card-text text-muted">
+                L'historique des transferts effectués apparaîtra ici.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover">
+              <thead className="table-light">
+                <tr>
+                  <th>Réservation</th>
+                  <th>Voyage</th>
+                  <th>Transporteur</th>
+                  <th>Expéditeur</th>
+                  <th>Montant total</th>
+                  <th>Frais plateforme</th>
+                  <th>Montant transféré</th>
+                  <th>Date de transfert</th>
+                  <th>ID Transfert</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completedTransfers.map((transfer) => (
+                  <tr key={transfer.booking_id}>
+                    <td>
+                      <span className="badge bg-secondary">#{transfer.booking_id}</span>
+                      <br />
+                      <small className="text-muted">{transfer.booking_uuid}</small>
+                    </td>
+                    <td>
+                      <i className="bi bi-geo-alt me-1"></i>
+                      {transfer.trip_route}
+                    </td>
+                    <td>
+                      <strong>{transfer.transporter.name}</strong>
+                      <br />
+                      <small className="text-muted">{transfer.transporter.email}</small>
+                    </td>
+                    <td>
+                      {transfer.sender.name}
+                      <br />
+                      <small className="text-muted">{transfer.sender.email}</small>
+                    </td>
+                    <td>
+                      <strong>{formatCurrency(transfer.amounts.total, transfer.amounts.currency)}</strong>
+                    </td>
+                    <td className="text-danger">
+                      -{formatCurrency(transfer.amounts.platform_fee, transfer.amounts.currency)}
+                    </td>
+                    <td className="text-success">
+                      <strong>{formatCurrency(transfer.amounts.transferred, transfer.amounts.currency)}</strong>
+                    </td>
+                    <td>
+                      <i className="bi bi-calendar3 me-1"></i>
+                      {formatDate(transfer.transfer_details.transferred_at)}
+                    </td>
+                    <td>
+                      <code className="small">{transfer.transfer_details.transfer_id}</code>
+                      <br />
+                      <small className="text-muted">
+                        <i className="bi bi-credit-card me-1"></i>
+                        {transfer.transfer_details.stripe_account_id.substring(0, 20)}...
+                      </small>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   )

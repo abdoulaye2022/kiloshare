@@ -109,20 +109,24 @@ class MyTripsStateManager extends ChangeNotifier {
     if (!force && _shouldUseCache(_lastSyncTrips)) {
       return;
     }
-    
+
     _setLoadingTrips(true);
     _errorTrips = null;
-    
+
     try {
+      // Attendre un peu pour s'assurer que le token est disponible
+      await Future.delayed(const Duration(milliseconds: 100));
+
       final trips = await _tripService.getUserTrips();
-      
+
       _allTrips = trips;
       _myTrips = trips.where((trip) => trip.status != TripStatus.draft).toList();
       _lastSyncTrips = DateTime.now();
-      
+
       _applyFilters();
     } catch (e) {
       _errorTrips = e.toString();
+      debugPrint('Erreur chargement voyages: $e');
     } finally {
       _setLoadingTrips(false);
     }
@@ -134,13 +138,16 @@ class MyTripsStateManager extends ChangeNotifier {
     if (!force && _shouldUseCache(_lastSyncDrafts)) {
       return;
     }
-    
+
     _setLoadingDrafts(true);
     _errorDrafts = null;
-    
+
     try {
+      // Attendre un peu pour s'assurer que le token est disponible
+      await Future.delayed(const Duration(milliseconds: 100));
+
       List<Trip> drafts;
-      
+
       try {
         // Essayer l'endpoint dédié aux brouillons
         drafts = await _tripService.getDrafts();
@@ -152,13 +159,14 @@ class MyTripsStateManager extends ChangeNotifier {
         }
         drafts = _allTrips.where((trip) => trip.status == TripStatus.draft).toList();
       }
-      
+
       _drafts = drafts;
       _lastSyncDrafts = DateTime.now();
-      
+
       _applyFilters();
     } catch (e) {
       _errorDrafts = e.toString();
+      debugPrint('Erreur chargement brouillons: $e');
     } finally {
       _setLoadingDrafts(false);
     }
@@ -170,19 +178,23 @@ class MyTripsStateManager extends ChangeNotifier {
     if (!force && _shouldUseCache(_lastSyncFavorites)) {
       return;
     }
-    
+
     _setLoadingFavorites(true);
     _errorFavorites = null;
-    
+
     try {
+      // Attendre un peu pour s'assurer que le token est disponible
+      await Future.delayed(const Duration(milliseconds: 100));
+
       final favorites = await FavoritesService.instance.getFavoriteTrips();
-      
+
       _favorites = favorites;
       _lastSyncFavorites = DateTime.now();
-      
+
       _applyFilters();
     } catch (e) {
       _errorFavorites = e.toString();
+      debugPrint('Erreur chargement favoris: $e');
     } finally {
       _setLoadingFavorites(false);
     }

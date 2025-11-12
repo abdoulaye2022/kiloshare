@@ -42,13 +42,6 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Recharger les données quand l'écran revient
-    _loadDeliveryCodeInfo();
-  }
-
-  @override
   void dispose() {
     for (var controller in _codeControllers) {
       controller.dispose();
@@ -62,19 +55,13 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
   Future<void> _loadDeliveryCodeInfo() async {
     final result = await _deliveryCodeService.getDeliveryCode(widget.booking.id.toString());
     if (result['success'] && mounted) {
-      final deliveryCode = result['delivery_code'] as DeliveryCodeModel;
+      final deliveryCodeData = result['delivery_code'] as Map<String, dynamic>;
+      final deliveryCode = DeliveryCodeModel.fromJson(deliveryCodeData);
       setState(() {
         _deliveryCode = deliveryCode;
         _attemptsRemaining = deliveryCode.attemptsRemaining;
         _isCodeAlreadyUsed = deliveryCode.hasBeenUsed;
       });
-
-      // Si le code a déjà été utilisé, afficher un message et empêcher la validation
-      if (_isCodeAlreadyUsed) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showAlreadyValidatedDialog();
-        });
-      }
     }
   }
 
@@ -190,14 +177,20 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
       );
 
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
         if (result['success']) {
+          // Marquer le code comme utilisé et arrêter le chargement
+          setState(() {
+            _isLoading = false;
+            _isCodeAlreadyUsed = true;
+          });
+
+          // Recharger les infos du code pour mettre à jour le statut
+          await _loadDeliveryCodeInfo();
+
           _showSuccessDialog(result['message']);
         } else {
           setState(() {
+            _isLoading = false;
             _errorMessage = result['error'];
             _attemptsRemaining = result['attempts_remaining'] ?? 0;
           });
@@ -285,8 +278,7 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Fermer dialog
-              Navigator.of(context).pop(true); // Retourner à l'écran précédent avec succès
+              Navigator.of(context).pop(); // Fermer dialog seulement
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ModernTheme.success,
@@ -320,41 +312,75 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
     );
   }
 
-  void _showAlreadyValidatedDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          Icons.check_circle,
-          color: ModernTheme.success,
-          size: 64,
-        ),
-        title: const Text('Code déjà validé'),
-        content: Text(
-          'Ce code de livraison a déjà été validé${_deliveryCode?.usedAt != null ? ' le ${_formatDate(_deliveryCode!.usedAt!)}' : ''}. '
-          'La livraison a été confirmée avec succès.\n\n'
-          'Vous pouvez fermer cet écran.'
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Fermer dialog
-              Navigator.of(context).pop(); // Retourner à l'écran précédent
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.success,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Retour'),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildAlreadyValidatedScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ModernTheme.spacing24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: ModernTheme.success,
+              size: 100,
+            ),
+            const SizedBox(height: ModernTheme.spacing24),
+            Text(
+              'Code déjà validé',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: ModernTheme.gray900,
+              ),
+            ),
+            const SizedBox(height: ModernTheme.spacing16),
+            Text(
+              'Ce code de livraison a déjà été validé${_deliveryCode?.usedAt != null ? ' le ${_formatDate(_deliveryCode!.usedAt!)}' : ''}.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: ModernTheme.gray600,
+              ),
+            ),
+            const SizedBox(height: ModernTheme.spacing8),
+            Text(
+              'La livraison a été confirmée avec succès.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: ModernTheme.gray600,
+              ),
+            ),
+            const SizedBox(height: ModernTheme.spacing32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ModernTheme.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: ModernTheme.spacing16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ModernTheme.radiusMedium),
+                  ),
+                ),
+                child: const Text(
+                  'Retour',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -379,36 +405,38 @@ class _DeliveryCodeValidationScreenState extends State<DeliveryCodeValidationScr
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ModernTheme.spacing16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Informations de la réservation
-            _buildBookingInfo(),
-            const SizedBox(height: ModernTheme.spacing24),
+      body: _isCodeAlreadyUsed
+        ? _buildAlreadyValidatedScreen()
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(ModernTheme.spacing16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Informations de la réservation
+                _buildBookingInfo(),
+                const SizedBox(height: ModernTheme.spacing24),
 
-            // Instructions
-            _buildInstructions(),
-            const SizedBox(height: ModernTheme.spacing24),
+                // Instructions
+                _buildInstructions(),
+                const SizedBox(height: ModernTheme.spacing24),
 
-            // Saisie du code
-            _buildCodeInput(),
-            const SizedBox(height: ModernTheme.spacing24),
+                // Saisie du code
+                _buildCodeInput(),
+                const SizedBox(height: ModernTheme.spacing24),
 
-            // Géolocalisation
-            _buildLocationSection(),
-            const SizedBox(height: ModernTheme.spacing24),
+                // Géolocalisation
+                _buildLocationSection(),
+                const SizedBox(height: ModernTheme.spacing24),
 
-            // Photos
-            _buildPhotosSection(),
-            const SizedBox(height: ModernTheme.spacing32),
+                // Photos
+                _buildPhotosSection(),
+                const SizedBox(height: ModernTheme.spacing32),
 
-            // Bouton de validation
-            _buildValidationButton(),
-          ],
-        ),
-      ),
+                // Bouton de validation
+                _buildValidationButton(),
+              ],
+            ),
+          ),
     );
   }
 

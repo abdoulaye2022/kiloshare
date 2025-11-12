@@ -62,9 +62,10 @@ class DeliveryCodeService {
       final data = json.decode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        final deliveryCodeData = data['data']['delivery_code'] as Map<String, dynamic>;
         return {
           'success': true,
-          'delivery_code': data['data']['delivery_code'] as Map<String, dynamic>,
+          'delivery_code': deliveryCodeData,
         };
       } else {
         return {'success': false, 'error': data['message'] ?? 'Code non trouvé'};

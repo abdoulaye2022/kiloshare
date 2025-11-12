@@ -17,19 +17,19 @@ class _MyTripsScreenState extends State<MyTripsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late MyTripsStateManager _stateManager;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _stateManager = MyTripsStateManager.instance;
-    
+
     // Écouter les changements du gestionnaire d'état
     _stateManager.addListener(_onStateChanged);
-    
+
     // Ajouter un listener pour les changements d'onglet
     _tabController.addListener(_onTabChanged);
-    
+
     // Charger les données initiales
     _loadInitialData();
   }
@@ -213,13 +213,16 @@ class _MyTripsScreenState extends State<MyTripsScreen>
   }
 
   Widget _buildTripsTab(List<Trip> trips, String emptyMessage, bool isLoading, String? error, {bool showActions = true}) {
+    // Afficher le chargement en priorité
     if (isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    if (error != null) {
+    // Si erreur mais pas de données, afficher l'erreur
+    // Si erreur mais il y a des données en cache, afficher les données avec un message
+    if (error != null && trips.isEmpty) {
       return _buildErrorState(error);
     }
 

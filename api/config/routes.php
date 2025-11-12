@@ -213,6 +213,8 @@ return function (App $app) {
                 // Delivery-based fund transfers
                 $adminGroup->get('/bookings/ready-for-transfer', [AdminController::class, 'getBookingsReadyForTransfer'])
                     ->add(new AuthMiddleware());
+                $adminGroup->get('/transfers/completed', [AdminController::class, 'getCompletedTransfers'])
+                    ->add(new AuthMiddleware());
                 $adminGroup->post('/bookings/{id}/transfer-funds', [AdminController::class, 'transferFundsAfterDelivery'])
                     ->add(new AuthMiddleware());
             });
@@ -225,7 +227,9 @@ return function (App $app) {
             $v1Group->get('/trips/cancellation-history', [TripController::class, 'getCancellationHistory'])->add(new AuthMiddleware());
 
             // Route dynamique publique APRÈS toutes les routes statiques
-            $v1Group->get('/trips/{id}', [TripController::class, 'getPublicTripDetails']);
+            // Utilise un middleware optionnel pour détecter l'utilisateur connecté s'il y a un token
+            $v1Group->get('/trips/{id}', [TripController::class, 'getPublicTripDetails'])
+                ->add(new \KiloShare\Middleware\OptionalAuthMiddleware());
 
             // Autres routes protégées
             $v1Group->group('/trips', function (RouteCollectorProxy $tripGroup) {
@@ -253,6 +257,9 @@ return function (App $app) {
                 $tripGroup->get('/{id}/bookings', [TripController::class, 'getTripBookings']);
                 $tripGroup->post('/{id}/images', [TripController::class, 'addTripImage']);
                 $tripGroup->delete('/{id}/images/{imageId}', [TripController::class, 'removeTripImage']);
+
+                // Statistiques et interactions
+                $tripGroup->post('/{id}/share', [TripController::class, 'shareTrip']);
 
                 // === NEW STATUS TRANSITION ACTIONS ===
                 $tripGroup->get('/{id}/actions', [TripController::class, 'getAvailableActions']);
@@ -338,6 +345,7 @@ return function (App $app) {
                 $bookingGroup->post('/{id}/payment/confirm', [BookingController::class, 'confirmPayment']);
                 $bookingGroup->post('/{id}/payment/capture', [BookingController::class, 'capturePayment']);
                 $bookingGroup->get('/{id}/payment/status', [BookingController::class, 'getPaymentStatus']);
+                $bookingGroup->post('/{id}/payment/retry', [BookingController::class, 'retryPayment']);
             })->add(new AuthMiddleware());
 
 

@@ -166,8 +166,10 @@ class Booking extends Model
     // Méthodes utilitaires
     public function canBeAcceptedBy(User $user): bool
     {
-        // Le transporteur peut accepter si status PENDING ou PAYMENT_AUTHORIZED
-        return ($this->status === self::STATUS_PENDING || $this->status === self::STATUS_PAYMENT_AUTHORIZED)
+        // Le transporteur peut accepter si status PENDING, PAYMENT_AUTHORIZED ou PAID
+        return ($this->status === self::STATUS_PENDING
+                || $this->status === self::STATUS_PAYMENT_AUTHORIZED
+                || $this->status === self::STATUS_PAID)
             && $this->trip->user_id === $user->id;
     }
 

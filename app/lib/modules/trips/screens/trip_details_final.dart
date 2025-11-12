@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
@@ -97,14 +98,10 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
       }
     } catch (e) {
       // Error loading trip data
-      
-      String errorMessage;
-      if (e.toString().contains('Trip not found')) {
-        errorMessage = 'Cette annonce n\'est pas disponible.\n\nRaisons possibles :\n• Annonce en brouillon (visible seulement par le propriétaire)\n• Annonce supprimée ou expirée\n• Problème d\'authentification\n\nID demandé: ${widget.tripId}';
-      } else {
-        errorMessage = e.toString();
-      }
-      
+      debugPrint('Erreur chargement voyage ${widget.tripId}: $e');
+
+      String errorMessage = 'Annonce non trouvée';
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -114,12 +111,89 @@ class _TripDetailsFinalState extends State<TripDetailsFinal> {
     }
   }
 
+  Future<void> _shareTrip() async {
+    if (_trip == null) return;
+
+    // Vérifier que le voyage est actif avant de permettre le partage
+    if (_trip!.status != TripStatus.active) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seuls les voyages actifs peuvent être partagés'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Utiliser localhost en dev, kiloshare.com en production
+    const bool isProduction = bool.fromEnvironment('dart.vm.product');
+    final String baseUrl = isProduction ? 'https://kiloshare.com' : 'http://localhost:3000';
+    // Utiliser l'UUID au lieu de l'ID pour plus de sécurité
+    final String tripUrl = '$baseUrl/trips/${_trip!.uuid}';
+
+    final String shareText = '''
+🧳 Voyage disponible sur KiloShare!
+
+De: ${_trip!.departureCity}
+À: ${_trip!.arrivalCity}
+Date: ${_trip!.departureDate}
+Prix: ${_trip!.pricePerKg}€/kg
+Capacité: ${_trip!.remainingWeight}kg disponibles
+
+Réservez maintenant: $tripUrl
+''';
+
+    try {
+      // Partager via le système natif
+      await Share.share(
+        shareText,
+        subject: 'Voyage ${_trip!.departureCity} → ${_trip!.arrivalCity}',
+      );
+
+      // Enregistrer le partage dans l'API
+      try {
+        final tripService = TripService();
+        await tripService.shareTrip(_trip!.id, platform: 'share_plus');
+      } catch (apiError) {
+        // Ne pas bloquer l'utilisateur si l'enregistrement échoue
+        debugPrint('Erreur lors de l\'enregistrement du partage: $apiError');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors du partage: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Vérifier si on peut retourner en arrière
+    final canPop = Navigator.of(context).canPop();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Détails du voyage'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: canPop
+          ? null // Utiliser le bouton retour par défaut
+          : IconButton(
+              icon: const Icon(Icons.home),
+              onPressed: () => context.go('/home'),
+              tooltip: 'Accueil',
+            ),
+        actions: [
+          // Afficher le bouton partage seulement si le voyage est actif
+          if (_trip != null && _trip!.status == TripStatus.active)
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _shareTrip,
+              tooltip: 'Partager',
+            ),
+        ],
       ),
       body: _buildBody(),
     );

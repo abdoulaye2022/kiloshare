@@ -859,11 +859,14 @@ class TripService {
   }
 
   /// Share trip
-  Future<String> shareTrip(String tripId) async {
+  Future<int> shareTrip(String tripId, {String? platform}) async {
     try {
       final token = await _getTokenWithRetry();
 
       final response = await _dio.post('/trips/$tripId/share',
+        data: {
+          'platform': platform,
+        },
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -872,9 +875,9 @@ class TripService {
           },
         ),
       );
-      
+
       if (response.data['success'] == true) {
-        return response.data['share_url'];
+        return response.data['data']['share_count'] as int? ?? 0;
       } else {
         throw TripException(response.data['message'] ?? 'Failed to share trip');
       }

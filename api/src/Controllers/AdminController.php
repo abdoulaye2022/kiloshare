@@ -475,8 +475,8 @@ class AdminController
                         return [
                             'id' => $image->id,
                             'trip_id' => $image->trip_id,
-                            'url' => $image->url,
-                            'image_url' => $image->url, // Alias pour compatibilité
+                            'url' => $image->image_url, // Utiliser l'accesseur pour l'URL complète
+                            'image_url' => $image->image_url, // Utiliser l'accesseur pour l'URL complète
                             'image_path' => $image->image_path,
                             'is_primary' => $image->is_primary,
                             'caption' => $image->alt_text,
@@ -705,8 +705,8 @@ class AdminController
                         return [
                             'id' => $image->id,
                             'trip_id' => $image->trip_id,
-                            'url' => $image->url,
-                            'image_url' => $image->url, // Alias pour compatibilité
+                            'url' => $image->image_url, // Utiliser l'accesseur pour l'URL complète
+                            'image_url' => $image->image_url, // Utiliser l'accesseur pour l'URL complète
                             'image_path' => $image->image_path,
                             'is_primary' => $image->is_primary,
                             'caption' => $image->alt_text,
@@ -1782,9 +1782,9 @@ class AdminController
         }
 
         try {
-            // Récupérer les réservations livrées avec code validé et sans transfert
+            // Récupérer les réservations livrées/complétées avec code validé et sans transfert
             $bookings = Booking::with(['trip.user', 'sender', 'deliveryCode', 'paymentAuthorization'])
-                ->where('status', Booking::STATUS_DELIVERED)
+                ->whereIn('status', [Booking::STATUS_DELIVERED, Booking::STATUS_COMPLETED, Booking::STATUS_PAID])
                 ->get()
                 ->filter(function ($booking) {
                     // Vérifier que le code de livraison est validé
@@ -1798,7 +1798,7 @@ class AdminController
                     }
 
                     // Vérifier que le transfert n'est pas déjà fait
-                    if (isset($booking->transfer_status) && $booking->transfer_status === 'completed') {
+                    if ($booking->paymentAuthorization->transferred_at !== null) {
                         return false;
                     }
 
@@ -1845,6 +1845,82 @@ class AdminController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to get bookings: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get completed transfers history
+     */
+    public function getCompletedTransfers(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+
+        if (!$user->hasRole('admin')) {
+            return Response::forbidden('Admin access required');
+        }
+
+        try {
+            // Récupérer toutes les réservations où le transfert a été effectué
+            $bookings = Booking::with(['trip.user', 'sender', 'deliveryCode', 'paymentAuthorization'])
+                ->whereIn('status', [Booking::STATUS_DELIVERED, Booking::STATUS_COMPLETED])
+                ->get()
+                ->filter(function ($booking) {
+                    // Vérifier que le transfert a été effectué
+                    return $booking->paymentAuthorization
+                        && $booking->paymentAuthorization->transferred_at !== null;
+                });
+
+            $completedTransfers = $bookings->map(function ($booking) {
+                $paymentAuth = $booking->paymentAuthorization;
+                $totalAmount = $paymentAuth->amount_cents / 100;
+                $platformFee = $paymentAuth->platform_fee_cents / 100;
+                $transferAmount = $totalAmount - $platformFee;
+
+                return [
+                    'booking_id' => $booking->id,
+                    'booking_uuid' => $booking->uuid,
+                    'trip_id' => $booking->trip->id,
+                    'trip_route' => $booking->trip->departure_city . ' → ' . $booking->trip->arrival_city,
+                    'transporter' => [
+                        'id' => $booking->trip->user->id,
+                        'name' => $booking->trip->user->first_name . ' ' . $booking->trip->user->last_name,
+                        'email' => $booking->trip->user->email,
+                    ],
+                    'sender' => [
+                        'id' => $booking->sender->id,
+                        'name' => $booking->sender->first_name . ' ' . $booking->sender->last_name,
+                        'email' => $booking->sender->email,
+                    ],
+                    'transfer_details' => [
+                        'transferred_at' => $paymentAuth->transferred_at ?
+                            ($paymentAuth->transferred_at instanceof \DateTime ?
+                                $paymentAuth->transferred_at->format('c') :
+                                $paymentAuth->transferred_at)
+                            : null,
+                        'transfer_id' => $paymentAuth->transfer_id,
+                        'stripe_account_id' => $paymentAuth->stripe_account_id,
+                    ],
+                    'amounts' => [
+                        'total' => $totalAmount,
+                        'platform_fee' => $platformFee,
+                        'transferred' => $transferAmount,
+                        'currency' => $paymentAuth->currency,
+                    ],
+                ];
+            });
+
+            // Trier par date de transfert décroissante
+            $completedTransfers = $completedTransfers->sortByDesc(function ($transfer) {
+                return $transfer['transfer_details']['transferred_at'];
+            })->values();
+
+            return Response::success([
+                'transfers' => $completedTransfers,
+                'total_count' => $completedTransfers->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to get completed transfers: ' . $e->getMessage());
         }
     }
 

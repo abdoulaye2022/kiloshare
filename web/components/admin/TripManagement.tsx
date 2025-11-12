@@ -111,7 +111,11 @@ export default function TripManagement() {
 
       if (response.ok) {
         const data = await response.json();
-        setTrips(data.data?.trips || data.trips || []);
+        console.log('API Response:', data);
+        const tripsData = data.data?.trips || data.trips || [];
+        console.log('Trips data:', tripsData, 'Is array?', Array.isArray(tripsData));
+        // S'assurer que c'est un tableau
+        setTrips(Array.isArray(tripsData) ? tripsData : []);
         setError(null);
       } else {
         // Essayer de parser le JSON, sinon utiliser le texte brut
@@ -131,6 +135,8 @@ export default function TripManagement() {
     } catch (error) {
       console.error('Error fetching trips:', error);
       setError(`Erreur de connexion au serveur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      // S'assurer que trips est un tableau même en cas d'erreur
+      setTrips([]);
     } finally {
       setLoading(false);
     }
@@ -290,12 +296,12 @@ export default function TripManagement() {
     return [];
   };
 
-  const filteredTrips = trips.filter(trip => {
+  const filteredTrips = (Array.isArray(trips) ? trips : []).filter(trip => {
     const matchesSearch = searchTerm === '' ||
-      trip.departure_city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trip.arrival_city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${trip.user.first_name} ${trip.user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trip.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      trip.departure_city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      trip.arrival_city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${trip.user?.first_name || ''} ${trip.user?.last_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      trip.user?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 

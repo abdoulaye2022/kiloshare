@@ -34,7 +34,9 @@ class _TransporterDeliveryCodeScreenState
     for (var booking in widget.bookings) {
       _codeControllers[booking.id] = TextEditingController();
       _validating[booking.id] = false;
-      _validated[booking.id] = false;
+      // Vérifier si le booking est déjà livré
+      _validated[booking.id] = booking.status == BookingStatus.delivered ||
+                                booking.status == BookingStatus.completed;
     }
   }
 

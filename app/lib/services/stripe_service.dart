@@ -202,6 +202,7 @@ class StripeService {
     try {
       final headers = await _getAuthHeaders();
       if (headers == null) {
+        print('StripeService.confirmPayment: No auth headers');
         return {
           'success': false,
           'error': 'Authentication required',
@@ -213,11 +214,18 @@ class StripeService {
         'booking_id': bookingId,
       });
 
+      final url = '$_baseUrl/stripe/payment/confirm';
+      print('StripeService.confirmPayment: POST $url');
+      print('StripeService.confirmPayment: Body: $body');
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/stripe/payment/confirm'),
+        Uri.parse(url),
         headers: headers,
         body: body,
       );
+
+      print('StripeService.confirmPayment: Status ${response.statusCode}');
+      print('StripeService.confirmPayment: Response: ${response.body}');
 
       final responseData = json.decode(response.body);
 
@@ -289,6 +297,15 @@ class StripeService {
     required String paymentIntentId,
   }) async {
     try {
+      // Initialiser la payment sheet d'abord
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'KiloShare',
+          style: ThemeMode.system,
+        ),
+      );
+
       // Présenter la feuille de paiement Stripe
       await Stripe.instance.presentPaymentSheet();
 
@@ -299,7 +316,7 @@ class StripeService {
       };
     } on StripeException catch (e) {
       print('Erreur StripeService.presentPaymentSheet: ${e.error}');
-      
+
       // Gérer les différents types d'erreurs Stripe
       String errorMessage;
       switch (e.error.code) {

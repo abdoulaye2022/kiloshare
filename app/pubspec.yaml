@@ -59,6 +59,9 @@ dependencies:
   # Launcher pour les liens externes
   url_launcher: ^6.2.5
 
+  # Partage
+  share_plus: ^10.1.2
+
   # Deep linking
   app_links: ^6.3.2
 

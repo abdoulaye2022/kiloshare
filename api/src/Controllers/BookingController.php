@@ -129,7 +129,9 @@ class BookingController
                     'sender_name' => $user->first_name . ' ' . $user->last_name,
                     'weight' => $data['weight'],
                     'price' => $totalPrice,
-                    'package_description' => $data['package_description']
+                    'package_description' => $data['package_description'],
+                    'booking_reference' => $booking->uuid,
+                    'trip_route' => $trip->departure_city . ' → ' . $trip->arrival_city
                 ]
             );
 
@@ -173,6 +175,88 @@ class BookingController
 
         } catch (\Exception $e) {
             return Response::serverError('Failed to create booking request: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Récupérer le client_secret pour réessayer le paiement d'une réservation
+     */
+    public function retryPayment(ServerRequestInterface $request): ResponseInterface
+    {
+        $user = $request->getAttribute('user');
+        $bookingId = $request->getAttribute('id');
+
+        try {
+            $booking = Booking::find($bookingId);
+
+            if (!$booking) {
+                return Response::notFound('Booking not found');
+            }
+
+            // Vérifier que l'utilisateur est bien l'expéditeur (celui qui doit payer)
+            if ($booking->sender_id !== $user->id) {
+                return Response::forbidden('You are not authorized to pay for this booking');
+            }
+
+            // Vérifier que le booking est dans un état payable
+            if (!in_array($booking->status, [
+                Booking::STATUS_PENDING,
+                Booking::STATUS_PAYMENT_AUTHORIZED,
+                Booking::STATUS_ACCEPTED
+            ])) {
+                return Response::error(
+                    'This booking cannot be paid in its current status',
+                    ['current_status' => $booking->status]
+                );
+            }
+
+            // Récupérer l'autorisation de paiement
+            $authorization = $booking->paymentAuthorization;
+
+            if (!$authorization) {
+                return Response::error('No payment authorization found for this booking');
+            }
+
+            // Vérifier si le paiement n'est pas expiré
+            if ($authorization->isConfirmationExpired()) {
+                return Response::error(
+                    'Payment authorization has expired. Please create a new booking.',
+                    ['error_code' => 'payment_expired']
+                );
+            }
+
+            // Vérifier si le paiement n'est pas déjà confirmé
+            if ($authorization->isConfirmed()) {
+                return Response::error(
+                    'Payment has already been confirmed',
+                    ['error_code' => 'already_confirmed']
+                );
+            }
+
+            // Récupérer le client_secret
+            $clientSecret = $this->paymentAuthService->getClientSecret($authorization);
+
+            if (!$clientSecret) {
+                return Response::error('Unable to retrieve payment client secret');
+            }
+
+            return Response::success([
+                'booking' => [
+                    'id' => $booking->id,
+                    'uuid' => $booking->uuid,
+                    'status' => $booking->status,
+                    'total_price' => $booking->total_price,
+                ],
+                'payment' => [
+                    'client_secret' => $clientSecret,
+                    'amount_cents' => $authorization->amount_cents,
+                    'currency' => $authorization->currency,
+                    'confirmation_deadline' => $authorization->confirmation_deadline?->toISOString(),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return Response::serverError('Failed to retry payment: ' . $e->getMessage());
         }
     }
 
@@ -454,9 +538,13 @@ class BookingController
                 $booking->sender_id,
                 'booking_accepted',
                 [
-                    'trip_title' => $booking->trip->title ?? 'Votre voyage',
+                    'trip_title' => $booking->trip->title ?? ($booking->trip->departure_city . ' → ' . $booking->trip->arrival_city),
                     'total_amount' => $booking->total_price,
-                    'transporter_name' => $user->first_name . ' ' . $user->last_name
+                    'transporter_name' => $user->first_name . ' ' . $user->last_name,
+                    'package_description' => $booking->package_description ?? '',
+                    'weight_kg' => $booking->weight_kg ?? 0,
+                    'booking_reference' => $booking->uuid ?? '',
+                    'action_url' => '/bookings/' . $booking->id,
                 ]
             );
 

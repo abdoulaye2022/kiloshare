@@ -83,14 +83,12 @@ export default function AdminLayout({
   const menuItems = [
     { href: '/admin/dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
     { href: '/admin/stats', icon: 'bi-bar-chart', label: 'Statistiques' },
-    { href: '/admin/analytics', icon: 'bi-graph-up', label: 'Analytics' },
     { href: '/admin/users', icon: 'bi-people', label: 'Utilisateurs' },
     { href: '/admin/trips', icon: 'bi-airplane', label: 'Voyages' },
     { href: '/admin/transactions', icon: 'bi-credit-card', label: 'Transactions' },
     { href: '/admin/stripe-accounts', icon: 'bi-shield-check', label: 'Comptes Stripe' },
     { href: '/admin/fund-transfers', icon: 'bi-arrow-left-right', label: 'Transferts de fonds' },
     { href: '/admin/messages', icon: 'bi-chat-dots', label: 'Messages' },
-    { href: '/admin/reports', icon: 'bi-file-text', label: 'Rapports' },
   ];
 
   return (

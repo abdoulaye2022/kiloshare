@@ -251,6 +251,17 @@ class PaymentAuthorizationService
                 ]);
             }
 
+            // Transférer les fonds au transporteur si compte Stripe Connect configuré
+            if ($authorization->stripe_account_id) {
+                try {
+                    $this->transferToTransporter($authorization);
+                } catch (\Exception $e) {
+                    error_log("TRANSFER_ERROR: Failed to transfer funds to transporter for authorization {$authorization->id}: " . $e->getMessage());
+                    // Ne pas bloquer la capture si le transfert échoue
+                    // L'admin pourra le faire manuellement
+                }
+            }
+
             // Annuler tous les jobs en attente pour cette autorisation
             $this->cancelPendingJobs($authorization);
 
@@ -376,21 +387,24 @@ class PaymentAuthorizationService
         Booking $booking,
         User $sender
     ): PaymentIntent {
-        $applicationFeeCents = $platformFeeCents;
+        // Ne PAS utiliser application_fee_amount ni transfer_data
+        // On garde tout l'argent sur le compte plateforme et on transfère manuellement
+        // Cela permet de :
+        // 1. Absorber les frais Stripe sur notre compte (pas celui du transporteur)
+        // 2. Transférer exactement (montant - commission plateforme) au transporteur
+        // 3. Garder notre commission complète après avoir payé les frais Stripe
 
         return $this->stripe->paymentIntents->create([
             'amount' => $amountCents,
             'currency' => 'cad',
             'capture_method' => 'manual', // Capture différée
             'confirmation_method' => 'automatic', // Confirmation automatique côté client
-            'application_fee_amount' => $applicationFeeCents,
-            'transfer_data' => [
-                'destination' => $stripeAccountId,
-            ],
             'metadata' => [
                 'booking_id' => $booking->id,
                 'sender_id' => $sender->id,
                 'trip_id' => $booking->trip_id,
+                'stripe_account_id' => $stripeAccountId,
+                'platform_fee_cents' => $platformFeeCents,
                 'type' => 'booking_payment',
                 'platform' => 'kiloshare',
             ],
@@ -455,8 +469,66 @@ class PaymentAuthorizationService
         // Programmer le nouveau job d'expiration (pour la capture)
         ScheduledJob::schedulePaymentExpiry($authorization);
 
-        // Programmer un rappel de paiement
+        // Programmer des rappels de paiement (24h et 2h avant expiration)
         ScheduledJob::schedulePaymentReminder($authorization, 24);
+        ScheduledJob::schedulePaymentReminder($authorization, 2);
+    }
+
+    /**
+     * Transférer les fonds au transporteur via Stripe Transfer
+     */
+    private function transferToTransporter(PaymentAuthorization $authorization): void
+    {
+        // Calculer le montant à transférer (montant total - frais de plateforme)
+        $transferAmount = $authorization->amount_cents - $authorization->platform_fee_cents;
+
+        if ($transferAmount <= 0) {
+            throw new \Exception("Le montant du transfert est invalide: {$transferAmount}");
+        }
+
+        try {
+            // Créer le transfert vers le compte Stripe Connect du transporteur
+            $transfer = $this->stripe->transfers->create([
+                'amount' => $transferAmount,
+                'currency' => strtolower($authorization->currency),
+                'destination' => $authorization->stripe_account_id,
+                'description' => "Paiement pour la livraison - Réservation #{$authorization->booking_id}",
+                'metadata' => [
+                    'booking_id' => $authorization->booking_id,
+                    'authorization_id' => $authorization->id,
+                    'platform_fee' => $authorization->platform_fee_cents,
+                ],
+            ]);
+
+            // Créer une transaction pour le transfert
+            Transaction::create([
+                'booking_id' => $authorization->booking_id,
+                'payment_authorization_id' => $authorization->id,
+                'type' => Transaction::TYPE_TRANSFER,
+                'amount_cents' => $transferAmount,
+                'currency' => $authorization->currency,
+                'status' => Transaction::STATUS_COMPLETED,
+                'stripe_transfer_id' => $transfer->id,
+                'description' => "Transfert au transporteur",
+                'metadata' => [
+                    'stripe_account_id' => $authorization->stripe_account_id,
+                    'platform_fee_cents' => $authorization->platform_fee_cents,
+                ],
+                'completed_at' => Carbon::now(),
+            ]);
+
+            // Mettre à jour l'autorisation
+            $authorization->update([
+                'transferred_at' => Carbon::now(),
+                'transfer_id' => $transfer->id,
+            ]);
+
+            error_log("TRANSFER_SUCCESS: Transferred {$transferAmount} cents to account {$authorization->stripe_account_id} for booking {$authorization->booking_id}");
+
+        } catch (StripeException $e) {
+            error_log("TRANSFER_ERROR: Stripe error during transfer: " . $e->getMessage());
+            throw new \Exception("Échec du transfert Stripe: " . $e->getMessage());
+        }
     }
 
     /**

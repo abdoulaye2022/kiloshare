@@ -466,13 +466,23 @@ class StripeController
             // Récupérer le Payment Intent depuis Stripe
             try {
                 $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
-                
-                if ($paymentIntent->status !== 'succeeded') {
-                    error_log("StripeController.confirmPayment - Payment status: " . $paymentIntent->status);
-                    return Response::error('Le paiement n\'a pas abouti', [], 400);
+
+                error_log("StripeController.confirmPayment - PaymentIntent status: " . $paymentIntent->status);
+
+                // Si le paiement nécessite une capture (manual capture mode)
+                if ($paymentIntent->status === 'requires_capture') {
+                    error_log("StripeController.confirmPayment - Capturing payment...");
+                    $paymentIntent = $paymentIntent->capture();
+                    error_log("StripeController.confirmPayment - Payment captured, new status: " . $paymentIntent->status);
                 }
-                
-                error_log("StripeController.confirmPayment - PaymentIntent retrieved successfully: " . $paymentIntentId);
+
+                // Vérifier que le paiement est maintenant succeeded
+                if ($paymentIntent->status !== 'succeeded') {
+                    error_log("StripeController.confirmPayment - Payment status after capture: " . $paymentIntent->status);
+                    return Response::error('Le paiement n\'a pas abouti (status: ' . $paymentIntent->status . ')', [], 400);
+                }
+
+                error_log("StripeController.confirmPayment - PaymentIntent retrieved and confirmed successfully: " . $paymentIntentId);
             } catch (\Exception $e) {
                 error_log("StripeController.confirmPayment - Error retrieving PaymentIntent: " . $e->getMessage());
                 return Response::error('Erreur lors de la récupération du Payment Intent: ' . $e->getMessage(), [], 500);

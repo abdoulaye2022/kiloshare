@@ -251,10 +251,13 @@ class SmartNotificationService
             }
 
             $channelService = $this->channels[$channel];
-            
+
             // Préparer le message selon le canal
             $message = $this->prepareMessage($type, $data, $channel, $preferences);
-            
+
+            // Ajouter le type de notification aux données pour les canaux
+            $dataWithType = array_merge($data, ['notification_type' => $type]);
+
             // Créer le log
             $log = NotificationLog::create([
                 'user_id' => $user->id,
@@ -267,9 +270,9 @@ class SmartNotificationService
                 'created_at' => Carbon::now()
             ]);
 
-            // Envoyer
-            $result = $channelService->send($user, $message, $data);
-            
+            // Envoyer avec le type de notification inclus
+            $result = $channelService->send($user, $message, $dataWithType);
+
             // Mettre à jour le log
             $log->update([
                 'status' => $result['success'] ? 'sent' : 'failed',
@@ -278,7 +281,7 @@ class SmartNotificationService
             ]);
 
             return $result;
-            
+
         } catch (Exception $e) {
             error_log("Channel {$channel} error: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];

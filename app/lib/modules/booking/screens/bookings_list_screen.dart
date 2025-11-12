@@ -40,6 +40,9 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
   Future<void> _loadBookings() async {
     if (!mounted) return;
 
+    // Attendre un peu pour s'assurer que le token est disponible
+    await Future.delayed(const Duration(milliseconds: 100));
+
     // Vérifier si l'utilisateur est connecté (sans déclencher de refresh)
     final isAuth = await _authService.hasValidTokens();
     if (!isAuth) {
@@ -67,7 +70,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
       }
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -435,8 +438,64 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
                 ],
               ),
               
-              // Actions rapides pour les réservations reçues en attente
-              if (userRole == 'receiver' && booking.isPending) ...[
+              // Bouton pour réessayer le paiement (expéditeur seulement)
+              if (userRole == 'sender' && booking.status == BookingStatus.paymentAuthorized) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Paiement en attente',
+                              style: TextStyle(
+                                color: Colors.orange.shade900,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Complétez le paiement pour confirmer votre réservation',
+                        style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _retryPayment(booking),
+                          icon: const Icon(Icons.payment, size: 18),
+                          label: const Text('Compléter le paiement'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange.shade600,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Actions rapides pour les réservations reçues en attente (acceptation possible)
+              if (userRole == 'receiver' && (booking.isPending || booking.status == BookingStatus.paymentAuthorized || booking.status == BookingStatus.paid)) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -618,6 +677,89 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
 
   void _showBookingDetails(BookingModel booking, String userRole) {
     context.push('/bookings/${booking.id}');
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _retryPayment(BookingModel booking) async {
+    if (!mounted) return;
+
+    // Afficher loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Appeler l'endpoint retry payment
+      final retryResult = await _bookingService.retryPayment(booking.id.toString());
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fermer le loader
+
+      if (retryResult['success'] == true) {
+        final paymentData = retryResult['payment'];
+        final clientSecret = paymentData['client_secret'];
+
+        // Extraire le payment_intent_id du client_secret
+        final paymentIntentId = clientSecret.split('_secret_')[0];
+
+        // Initialiser le paiement Stripe avec la sheet
+        final paymentResult = await _stripeService.presentPaymentSheet(
+          paymentIntentId: paymentIntentId,
+          clientSecret: clientSecret,
+        );
+
+        if (paymentResult['success'] == true) {
+          // Confirmer le paiement côté backend
+          print('DEBUG: Confirming payment with backend...');
+          final confirmResult = await _stripeService.confirmPayment(
+            paymentIntentId: paymentIntentId,
+            bookingId: booking.id,
+          );
+          print('DEBUG: Confirmation result: $confirmResult');
+
+          if (!mounted) return;
+
+          if (confirmResult['success'] == true) {
+            // Afficher succès
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Paiement complété avec succès !'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            // Recharger la liste
+            _loadBookings();
+          } else {
+            // Erreur lors de la confirmation backend
+            _showError(confirmResult['error'] ?? 'Erreur lors de la confirmation du paiement');
+          }
+        } else {
+          if (!mounted) return;
+          _showError(paymentResult['error'] ?? 'Échec du paiement');
+        }
+      } else {
+        if (!mounted) return;
+        _showError(retryResult['error'] ?? 'Impossible de réessayer le paiement');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fermer le loader si ouvert
+      _showError('Erreur: ${e.toString()}');
+    }
   }
 
   Future<void> _acceptBooking(BookingModel booking) async {
