@@ -662,10 +662,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             weight: (_tripData['available_weight_kg'] ?? 10.0).toDouble(),
             maxWeight: _getMaxWeightForTransport(),
             onWeightChanged: (weight) {
-              print('DEBUG: Weight changed to: $weight');
               setState(() {
                 _tripData['available_weight_kg'] = weight;
-                print('DEBUG: _tripData after weight change: $_tripData');
               });
             },
           ),
@@ -686,7 +684,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 setState(() {
                   _tripData['price_per_kg'] = pricePerKg;
                   _tripData['currency'] = currency;
-                  print('DEBUG: _tripData after price selection: $_tripData');
                 });
               },
             ),
@@ -1028,7 +1025,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   void _nextStep() {
-    // print('=== DEBUG _nextStep called ===');
     // print('Current step: $_currentStep');
     // print('Total steps: $_totalSteps');
     // print('Can continue: ${_canContinue()}');
@@ -1093,13 +1089,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   Future<void> _submitTrip() async {
-    print('=== DEBUG: _submitTrip() START ===');
-    print('DEBUG: _tripData full contents: $_tripData');
-    print('DEBUG: _tripData keys: ${_tripData.keys.toList()}');
-    print('DEBUG: _tripData is null: ${_tripData == null}');
 
     // Debug each key access that might be null
-    print('DEBUG: Checking individual keys...');
     print(
         'DEBUG: transport_type: ${_tripData['transport_type']} (type: ${_tripData['transport_type']?.runtimeType})');
     print(
@@ -1134,7 +1125,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         'DEBUG: _specialNotesController.text: "${_specialNotesController.text}"');
     print(
         'DEBUG: _flightNumberController.text: "${_flightNumberController.text}"');
-    print('DEBUG: _airlineController.text: "${_airlineController.text}"');
 
     setState(() {
       _isLoading = true;
@@ -1142,11 +1132,9 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
     try {
       final isEditMode = widget.tripId != null;
-      print('DEBUG: isEditMode: $isEditMode');
 
       if (isEditMode) {
         // Edit existing trip
-        print('DEBUG: Creating updateData for edit mode...');
         late final Map<String, dynamic> updateData;
         try {
           updateData = {
@@ -1175,10 +1163,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                     ? _tripData['restricted_categories']
                     : null,
           };
-          print('DEBUG: updateData created successfully: $updateData');
         } catch (e) {
-          print('DEBUG: ERROR creating updateData: $e');
-          print('DEBUG: Error type: ${e.runtimeType}');
           rethrow;
         }
 
@@ -1216,7 +1201,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               imageFiles: _selectedImages,
             );
             
-            print('DEBUG: All images uploaded and added to trip successfully');
           } catch (e) {
             print('ERROR: Image upload failed: $e');
             // Show error to user but don't prevent trip update
@@ -1243,32 +1227,21 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         }
       } else {
         // Create new trip
-        print('DEBUG: Creating new trip...');
 
         // Images will be uploaded by the API during trip creation using multipart/form-data
         // The backend will handle GCS upload
 
         try {
-          print('DEBUG: About to call _tripService.createTrip with:');
-          print('DEBUG: transportType: ${_tripData['transport_type']}');
-          print('DEBUG: departureCity: ${_tripData['departure_city']}');
-          print('DEBUG: departureCountry: ${_tripData['departure_country']}');
           print(
               'DEBUG: departureAirportCode: ${_tripData['transport_type'] == 'plane' ? _tripData['departure_airport_code'] : null}');
-          print('DEBUG: departureDate: ${_tripData['departure_date']}');
-          print('DEBUG: arrivalCity: ${_tripData['arrival_city']}');
-          print('DEBUG: arrivalCountry: ${_tripData['arrival_country']}');
           print(
               'DEBUG: arrivalAirportCode: ${_tripData['transport_type'] == 'plane' ? _tripData['arrival_airport_code'] : null}');
-          print('DEBUG: arrivalDate: ${_tripData['arrival_date']}');
           print(
               'DEBUG: availableWeightKg: ${(_tripData['available_weight_kg'] ?? 0).toDouble()}');
           print(
               'DEBUG: pricePerKg: ${(_tripData['price_per_kg'] ?? 0).toDouble()}');
-          print('DEBUG: currency: ${_tripData['currency'] ?? 'CAD'}');
           print(
               'DEBUG: restrictedCategories: ${(_tripData['restricted_categories'] as List?)?.isEmpty == false ? List<String>.from(_tripData['restricted_categories']) : null}');
-          if (_selectedImages.isNotEmpty) print('DEBUG: images: ${_selectedImages.length} images selected');
 
           final createdTrip = await _tripService.createTrip(
             transportType: _tripData['transport_type'],
@@ -1308,7 +1281,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                     : null,
             restrictedItems: null,
           );
-          print('DEBUG: _tripService.createTrip completed successfully');
 
           // Upload images if any were selected
           if (_selectedImages.isNotEmpty) {
@@ -1317,17 +1289,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 tripId: createdTrip.id.toString(),
                 imageFiles: _selectedImages,
               );
-              print('DEBUG: Images uploaded successfully to GCS');
             } catch (e) {
               print('ERROR: Image upload failed: $e');
               // Continue anyway - trip was created successfully
             }
           }
 
-          print('DEBUG: Trip created successfully');
         } catch (e) {
-          print('DEBUG: ERROR in createTrip: $e');
-          print('DEBUG: Error type: ${e.runtimeType}');
           rethrow;
         }
 
@@ -1343,9 +1311,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         }
       }
     } catch (e) {
-      print('=== DEBUG: Final catch block - error: $e');
-      print('DEBUG: Error type: ${e.runtimeType}');
-      print('DEBUG: Error stack trace: ${StackTrace.current}');
 
       // Extract user-friendly error message
       String errorMessage = 'Une erreur est survenue';

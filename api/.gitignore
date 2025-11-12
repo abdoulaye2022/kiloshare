@@ -16,6 +16,8 @@ composer.lock
 /storage/logs/*.log
 /storage/cache/*
 /storage/tmp/*
+/logs/*.txt
+/logs/*.log
 *.log
 *.log.*
 

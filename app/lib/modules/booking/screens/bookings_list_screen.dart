@@ -722,12 +722,10 @@ class _BookingsListScreenState extends State<BookingsListScreen> with SingleTick
 
         if (paymentResult['success'] == true) {
           // Confirmer le paiement côté backend
-          print('DEBUG: Confirming payment with backend...');
           final confirmResult = await _stripeService.confirmPayment(
             paymentIntentId: paymentIntentId,
             bookingId: booking.id,
           );
-          print('DEBUG: Confirmation result: $confirmResult');
 
           if (!mounted) return;
 

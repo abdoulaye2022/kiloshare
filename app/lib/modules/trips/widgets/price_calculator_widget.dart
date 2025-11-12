@@ -71,20 +71,12 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   }
 
   Future<void> _loadPriceSuggestion() async {
-    print('=== DEBUG: _loadPriceSuggestion() START ===');
-    print('DEBUG: departureCity: ${widget.departureCity}');
-    print('DEBUG: departureCountry: ${widget.departureCountry}');
-    print('DEBUG: arrivalCity: ${widget.arrivalCity}');
-    print('DEBUG: arrivalCountry: ${widget.arrivalCountry}');
-    print('DEBUG: weightKg: ${widget.weightKg}');
-    print('DEBUG: transportType: ${widget.transportType}');
 
     // Safety check: ensure all required parameters are not null
     if (widget.departureCity == null ||
         widget.departureCountry == null ||
         widget.arrivalCity == null ||
         widget.arrivalCountry == null) {
-      print('DEBUG: Missing required location data - setting default price');
       // Set default price if required data is missing
       final defaultPrice = 15.0; // CAD per kg
       _priceController.text = defaultPrice.toString();
@@ -101,15 +93,11 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       _isLoadingSuggestion = true;
     });
 
-    print('DEBUG: Starting price suggestion calculation...');
 
     try {
       // Always use fallback price suggestion since multi-transport API is not available
-      print('DEBUG: Using fallback price suggestion service');
       await _useFallbackPriceSuggestion();
     } catch (e) {
-      print('DEBUG: Final catch block - error: $e');
-      print('DEBUG: Error type: ${e.runtimeType}');
       if (mounted) {
         // Set a default price when suggestion fails (no error toast)
         final defaultPrice = 15.0; // CAD per kg
@@ -169,13 +157,6 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
   }
 
   Future<void> _useFallbackPriceSuggestion() async {
-    print('DEBUG: _useFallbackPriceSuggestion() START');
-    print('DEBUG: Calling _tripService.getPriceSuggestion with:');
-    print('DEBUG: - departureCity: ${widget.departureCity}');
-    print('DEBUG: - departureCountry: ${widget.departureCountry}');
-    print('DEBUG: - arrivalCity: ${widget.arrivalCity}');
-    print('DEBUG: - arrivalCountry: ${widget.arrivalCountry}');
-    print('DEBUG: - currency: $_selectedCurrency');
 
     final suggestion = await _tripService.getPriceSuggestion(
       departureCity: widget.departureCity!,
@@ -185,8 +166,6 @@ class _PriceCalculatorWidgetState extends State<PriceCalculatorWidget> {
       currency: _selectedCurrency,
     );
 
-    print('DEBUG: Received suggestion: $suggestion');
-    print('DEBUG: Suggested price: ${suggestion.suggestedPricePerKg}');
 
     setState(() {
       _priceSuggestion = suggestion;

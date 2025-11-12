@@ -461,15 +461,11 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
   }
 
   Future<void> _searchTrips() async {
-    print('=== DEBUG: _searchTrips START ===');
-    print('DEBUG: Can search: ${_canSearch()}');
     
     if (!_canSearch()) {
-      print('DEBUG: Cannot search - requirements not met');
       return;
     }
 
-    print('DEBUG: Search parameters:');
     print('  - departureCity: $_departureCity');
     print('  - arrivalCity: $_arrivalCity');
     print('  - departureCountry: $_departureCountry');
@@ -487,7 +483,6 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
     });
 
     try {
-      print('DEBUG: Calling AuthTokenService.instance.tripService.searchTrips...');
       final results = await AuthTokenService.instance.tripService.searchTrips(
         departureCity: _departureCity,
         arrivalCity: _arrivalCity,
@@ -501,9 +496,6 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
         ticketVerified: _ticketVerifiedOnly,
       );
       
-      print('DEBUG: Search completed successfully');
-      print('DEBUG: Results count: ${results.length}');
-      print('DEBUG: Results: ${results.map((t) => '${t.id}: ${t.departureCity} → ${t.arrivalCity}').join(', ')}');
       
       setState(() {
         _searchResults = results;
@@ -511,12 +503,7 @@ class _SearchTripsScreenState extends State<SearchTripsScreen> {
         _isLoading = false;
       });
       
-      print('=== DEBUG: _searchTrips END - SUCCESS ===');
     } catch (e) {
-      print('=== DEBUG: _searchTrips ERROR ===');
-      print('DEBUG: Error type: ${e.runtimeType}');
-      print('DEBUG: Error message: $e');
-      print('DEBUG: Error toString: ${e.toString()}');
       
       setState(() {
         _error = e.toString();

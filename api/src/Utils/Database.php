@@ -7,6 +7,7 @@ namespace KiloShare\Utils;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
+use App\Utils\Logger;
 
 class Database
 {
@@ -42,6 +43,9 @@ class Database
         if ($settings['app']['debug']) {
             self::$capsule->connection()->enableQueryLog();
         }
+
+        // Capture des erreurs SQL
+        self::setupErrorLogging();
     }
 
     public static function getCapsule(): Capsule
@@ -91,5 +95,44 @@ class Database
     public static function disableQueryLog(): void
     {
         self::getCapsule()->connection()->disableQueryLog();
+    }
+
+    /**
+     * Configure SQL error logging
+     */
+    private static function setupErrorLogging(): void
+    {
+        // Listen to query execution failures
+        self::getCapsule()->connection()->listen(function ($query) {
+            // This is called for successful queries - we skip logging here
+        });
+
+        // Set PDO error mode to exception to catch SQL errors
+        $pdo = self::getCapsule()->connection()->getPdo();
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+    }
+
+    /**
+     * Log SQL error
+     */
+    public static function logSqlError(\Throwable $exception, string $query = '', array $bindings = []): void
+    {
+        $fullQuery = $query;
+        if (!empty($bindings)) {
+            foreach ($bindings as $binding) {
+                $value = is_string($binding) ? "'$binding'" : $binding;
+                $fullQuery = preg_replace('/\?/', (string)$value, $fullQuery, 1);
+            }
+        }
+
+        Logger::logSqlError(
+            $fullQuery ?: $exception->getMessage(),
+            $exception->getMessage(),
+            [
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'bindings' => $bindings,
+            ]
+        );
     }
 }
