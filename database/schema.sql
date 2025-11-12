@@ -1,17 +1,26 @@
 -- =====================================================
 -- KiloShare Database Schema
--- Generated: 2025-11-11
+-- Generated: 2025-11-12
 -- Purpose: Complete database structure for production
+-- =====================================================
+-- 
+-- This schema includes:
+-- - User management (users, user_tokens, user_fcm_tokens)
+-- - Authentication (email_verifications, verification_codes)
+-- - Stripe integration (user_stripe_accounts, payment_authorizations)
+-- - Trips & Bookings (trips, bookings, trip_images)
+-- - Delivery system (delivery_codes)
+-- - Messaging (conversations, messages, conversation_participants)
+-- - Notifications (notifications, notification_logs, user_notification_preferences)
+-- - Reviews & Ratings (reviews, user_ratings, user_reliability_history)
+-- - Transactions & Payments (transactions, payment_events_log)
+-- - Admin (admin_actions)
+-- - Misc (trip_favorites, trip_views, trip_shares, contact_revelations)
 -- =====================================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- MySQL dump 10.13  Distrib 9.3.0, for macos15.2 (arm64)
---
--- Host: localhost    Database: kiloshare
--- ------------------------------------------------------
--- Server version	9.3.0
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -23,11 +32,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
---
--- Table structure for table `admin_actions`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `admin_actions` (
@@ -43,11 +47,6 @@ CREATE TABLE `admin_actions` (
   KEY `idx_target` (`target_type`,`target_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `bookings`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `bookings` (
@@ -104,11 +103,6 @@ CREATE TABLE `bookings` (
   CONSTRAINT `fk_booking_payment_authorization` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table principale des réservations de transport de colis';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `cancellation_attempts`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cancellation_attempts` (
@@ -129,11 +123,6 @@ CREATE TABLE `cancellation_attempts` (
   CONSTRAINT `cancellation_attempts_ibfk_3` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `contact_revelations`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `contact_revelations` (
@@ -153,11 +142,6 @@ CREATE TABLE `contact_revelations` (
   CONSTRAINT `contact_revelations_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `conversation_participants`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversation_participants` (
@@ -175,11 +159,6 @@ CREATE TABLE `conversation_participants` (
   CONSTRAINT `conversation_participants_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `conversations`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversations` (
@@ -200,11 +179,6 @@ CREATE TABLE `conversations` (
   CONSTRAINT `chk_conversation_reference` CHECK (((`booking_id` is not null) or (`trip_id` is not null)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `delivery_codes`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `delivery_codes` (
@@ -241,11 +215,6 @@ CREATE TABLE `delivery_codes` (
   CONSTRAINT `delivery_codes_ibfk_3` FOREIGN KEY (`used_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `email_verifications`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `email_verifications` (
@@ -265,11 +234,6 @@ CREATE TABLE `email_verifications` (
   CONSTRAINT `email_verifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `escrow_accounts`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `escrow_accounts` (
@@ -288,11 +252,6 @@ CREATE TABLE `escrow_accounts` (
   CONSTRAINT `escrow_accounts_ibfk_1` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Système de rétention de fonds jusqu''à livraison confirmée';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `message_reads`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `message_reads` (
@@ -307,11 +266,6 @@ CREATE TABLE `message_reads` (
   CONSTRAINT `message_reads_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `messages` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `messages`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `messages` (
@@ -342,11 +296,6 @@ CREATE TABLE `messages` (
   CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `notification_logs`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_logs` (
@@ -383,11 +332,6 @@ CREATE TABLE `notification_logs` (
   CONSTRAINT `notification_logs_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `notification_templates`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_templates` (
@@ -411,11 +355,6 @@ CREATE TABLE `notification_templates` (
   KEY `idx_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `notifications`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
@@ -440,11 +379,6 @@ CREATE TABLE `notifications` (
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `payment_authorizations`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_authorizations` (
@@ -467,6 +401,8 @@ CREATE TABLE `payment_authorizations` (
   `last_capture_error` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `transferred_at` datetime DEFAULT NULL COMMENT 'Date du transfert au transporteur',
+  `transfer_id` varchar(255) DEFAULT NULL COMMENT 'ID du transfert Stripe',
   PRIMARY KEY (`id`),
   UNIQUE KEY `payment_intent_id` (`payment_intent_id`),
   KEY `idx_booking_id` (`booking_id`),
@@ -477,14 +413,10 @@ CREATE TABLE `payment_authorizations` (
   KEY `idx_confirmation_deadline` (`confirmation_deadline`),
   KEY `idx_status_auto_capture` (`status`,`auto_capture_at`),
   KEY `idx_status_expires` (`status`,`expires_at`),
+  KEY `idx_transferred_at` (`transferred_at`),
   CONSTRAINT `payment_authorizations_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `payment_configurations`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_configurations` (
@@ -504,11 +436,6 @@ CREATE TABLE `payment_configurations` (
   KEY `idx_is_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `payment_events_log`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_events_log` (
@@ -538,13 +465,8 @@ CREATE TABLE `payment_events_log` (
   CONSTRAINT `payment_events_log_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `payment_events_log_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE,
   CONSTRAINT `payment_events_log_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `review_reminders`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `review_reminders` (
@@ -562,11 +484,6 @@ CREATE TABLE `review_reminders` (
   CONSTRAINT `review_reminders_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `reviews`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `reviews` (
@@ -594,11 +511,6 @@ CREATE TABLE `reviews` (
   CONSTRAINT `reviews_chk_3` CHECK ((char_length(`comment`) <= 500))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `scheduled_jobs`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `scheduled_jobs` (
@@ -627,13 +539,8 @@ CREATE TABLE `scheduled_jobs` (
   KEY `idx_job_cleanup` (`status`,`created_at`),
   CONSTRAINT `scheduled_jobs_ibfk_1` FOREIGN KEY (`payment_authorization_id`) REFERENCES `payment_authorizations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `scheduled_jobs_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `transactions`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `transactions` (
@@ -679,11 +586,6 @@ CREATE TABLE `transactions` (
   CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Transactions financières et paiements Stripe';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `trip_favorites`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_favorites` (
@@ -699,11 +601,6 @@ CREATE TABLE `trip_favorites` (
   CONSTRAINT `trip_favorites_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `trip_images`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_images` (
@@ -730,13 +627,8 @@ CREATE TABLE `trip_images` (
   KEY `idx_trip_images_primary` (`is_primary`),
   KEY `idx_trip_images_order` (`order`),
   CONSTRAINT `trip_images_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `trip_reports`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trip_reports` (
@@ -760,11 +652,42 @@ CREATE TABLE `trip_reports` (
   CONSTRAINT `trip_reports_ibfk_3` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `trips`
---
-
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `trip_shares` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `trip_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `shared_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `platform` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'whatsapp, telegram, copy_link, etc.',
+  PRIMARY KEY (`id`),
+  KEY `idx_trip_id` (`trip_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_shared_at` (`shared_at`),
+  CONSTRAINT `trip_shares_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `trip_shares_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `trip_views` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `trip_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `session_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` text COLLATE utf8mb4_unicode_ci,
+  `viewed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_view` (`trip_id`,`user_id`,`session_id`),
+  KEY `idx_trip_id` (`trip_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_session_id` (`session_id`),
+  KEY `idx_viewed_at` (`viewed_at`),
+  CONSTRAINT `trip_views_ibfk_1` FOREIGN KEY (`trip_id`) REFERENCES `trips` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `trip_views_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `trips` (
@@ -875,11 +798,6 @@ CREATE TABLE `trips` (
   CONSTRAINT `trips_ibfk_2` FOREIGN KEY (`original_trip_id`) REFERENCES `trips` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_fcm_tokens`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_fcm_tokens` (
@@ -906,13 +824,8 @@ CREATE TABLE `user_fcm_tokens` (
   KEY `idx_user_fcm_active` (`user_id`,`is_active`),
   KEY `idx_platform_active` (`platform`,`is_active`),
   CONSTRAINT `fk_user_fcm_tokens_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stockage des tokens FCM pour les notifications push des utilisateurs';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_notification_preferences`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_notification_preferences` (
@@ -941,13 +854,8 @@ CREATE TABLE `user_notification_preferences` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`),
   CONSTRAINT `user_notification_preferences_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_ratings`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_ratings` (
@@ -967,11 +875,6 @@ CREATE TABLE `user_ratings` (
   CONSTRAINT `user_ratings_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_reliability_history`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_reliability_history` (
@@ -988,11 +891,6 @@ CREATE TABLE `user_reliability_history` (
   CONSTRAINT `user_reliability_history_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_stripe_accounts`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_stripe_accounts` (
@@ -1015,11 +913,6 @@ CREATE TABLE `user_stripe_accounts` (
   CONSTRAINT `user_stripe_accounts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Comptes Stripe Connect pour les utilisateurs transporteurs';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_tokens`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_tokens` (
@@ -1037,13 +930,8 @@ CREATE TABLE `user_tokens` (
   KEY `idx_type` (`type`),
   KEY `idx_expires_at` (`expires_at`),
   CONSTRAINT `user_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `users`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
@@ -1114,11 +1002,6 @@ CREATE TABLE `users` (
   KEY `idx_users_reliability` (`reliability_score`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Table des utilisateurs avec système de rôles';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `verification_codes`
---
-
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `verification_codes` (
@@ -1151,10 +1034,7 @@ CREATE TABLE `verification_codes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-11  0:51:10
+
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- =====================================================
--- End of KiloShare Database Schema
--- =====================================================
